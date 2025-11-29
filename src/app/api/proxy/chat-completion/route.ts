@@ -262,18 +262,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(errorResponse, { status: 502 });
     }
 
+    // Format response in OpenAI-compatible format for JanitorAI
     const successResponse = {
-      message: result.message,
-      usage: result.usage,
-      debug: result.debug,
+      id: `chatcmpl-${requestId}`,
+      object: 'chat.completion',
+      created: Math.floor(Date.now() / 1000),
+      model: connectionPreset.model,
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: 'assistant' as const,
+            content: result.message?.content || '',
+          },
+          finish_reason: 'stop',
+        },
+      ],
+      usage: result.usage
+        ? {
+            prompt_tokens: result.usage.promptTokens || 0,
+            completion_tokens: result.usage.completionTokens || 0,
+            total_tokens: result.usage.totalTokens || 0,
+          }
+        : undefined,
     };
 
     // Log the successful response
     await logResponse(requestId, {
       status: 200,
       response: successResponse,
-      message: result.message?.content,
-      usage: result.usage,
+      message: successResponse.choices[0]?.message?.content,
+      usage: successResponse.usage,
     }, Date.now() - startTime);
 
     // Record usage statistics

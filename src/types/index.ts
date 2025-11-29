@@ -387,6 +387,7 @@ export interface AppSettings {
   defaultConnectionId?: string;
   defaultPromptPresetId?: string;
   defaultSamplerPresetId?: string;
+  defaultChatCompletionPresetId?: string;
   showAdvancedOptions: boolean;
   logging: LoggingSettings;
 }

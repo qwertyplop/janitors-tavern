@@ -14,6 +14,7 @@ import {
   importSTPreset,
   exportToSTPreset,
   createDefaultChatCompletionPreset,
+  updateSettings,
 } from '@/lib/storage';
 import { ChatCompletionPreset, STChatCompletionPreset } from '@/types';
 import { downloadJson, readJsonFile, formatDate } from '@/lib/utils';
@@ -37,6 +38,13 @@ export default function PresetsPage() {
 
   const selectedPreset = presets.find(p => p.id === selectedId);
 
+  // Set selected preset as default
+  const selectAndSetDefault = (id: string) => {
+    setSelectedId(id);
+    // Also update settings to make this the default chat completion preset
+    updateSettings({ defaultChatCompletionPresetId: id });
+  };
+
   const handleCreate = () => {
     const newPreset = createDefaultChatCompletionPreset();
     const now = new Date().toISOString();
@@ -57,7 +65,7 @@ export default function PresetsPage() {
   const handleSave = (preset: ChatCompletionPreset) => {
     if (!preset.id) {
       const added = addChatCompletionPreset(preset);
-      setSelectedId(added.id);
+      selectAndSetDefault(added.id);
     } else {
       updateChatCompletionPreset(preset.id, preset);
     }
@@ -98,7 +106,7 @@ export default function PresetsPage() {
         if (data && typeof data === 'object' && 'prompts' in data) {
           const imported = importSTPreset(data, file.name);
           const added = addChatCompletionPreset(imported);
-          setSelectedId(added.id);
+          selectAndSetDefault(added.id);
         }
       }
       setPresets(getChatCompletionPresets());
@@ -118,7 +126,7 @@ export default function PresetsPage() {
     };
     const added = addChatCompletionPreset(duplicated);
     setPresets(getChatCompletionPresets());
-    setSelectedId(added.id);
+    selectAndSetDefault(added.id);
   };
 
   // If editing, show the editor full-screen
@@ -193,7 +201,7 @@ export default function PresetsPage() {
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
                       : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'
                   )}
-                  onClick={() => setSelectedId(preset.id)}
+                  onClick={() => selectAndSetDefault(preset.id)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">

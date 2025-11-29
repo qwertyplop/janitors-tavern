@@ -16,6 +16,10 @@ import {
 import { parseJanitorRequest, janitorDataToMacroContext, JanitorRequest } from '@/lib/janitor-parser';
 import { processMacros, MacroContext } from '@/lib/macros';
 import { buildMessages as buildPresetMessages, OutputMessage } from '@/lib/prompt-builder';
+import {
+  getDefaultConnectionPreset,
+  getDefaultChatCompletionPreset,
+} from '@/lib/server-storage';
 
 // ============================================
 // Request Types
@@ -118,8 +122,17 @@ export async function POST(request: NextRequest) {
   try {
     const body: ProxyRequest = await request.json();
 
-    const connectionPreset = body.connectionPreset;
-    const chatCompletionPreset = body.chatCompletionPreset;
+    // Use provided presets or load defaults from storage
+    let connectionPreset = body.connectionPreset;
+    let chatCompletionPreset = body.chatCompletionPreset;
+
+    // If no presets provided, load defaults from Blob storage
+    if (!connectionPreset) {
+      connectionPreset = await getDefaultConnectionPreset() || undefined;
+    }
+    if (!chatCompletionPreset) {
+      chatCompletionPreset = await getDefaultChatCompletionPreset() || undefined;
+    }
 
     // Log the raw incoming request
     await logRequest(requestId, {

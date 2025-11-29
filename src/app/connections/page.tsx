@@ -14,6 +14,7 @@ import {
   deleteConnectionPreset,
   saveConnectionPresets,
   generateId,
+  updateSettings,
 } from '@/lib/storage';
 import { ConnectionPreset } from '@/types';
 import { downloadJson, readJsonFile } from '@/lib/utils';
@@ -118,6 +119,13 @@ export default function ConnectionsPage() {
   }, []);
 
   const selectedConnection = connections.find(c => c.id === selectedId);
+
+  // Set selected connection as default
+  const selectAndSetDefault = (id: string) => {
+    setSelectedId(id);
+    // Also update settings to make this the default connection
+    updateSettings({ defaultConnectionId: id });
+  };
 
   // Reset connection state when selection changes (but not during initial auto-connect)
   useEffect(() => {
@@ -308,7 +316,7 @@ export default function ConnectionsPage() {
         providerType: 'openai-compatible',
         model: '',
       });
-      setSelectedId(newPreset.id);
+      selectAndSetDefault(newPreset.id);
     }
 
     setConnections(getConnectionPresets());
@@ -418,7 +426,7 @@ export default function ConnectionsPage() {
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
                       : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'
                   )}
-                  onClick={() => setSelectedId(connection.id)}
+                  onClick={() => selectAndSetDefault(connection.id)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">

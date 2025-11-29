@@ -40,6 +40,7 @@ export default function SettingsPage() {
   const [serverSettings, setServerSettings] = useState<ServerSettings | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [connections, setConnections] = useState<ConnectionPreset[]>([]);
+  const [chatCompletionPresets, setChatCompletionPresets] = useState<ChatCompletionPreset[]>([]);
   const [prompts, setPrompts] = useState<PromptPreset[]>([]);
   const [samplers, setSamplers] = useState<SamplerPreset[]>([]);
   const [saved, setSaved] = useState(false);
@@ -68,6 +69,7 @@ export default function SettingsPage() {
     setSettings(getSettings());
     setProfiles(getProfiles());
     setConnections(getConnectionPresets());
+    setChatCompletionPresets(getChatCompletionPresets());
     setPrompts(getPromptPresets());
     setSamplers(getSamplerPresets());
 
@@ -80,6 +82,7 @@ export default function SettingsPage() {
     if (initialized) {
       setSettings(getSettings());
       setConnections(getConnectionPresets());
+      setChatCompletionPresets(getChatCompletionPresets());
     }
   }, [initialized]);
 
@@ -589,6 +592,22 @@ export default function SettingsPage() {
                 </option>
               ))}
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="defaultChatCompletion">Default Chat Completion Preset</Label>
+            <Select
+              id="defaultChatCompletion"
+              value={settings.defaultChatCompletionPresetId || ''}
+              onChange={(e) => handleChange('defaultChatCompletionPresetId', e.target.value || undefined)}
+            >
+              <option value="">None (use first available)</option>
+              {chatCompletionPresets.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </Select>
+            <p className="text-xs text-zinc-500">Used when JanitorAI sends requests without a preset</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="defaultPrompt">Default Prompt Preset</Label>

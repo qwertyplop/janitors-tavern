@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -45,8 +44,17 @@ export default function SettingsPage() {
   const [samplers, setSamplers] = useState<SamplerPreset[]>([]);
   const [saved, setSaved] = useState(false);
   const [serverSaved, setServerSaved] = useState(false);
-  const [logs, setLogs] = useState<string>('');
-  const [logFileSize, setLogFileSize] = useState<number>(0);
+
+  // Cloud logs state
+  const [logEntries, setLogEntries] = useState<Array<{
+    id: string;
+    timestamp: string;
+    type: string;
+    requestId: string;
+    data: unknown;
+    durationMs?: number;
+  }>>([]);
+  const [logCount, setLogCount] = useState(0);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
   // Storage sync from context
@@ -170,6 +178,12 @@ export default function SettingsPage() {
       saveChatCompletionPresets(backup.presets);
       saveSettingsToStorage(backup.settings);
 
+      // Force sync to cloud before reloading (if blob is configured)
+      if (blobConfigured) {
+        setSyncFeedback({ type: 'success', message: 'Syncing imported data to cloud...' });
+        await forcePush();
+      }
+
       // Refresh page to load new data
       window.location.reload();
     } catch (error) {
@@ -218,15 +232,13 @@ export default function SettingsPage() {
   };
 
   const fetchLogs = async () => {
-    if (!serverSettings?.logging.logFilePath) return;
-
     setLoadingLogs(true);
     try {
-      const response = await fetch(`/api/logs?path=${encodeURIComponent(serverSettings.logging.logFilePath)}&max=100`);
+      const response = await fetch('/api/storage/logs');
       if (response.ok) {
         const data = await response.json();
-        setLogs(data.logs);
-        setLogFileSize(data.fileSize);
+        setLogEntries(data.logs || []);
+        setLogCount(data.count || 0);
       }
     } catch (error) {
       console.error('Failed to fetch logs:', error);
@@ -236,30 +248,22 @@ export default function SettingsPage() {
   };
 
   const clearLogs = async () => {
-    if (!serverSettings?.logging.logFilePath) return;
     if (!confirm('Are you sure you want to clear all logs?')) return;
 
     try {
-      const response = await fetch(`/api/logs?path=${encodeURIComponent(serverSettings.logging.logFilePath)}`, {
+      const response = await fetch('/api/storage/logs', {
         method: 'DELETE',
       });
 
       if (response.ok) {
-        setLogs('');
-        setLogFileSize(0);
+        setLogEntries([]);
+        setLogCount(0);
       }
     } catch (error) {
       console.error('Failed to clear logs:', error);
     }
   };
 
-  const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
 
   if (!settings) {
     return <div>Loading...</div>;
@@ -357,13 +361,13 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Log Viewer</span>
-            {logFileSize > 0 && (
+            {logCount > 0 && (
               <span className="text-sm font-normal text-zinc-500">
-                File size: {formatBytes(logFileSize)}
+                {logCount} entries
               </span>
             )}
           </CardTitle>
-          <CardDescription>View recent log entries</CardDescription>
+          <CardDescription>View recent request/response logs (stored in Vercel Blob)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2">
@@ -374,12 +378,49 @@ export default function SettingsPage() {
               Clear Logs
             </Button>
           </div>
-          <Textarea
-            value={logs || 'No logs yet. Click "Refresh Logs" to load.'}
-            readOnly
-            rows={15}
-            className="font-mono text-xs"
-          />
+          <div className="max-h-[500px] overflow-auto rounded-md border border-zinc-200 dark:border-zinc-700">
+            {logEntries.length === 0 ? (
+              <div className="p-4 text-center text-zinc-500">
+                No logs yet. Click &quot;Refresh Logs&quot; to load.
+              </div>
+            ) : (
+              <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
+                {logEntries.map((entry) => (
+                  <details key={entry.id} className="group">
+                    <summary className="flex cursor-pointer items-center gap-3 p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                      <Badge className={
+                        entry.type === 'error'
+                          ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                          : entry.type === 'request'
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                          : entry.type === 'response'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          : 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200'
+                      }>
+                        {entry.type}
+                      </Badge>
+                      <span className="font-mono text-xs text-zinc-500">
+                        {new Date(entry.timestamp).toLocaleString()}
+                      </span>
+                      <span className="font-mono text-xs text-zinc-400">
+                        [{entry.requestId}]
+                      </span>
+                      {entry.durationMs && (
+                        <span className="text-xs text-zinc-500">
+                          {entry.durationMs}ms
+                        </span>
+                      )}
+                    </summary>
+                    <div className="bg-zinc-50 p-3 dark:bg-zinc-900">
+                      <pre className="max-h-[300px] overflow-auto whitespace-pre-wrap break-all font-mono text-xs text-zinc-700 dark:text-zinc-300">
+                        {JSON.stringify(entry.data, null, 2)}
+                      </pre>
+                    </div>
+                  </details>
+                ))}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 

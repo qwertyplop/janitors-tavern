@@ -34,6 +34,19 @@ let initPromise: Promise<void> | null = null;
 let pushDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 const PUSH_DEBOUNCE_MS = 1000; // Wait 1 second after last change before pushing
 
+// Sync status change listeners
+type SyncListener = (syncing: boolean) => void;
+const syncListeners: Set<SyncListener> = new Set();
+
+export function addSyncListener(listener: SyncListener): () => void {
+  syncListeners.add(listener);
+  return () => syncListeners.delete(listener);
+}
+
+function notifySyncListeners(syncing: boolean): void {
+  syncListeners.forEach(listener => listener(syncing));
+}
+
 // ============================================
 // Check Blob Configuration
 // ============================================
@@ -219,6 +232,7 @@ export function triggerPush(): void {
     if (isSyncing) return;
 
     isSyncing = true;
+    notifySyncListeners(true);
     console.log('[Storage Sync] Auto-pushing changes to cloud...');
 
     try {
@@ -231,6 +245,7 @@ export function triggerPush(): void {
       }
     } finally {
       isSyncing = false;
+      notifySyncListeners(false);
     }
   }, PUSH_DEBOUNCE_MS);
 }

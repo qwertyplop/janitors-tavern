@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { initializeSync, getSyncStatus, forceSync, isBlobConfigured } from '@/lib/storage-sync';
+import { initializeSync, getSyncStatus, forceSync, isBlobConfigured, addSyncListener } from '@/lib/storage-sync';
 
 interface SyncContextValue {
   initialized: boolean;
@@ -28,6 +28,18 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       setBlobConfigured(status.configured);
       setLastSync(status.lastSync);
     });
+
+    // Listen for auto-push sync status changes
+    const unsubscribe = addSyncListener((isSyncing) => {
+      setSyncing(isSyncing);
+      if (!isSyncing) {
+        // Update lastSync when sync completes
+        const status = getSyncStatus();
+        setLastSync(status.lastSync);
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const forcePush = async (): Promise<boolean> => {

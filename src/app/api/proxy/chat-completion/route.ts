@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
 import { createProviderFromPreset } from '@/providers';
 import { ProviderRequest } from '@/providers/base';
 import {
   ConnectionPreset,
   ChatCompletionPreset,
-  LoggingSettings,
   ChatMessage,
 } from '@/types';
-import { logRequest, logResponse, logError, generateRequestId } from '@/lib/logger';
+import {
+  logRequest,
+  logProcessedRequest,
+  logResponse,
+  logError,
+  generateRequestId,
+} from '@/lib/vercel-logger';
 import { parseJanitorRequest, janitorDataToMacroContext, JanitorRequest } from '@/lib/janitor-parser';
 import { processMacros, MacroContext } from '@/lib/macros';
 import { buildMessages as buildPresetMessages, OutputMessage } from '@/lib/prompt-builder';
@@ -29,28 +32,6 @@ interface ProxyRequest {
   // Presets (loaded from client localStorage and sent with request)
   connectionPreset?: ConnectionPreset;
   chatCompletionPreset?: ChatCompletionPreset;
-}
-
-// ============================================
-// Server Settings
-// ============================================
-
-async function getLoggingConfig(): Promise<LoggingSettings> {
-  const defaultConfig: LoggingSettings = {
-    enabled: false,
-    logRequests: true,
-    logResponses: true,
-    logFilePath: 'logs/proxy.log',
-  };
-
-  try {
-    const settingsFile = path.join(process.cwd(), 'data', 'server-settings.json');
-    const content = await fs.readFile(settingsFile, 'utf-8');
-    const settings = JSON.parse(content);
-    return { ...defaultConfig, ...settings.logging };
-  } catch {
-    return defaultConfig;
-  }
 }
 
 // ============================================
@@ -133,32 +114,41 @@ function squashSystemMessages(messages: OutputMessage[]): OutputMessage[] {
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   const requestId = generateRequestId();
-  const loggingConfig = await getLoggingConfig();
 
   try {
     const body: ProxyRequest = await request.json();
 
+    const connectionPreset = body.connectionPreset;
+    const chatCompletionPreset = body.chatCompletionPreset;
+
     // Log the raw incoming request
-    await logRequest(loggingConfig, requestId, {
-      rawBody: body,
-      headers: Object.fromEntries(request.headers.entries()),
+    await logRequest(requestId, {
       url: request.url,
+      method: 'POST',
+      headers: Object.fromEntries(request.headers.entries()),
+      body: body,
+      incomingMessages: body.messages,
+      connectionPreset: connectionPreset ? {
+        name: connectionPreset.name,
+        baseUrl: connectionPreset.baseUrl,
+        model: connectionPreset.model,
+      } : undefined,
+      chatCompletionPreset: chatCompletionPreset ? {
+        name: chatCompletionPreset.name,
+      } : undefined,
     });
 
     // Validate required fields
     if (!body.messages || body.messages.length === 0) {
       const errorResponse = { error: 'Messages are required' };
-      await logResponse(loggingConfig, requestId, errorResponse, Date.now() - startTime);
+      await logError(requestId, 'Messages are required', 'validation');
       return NextResponse.json(errorResponse, { status: 400 });
     }
-
-    const connectionPreset = body.connectionPreset;
-    const chatCompletionPreset = body.chatCompletionPreset;
 
     // Connection preset is required
     if (!connectionPreset) {
       const errorResponse = { error: 'Connection preset is required' };
-      await logResponse(loggingConfig, requestId, errorResponse, Date.now() - startTime);
+      await logError(requestId, 'Connection preset is required', 'validation');
       return NextResponse.json(errorResponse, { status: 400 });
     }
 
@@ -172,7 +162,7 @@ export async function POST(request: NextRequest) {
 
     if (!apiKey) {
       const errorResponse = { error: 'API key not configured' };
-      await logResponse(loggingConfig, requestId, errorResponse, Date.now() - startTime);
+      await logError(requestId, 'API key not configured', 'validation');
       return NextResponse.json(errorResponse, { status: 400 });
     }
 
@@ -239,22 +229,22 @@ export async function POST(request: NextRequest) {
     };
 
     // Log the processed request being sent to provider
-    await logRequest(loggingConfig, requestId, {
-      type: 'outgoing_to_provider',
-      provider: connectionPreset.providerType,
-      baseUrl: connectionPreset.baseUrl,
+    await logProcessedRequest(requestId, {
+      processedMessages,
+      samplerSettings: samplerParams,
+      providerUrl: connectionPreset.baseUrl,
       model: connectionPreset.model,
-      messageCount: processedMessages.length,
-      samplerParams,
-      squashEnabled: chatCompletionPreset?.providerSettings?.squashSystemMessages ?? false,
     });
 
     const result = await provider.sendChatCompletion(providerRequest);
 
     if (result.error) {
       const errorResponse = { error: result.error };
-      await logError(loggingConfig, requestId, result.error);
-      await logResponse(loggingConfig, requestId, errorResponse, Date.now() - startTime);
+      await logError(requestId, result.error, 'provider');
+      await logResponse(requestId, {
+        status: 502,
+        response: errorResponse,
+      }, Date.now() - startTime);
       return NextResponse.json(errorResponse, { status: 502 });
     }
 
@@ -265,22 +255,27 @@ export async function POST(request: NextRequest) {
     };
 
     // Log the successful response
-    await logResponse(loggingConfig, requestId, {
-      rawResponse: successResponse,
-      providerResponse: result,
+    await logResponse(requestId, {
+      status: 200,
+      response: successResponse,
+      message: result.message?.content,
+      usage: result.usage,
     }, Date.now() - startTime);
 
     return NextResponse.json(successResponse);
   } catch (error) {
     console.error('Proxy error:', error);
 
-    await logError(loggingConfig, requestId, error);
+    await logError(requestId, error, 'proxy');
 
     const errorResponse = {
       error: `Proxy error: ${error instanceof Error ? error.message : 'Unknown error'}`,
     };
 
-    await logResponse(loggingConfig, requestId, errorResponse, Date.now() - startTime);
+    await logResponse(requestId, {
+      status: 500,
+      response: errorResponse,
+    }, Date.now() - startTime);
 
     return NextResponse.json(errorResponse, { status: 500 });
   }

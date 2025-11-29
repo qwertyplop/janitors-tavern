@@ -1,0 +1,680 @@
+'use client';
+
+import { useState } from 'react';
+import { ChatCompletionPreset, STPromptBlock, STPromptOrder, STSamplerSettings } from '@/types';
+import { PromptBlockList } from './PromptBlockList';
+import { SamplerSettingsPanel } from './SamplerSettingsPanel';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
+import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+
+interface ChatCompletionPresetEditorProps {
+  preset: ChatCompletionPreset;
+  onChange: (preset: ChatCompletionPreset) => void;
+  onSave: (preset: ChatCompletionPreset) => void;
+  onCancel: () => void;
+  onExport?: (preset: ChatCompletionPreset) => void;
+}
+
+type TabId = 'prompts' | 'sampler' | 'special' | 'utility' | 'advanced';
+
+interface Tab {
+  id: TabId;
+  label: string;
+}
+
+const TABS: Tab[] = [
+  { id: 'prompts', label: 'Prompt Blocks' },
+  { id: 'sampler', label: 'Sampler Settings' },
+  { id: 'special', label: 'Special Prompts' },
+  { id: 'utility', label: 'Utility Prompts' },
+  { id: 'advanced', label: 'Advanced' },
+];
+
+const NAMES_BEHAVIOR_OPTIONS = [
+  { value: 0, label: 'None', description: 'No special handling for character names' },
+  { value: 1, label: 'Prefix messages', description: 'Add character name prefix to messages' },
+  { value: 2, label: 'Include in system', description: 'Include names in system prompt' },
+  { value: 3, label: 'Both', description: 'Prefix and system prompt' },
+];
+
+const REASONING_EFFORT_OPTIONS = [
+  { value: 'auto', label: 'Auto', description: 'Let the model decide' },
+  { value: 'min', label: 'Minimum', description: 'Minimal reasoning (1024 tokens)' },
+  { value: 'low', label: 'Low', description: '15% of max response' },
+  { value: 'medium', label: 'Medium', description: '25% of max response' },
+  { value: 'high', label: 'High', description: '50% of max response' },
+  { value: 'max', label: 'Maximum', description: '95% of max response' },
+];
+
+const CONTINUE_POSTFIX_OPTIONS = [
+  { value: '', label: 'None', description: 'No postfix added' },
+  { value: ' ', label: 'Space', description: 'Add a space before continued text' },
+  { value: '\n', label: 'Newline', description: 'Add a newline before continued text' },
+];
+
+export function ChatCompletionPresetEditor({
+  preset,
+  onChange,
+  onSave,
+  onCancel,
+  onExport,
+}: ChatCompletionPresetEditorProps) {
+  const [activeTab, setActiveTab] = useState<TabId>('prompts');
+
+  const handleBlocksChange = (
+    promptBlocks: STPromptBlock[],
+    promptOrder: STPromptOrder[]
+  ) => {
+    onChange({ ...preset, promptBlocks, promptOrder });
+  };
+
+  const handleSamplerChange = (sampler: STSamplerSettings) => {
+    onChange({ ...preset, sampler });
+  };
+
+  const handleSpecialPromptsChange = (
+    key: keyof ChatCompletionPreset['specialPrompts'],
+    value: string
+  ) => {
+    onChange({
+      ...preset,
+      specialPrompts: { ...preset.specialPrompts, [key]: value },
+    });
+  };
+
+  const handleFormatStringsChange = (
+    key: keyof ChatCompletionPreset['formatStrings'],
+    value: string
+  ) => {
+    onChange({
+      ...preset,
+      formatStrings: { ...preset.formatStrings, [key]: value },
+    });
+  };
+
+  const handleProviderSettingsChange = (
+    key: keyof ChatCompletionPreset['providerSettings'],
+    value: boolean
+  ) => {
+    onChange({
+      ...preset,
+      providerSettings: { ...preset.providerSettings, [key]: value },
+    });
+  };
+
+  const handleAdvancedSettingsChange = <K extends keyof ChatCompletionPreset['advancedSettings']>(
+    key: K,
+    value: ChatCompletionPreset['advancedSettings'][K]
+  ) => {
+    onChange({
+      ...preset,
+      advancedSettings: { ...preset.advancedSettings, [key]: value },
+    });
+  };
+
+  const handleContinueSettingsChange = <K extends keyof ChatCompletionPreset['continueSettings']>(
+    key: K,
+    value: ChatCompletionPreset['continueSettings'][K]
+  ) => {
+    onChange({
+      ...preset,
+      continueSettings: { ...preset.continueSettings, [key]: value },
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex-1 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="name">Preset Name</Label>
+              <Input
+                id="name"
+                value={preset.name}
+                onChange={(e) => onChange({ ...preset, name: e.target.value })}
+                placeholder="Preset name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="tags">Tags (comma-separated)</Label>
+              <Input
+                id="tags"
+                value={preset.tags.join(', ')}
+                onChange={(e) =>
+                  onChange({
+                    ...preset,
+                    tags: e.target.value.split(',').map((t) => t.trim()).filter(Boolean),
+                  })
+                }
+                placeholder="tag1, tag2, ..."
+              />
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              value={preset.description || ''}
+              onChange={(e) => onChange({ ...preset, description: e.target.value })}
+              placeholder="Optional description..."
+              className="h-20"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Action buttons */}
+      <div className="flex items-center justify-between border-b pb-4">
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          {onExport && (
+            <Button variant="outline" onClick={() => onExport(preset)}>
+              Export to ST Format
+            </Button>
+          )}
+        </div>
+        <Button onClick={() => onSave(preset)}>Save Preset</Button>
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b">
+        <nav className="flex gap-4">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                'pb-3 px-1 border-b-2 transition-colors',
+                activeTab === tab.id
+                  ? 'border-blue-600 text-blue-600 font-medium'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      <div className="min-h-[500px]">
+        {activeTab === 'prompts' && (
+          <PromptBlockList
+            blocks={preset.promptBlocks}
+            promptOrder={preset.promptOrder}
+            onChange={handleBlocksChange}
+          />
+        )}
+
+        {activeTab === 'sampler' && (
+          <SamplerSettingsPanel
+            settings={preset.sampler}
+            onChange={handleSamplerChange}
+          />
+        )}
+
+        {activeTab === 'special' && (
+          <div className="space-y-6">
+            <Card className="p-4">
+              <h3 className="text-lg font-semibold mb-4">Chat Transition Prompts</h3>
+              <p className="text-sm text-zinc-500 mb-4">
+                These prompts are sent before the chat history to inform the model where background information ends and chat history begins.
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="newChat">New Chat Prompt</Label>
+                  <Textarea
+                    id="newChat"
+                    value={preset.specialPrompts.newChat}
+                    onChange={(e) => handleSpecialPromptsChange('newChat', e.target.value)}
+                    className="h-20 font-mono text-sm"
+                    placeholder="Used for individual chats..."
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">Used for individual chats</p>
+                </div>
+                <div>
+                  <Label htmlFor="newGroupChat">New Group Chat Prompt</Label>
+                  <Textarea
+                    id="newGroupChat"
+                    value={preset.specialPrompts.newGroupChat}
+                    onChange={(e) => handleSpecialPromptsChange('newGroupChat', e.target.value)}
+                    className="h-20 font-mono text-sm"
+                    placeholder="Used for group chats..."
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">Used for group chats</p>
+                </div>
+                <div>
+                  <Label htmlFor="newExampleChat">New Example Chat Prompt</Label>
+                  <Textarea
+                    id="newExampleChat"
+                    value={preset.specialPrompts.newExampleChat}
+                    onChange={(e) => handleSpecialPromptsChange('newExampleChat', e.target.value)}
+                    className="h-20 font-mono text-sm"
+                    placeholder="Used for example dialogue blocks..."
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">Used for example dialogue blocks</p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <h3 className="text-lg font-semibold mb-4">Generation Control Prompts</h3>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="continueNudge">Continue Nudge Prompt</Label>
+                  <Textarea
+                    id="continueNudge"
+                    value={preset.specialPrompts.continueNudge}
+                    onChange={(e) => handleSpecialPromptsChange('continueNudge', e.target.value)}
+                    className="h-20 font-mono text-sm"
+                    placeholder="Sent when Continue is triggered..."
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Sent at the end of the prompt to instruct the model on what to do when Continue is triggered
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="groupNudge">Group Nudge Prompt</Label>
+                  <Textarea
+                    id="groupNudge"
+                    value={preset.specialPrompts.groupNudge}
+                    onChange={(e) => handleSpecialPromptsChange('groupNudge', e.target.value)}
+                    className="h-20 font-mono text-sm"
+                    placeholder="Used in group chats to force a reply from a specific character..."
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Used in group chats to force a reply from a specific character. Leave empty to disable.
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="impersonation">Impersonation Prompt</Label>
+                  <Textarea
+                    id="impersonation"
+                    value={preset.specialPrompts.impersonation}
+                    onChange={(e) => handleSpecialPromptsChange('impersonation', e.target.value)}
+                    className="h-20 font-mono text-sm"
+                    placeholder="Sent when Impersonate is triggered..."
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Sent when the Impersonate button is pressed
+                  </p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <h3 className="text-lg font-semibold mb-4">Continue Settings</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="continuePostfix">Continue Postfix</Label>
+                  <Select
+                    id="continuePostfix"
+                    value={preset.continueSettings.postfix}
+                    onChange={(e) => handleContinueSettingsChange('postfix', e.target.value)}
+                  >
+                    {CONTINUE_POSTFIX_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Prepended to continued message responses
+                  </p>
+                </div>
+                <div className="flex items-center">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={preset.continueSettings.prefill}
+                      onChange={(e) => handleContinueSettingsChange('prefill', e.target.checked)}
+                      className="w-4 h-4 rounded"
+                    />
+                    <div>
+                      <span className="text-sm font-medium">Continue Prefill</span>
+                      <p className="text-xs text-zinc-500">
+                        Send Continue Nudge as Assistant role instead of System
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === 'utility' && (
+          <div className="space-y-6">
+            <Card className="p-4">
+              <h3 className="text-lg font-semibold mb-4">Format Templates</h3>
+              <p className="text-sm text-zinc-500 mb-4">
+                Templates used to wrap information from World Info and Character Cards. If not set, information is sent as-is.
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="worldInfo">World Info Format</Label>
+                  <Input
+                    id="worldInfo"
+                    value={preset.formatStrings.worldInfo}
+                    onChange={(e) => handleFormatStringsChange('worldInfo', e.target.value)}
+                    className="font-mono"
+                    placeholder="{0}"
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Use {'{0}'} as the placeholder for World Info content
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="scenario">Scenario Format</Label>
+                  <Input
+                    id="scenario"
+                    value={preset.formatStrings.scenario}
+                    onChange={(e) => handleFormatStringsChange('scenario', e.target.value)}
+                    className="font-mono"
+                    placeholder="{{scenario}}"
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Use {'{{scenario}}'} as the placeholder
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="personality">Personality Format</Label>
+                  <Input
+                    id="personality"
+                    value={preset.formatStrings.personality}
+                    onChange={(e) => handleFormatStringsChange('personality', e.target.value)}
+                    className="font-mono"
+                    placeholder="[{{char}}'s personality: {{personality}}]"
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Use {'{{personality}}'} as the placeholder
+                  </p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <h3 className="text-lg font-semibold mb-4">Message Handling</h3>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="sendIfEmpty">Replace Empty Message</Label>
+                  <Input
+                    id="sendIfEmpty"
+                    value={preset.advancedSettings.sendIfEmpty}
+                    onChange={(e) => handleAdvancedSettingsChange('sendIfEmpty', e.target.value)}
+                    placeholder="Message to send when text box is empty..."
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Sends this message instead of a blank when the text box is empty
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="namesBehavior">Character Names Behavior</Label>
+                  <Select
+                    id="namesBehavior"
+                    value={String(preset.advancedSettings.namesBehavior)}
+                    onChange={(e) => handleAdvancedSettingsChange('namesBehavior', parseInt(e.target.value))}
+                  >
+                    {NAMES_BEHAVIOR_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Strategy for instructing the model on how to associate messages with characters
+                  </p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <h3 className="text-lg font-semibold mb-4">Assistant Settings</h3>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="assistantPrefill">Assistant Prefill</Label>
+                  <Textarea
+                    id="assistantPrefill"
+                    value={preset.assistantPrefill}
+                    onChange={(e) => onChange({ ...preset, assistantPrefill: e.target.value })}
+                    className="h-20 font-mono text-sm"
+                    placeholder="Text to prefill the assistant's response..."
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Pre-fill the beginning of the assistant&apos;s response
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="assistantImpersonation">Assistant Impersonation</Label>
+                  <Textarea
+                    id="assistantImpersonation"
+                    value={preset.assistantImpersonation}
+                    onChange={(e) => onChange({ ...preset, assistantImpersonation: e.target.value })}
+                    className="h-20 font-mono text-sm"
+                    placeholder="Text for impersonation mode..."
+                  />
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === 'advanced' && (
+          <div className="space-y-6">
+            <Card className="p-4">
+              <h3 className="text-lg font-semibold mb-4">Provider Settings</h3>
+              <p className="text-sm text-zinc-500 mb-4">
+                Settings specific to different API providers
+              </p>
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                  <input
+                    type="checkbox"
+                    checked={preset.providerSettings.claudeUseSysprompt}
+                    onChange={(e) => handleProviderSettingsChange('claudeUseSysprompt', e.target.checked)}
+                    className="w-4 h-4 rounded"
+                  />
+                  <div>
+                    <span className="text-sm font-medium">Use Claude System Prompt</span>
+                    <p className="text-xs text-zinc-500">Merge system messages into a separate system instruction field (Claude)</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                  <input
+                    type="checkbox"
+                    checked={preset.providerSettings.makersuiteUseSysprompt}
+                    onChange={(e) => handleProviderSettingsChange('makersuiteUseSysprompt', e.target.checked)}
+                    className="w-4 h-4 rounded"
+                  />
+                  <div>
+                    <span className="text-sm font-medium">Use MakerSuite System Prompt</span>
+                    <p className="text-xs text-zinc-500">Merge system messages into a separate system instruction field (Gemini)</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                  <input
+                    type="checkbox"
+                    checked={preset.providerSettings.squashSystemMessages}
+                    onChange={(e) => handleProviderSettingsChange('squashSystemMessages', e.target.checked)}
+                    className="w-4 h-4 rounded"
+                  />
+                  <div>
+                    <span className="text-sm font-medium">Squash System Messages</span>
+                    <p className="text-xs text-zinc-500">Combine consecutive System messages into a single message (deprecated)</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                  <input
+                    type="checkbox"
+                    checked={preset.providerSettings.streamOpenai}
+                    onChange={(e) => handleProviderSettingsChange('streamOpenai', e.target.checked)}
+                    className="w-4 h-4 rounded"
+                  />
+                  <div>
+                    <span className="text-sm font-medium">Stream OpenAI Responses</span>
+                    <p className="text-xs text-zinc-500">Enable streaming for OpenAI-compatible endpoints</p>
+                  </div>
+                </label>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <h3 className="text-lg font-semibold mb-4">Reasoning Settings</h3>
+              <p className="text-sm text-zinc-500 mb-4">
+                Settings for models that support reasoning/thinking modes
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="reasoningEffort">Reasoning Effort</Label>
+                  <Select
+                    id="reasoningEffort"
+                    value={preset.advancedSettings.reasoningEffort}
+                    onChange={(e) => handleAdvancedSettingsChange('reasoningEffort', e.target.value)}
+                  >
+                    {REASONING_EFFORT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    {REASONING_EFFORT_OPTIONS.find((o) => o.value === preset.advancedSettings.reasoningEffort)?.description}
+                  </p>
+                </div>
+                <div className="flex items-center">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={preset.advancedSettings.showThoughts}
+                      onChange={(e) => handleAdvancedSettingsChange('showThoughts', e.target.checked)}
+                      className="w-4 h-4 rounded"
+                    />
+                    <div>
+                      <span className="text-sm font-medium">Show Thoughts</span>
+                      <p className="text-xs text-zinc-500">Display model reasoning in responses</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <h3 className="text-lg font-semibold mb-4">Media Settings</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                  <input
+                    type="checkbox"
+                    checked={preset.mediaSettings.imageInlining}
+                    onChange={(e) =>
+                      onChange({
+                        ...preset,
+                        mediaSettings: { ...preset.mediaSettings, imageInlining: e.target.checked },
+                      })
+                    }
+                    className="w-4 h-4 rounded"
+                  />
+                  <div>
+                    <span className="text-sm font-medium">Send Inline Images</span>
+                    <p className="text-xs text-zinc-500">Enable multimodal image processing</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                  <input
+                    type="checkbox"
+                    checked={preset.mediaSettings.videoInlining}
+                    onChange={(e) =>
+                      onChange({
+                        ...preset,
+                        mediaSettings: { ...preset.mediaSettings, videoInlining: e.target.checked },
+                      })
+                    }
+                    className="w-4 h-4 rounded"
+                  />
+                  <div>
+                    <span className="text-sm font-medium">Send Inline Videos</span>
+                    <p className="text-xs text-zinc-500">Enable multimodal video processing</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                  <input
+                    type="checkbox"
+                    checked={preset.advancedSettings.requestImages}
+                    onChange={(e) => handleAdvancedSettingsChange('requestImages', e.target.checked)}
+                    className="w-4 h-4 rounded"
+                  />
+                  <div>
+                    <span className="text-sm font-medium">Request Inline Images</span>
+                    <p className="text-xs text-zinc-500">Allow model to return image attachments</p>
+                  </div>
+                </label>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <h3 className="text-lg font-semibold mb-4">Advanced Features</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                  <input
+                    type="checkbox"
+                    checked={preset.advancedSettings.functionCalling}
+                    onChange={(e) => handleAdvancedSettingsChange('functionCalling', e.target.checked)}
+                    className="w-4 h-4 rounded"
+                  />
+                  <div>
+                    <span className="text-sm font-medium">Enable Function Calling</span>
+                    <p className="text-xs text-zinc-500">Allow model to call functions/tools</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                  <input
+                    type="checkbox"
+                    checked={preset.advancedSettings.enableWebSearch}
+                    onChange={(e) => handleAdvancedSettingsChange('enableWebSearch', e.target.checked)}
+                    className="w-4 h-4 rounded"
+                  />
+                  <div>
+                    <span className="text-sm font-medium">Enable Web Search</span>
+                    <p className="text-xs text-zinc-500">Enrich prompts with search results</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                  <input
+                    type="checkbox"
+                    checked={preset.advancedSettings.wrapInQuotes}
+                    onChange={(e) => handleAdvancedSettingsChange('wrapInQuotes', e.target.checked)}
+                    className="w-4 h-4 rounded"
+                  />
+                  <div>
+                    <span className="text-sm font-medium">Wrap in Quotes</span>
+                    <p className="text-xs text-zinc-500">Wrap user messages in hidden quotation marks (deprecated)</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                  <input
+                    type="checkbox"
+                    checked={preset.advancedSettings.maxContextUnlocked}
+                    onChange={(e) => handleAdvancedSettingsChange('maxContextUnlocked', e.target.checked)}
+                    className="w-4 h-4 rounded"
+                  />
+                  <div>
+                    <span className="text-sm font-medium">Unlock Max Context</span>
+                    <p className="text-xs text-zinc-500">Allow higher context limits</p>
+                  </div>
+                </label>
+              </div>
+            </Card>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

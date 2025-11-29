@@ -10,6 +10,7 @@ interface OpenAIMessage {
 interface OpenAIRequest {
   model: string;
   messages: OpenAIMessage[];
+  stream: boolean;
   temperature?: number;
   top_p?: number;
   max_tokens?: number;
@@ -38,21 +39,61 @@ interface OpenAIResponse {
   };
 }
 
+// Streaming chunk interface
+interface OpenAIStreamChunk {
+  id: string;
+  object: string;
+  created: number;
+  model: string;
+  choices: {
+    index: number;
+    delta: {
+      role?: 'assistant';
+      content?: string;
+    };
+    finish_reason: string | null;
+  }[];
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+export interface StreamingResult {
+  stream: ReadableStream<Uint8Array>;
+  model: string;
+  requestId: string;
+}
+
 export class OpenAICompatibleProvider extends ChatProvider {
   constructor(config: ProviderConfig) {
     super(config);
   }
 
   protected getHeaders(): Record<string, string> {
+    // Clean headers - don't pass through any identifying info from JanitorAI
     return {
-      ...super.getHeaders(),
-      Authorization: `Bearer ${this.config.apiKey}`,
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${this.config.apiKey}`,
+      'Accept': 'text/event-stream',
+      'User-Agent': 'JanitorsTavern/1.0',
+      // Add custom headers from config (user can override)
+      ...this.config.extraHeaders,
     };
   }
 
-  async sendChatCompletion(request: ProviderRequest): Promise<InternalChatResponse> {
-    const startTime = Date.now();
+  protected getNonStreamHeaders(): Record<string, string> {
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${this.config.apiKey}`,
+      'Accept': 'application/json',
+      'User-Agent': 'JanitorsTavern/1.0',
+      ...this.config.extraHeaders,
+    };
+  }
 
+  private buildOpenAIRequest(request: ProviderRequest, stream: boolean): OpenAIRequest {
     const openaiRequest: OpenAIRequest = {
       model: request.model || this.config.model,
       messages: request.messages.map((m) => ({
@@ -60,6 +101,7 @@ export class OpenAICompatibleProvider extends ChatProvider {
         content: m.content,
         ...(m.name && { name: m.name }),
       })),
+      stream,
     };
 
     // Apply sampler parameters
@@ -82,10 +124,17 @@ export class OpenAICompatibleProvider extends ChatProvider {
       openaiRequest.stop = request.parameters.stop;
     }
 
+    return openaiRequest;
+  }
+
+  async sendChatCompletion(request: ProviderRequest): Promise<InternalChatResponse> {
+    const startTime = Date.now();
+    const openaiRequest = this.buildOpenAIRequest(request, false);
+
     try {
       const response = await fetch(this.buildUrl('/chat/completions'), {
         method: 'POST',
-        headers: this.getHeaders(),
+        headers: this.getNonStreamHeaders(),
         body: JSON.stringify(openaiRequest),
       });
 
@@ -128,11 +177,111 @@ export class OpenAICompatibleProvider extends ChatProvider {
     }
   }
 
+  /**
+   * Send a streaming chat completion request
+   * Returns a ReadableStream that can be piped directly to the response
+   */
+  async sendChatCompletionStream(
+    request: ProviderRequest,
+    requestId: string,
+    onComplete?: (content: string, usage?: { promptTokens: number; completionTokens: number; totalTokens: number }) => void
+  ): Promise<{ stream: ReadableStream<Uint8Array>; error?: string }> {
+    const openaiRequest = this.buildOpenAIRequest(request, true);
+    const model = request.model || this.config.model;
+
+    try {
+      const response = await fetch(this.buildUrl('/chat/completions'), {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(openaiRequest),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          stream: new ReadableStream(),
+          error: `Provider error: ${response.status} - ${errorText}`,
+        };
+      }
+
+      if (!response.body) {
+        return {
+          stream: new ReadableStream(),
+          error: 'No response body',
+        };
+      }
+
+      // Track content for onComplete callback
+      let fullContent = '';
+      let usage: { promptTokens: number; completionTokens: number; totalTokens: number } | undefined;
+
+      const encoder = new TextEncoder();
+      const decoder = new TextDecoder();
+
+      // Transform the stream to ensure proper SSE format
+      const transformStream = new TransformStream<Uint8Array, Uint8Array>({
+        transform: (chunk, controller) => {
+          const text = decoder.decode(chunk, { stream: true });
+
+          // Parse SSE events and extract content
+          const lines = text.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') {
+                // Call onComplete with accumulated content
+                if (onComplete) {
+                  onComplete(fullContent, usage);
+                }
+              } else {
+                try {
+                  const parsed: OpenAIStreamChunk = JSON.parse(data);
+                  const content = parsed.choices[0]?.delta?.content;
+                  if (content) {
+                    fullContent += content;
+                  }
+                  // Some providers send usage in the final chunk
+                  if (parsed.usage) {
+                    usage = {
+                      promptTokens: parsed.usage.prompt_tokens,
+                      completionTokens: parsed.usage.completion_tokens,
+                      totalTokens: parsed.usage.total_tokens,
+                    };
+                  }
+                } catch {
+                  // Ignore parse errors for partial chunks
+                }
+              }
+            }
+          }
+
+          // Pass through the original chunk
+          controller.enqueue(chunk);
+        },
+        flush: (controller) => {
+          // Ensure onComplete is called even if [DONE] wasn't received
+          if (onComplete && fullContent) {
+            onComplete(fullContent, usage);
+          }
+        },
+      });
+
+      const transformedStream = response.body.pipeThrough(transformStream);
+
+      return { stream: transformedStream };
+    } catch (error) {
+      return {
+        stream: new ReadableStream(),
+        error: `Request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      };
+    }
+  }
+
   async testConnection(): Promise<{ success: boolean; message: string }> {
     try {
       const response = await fetch(this.buildUrl('/models'), {
         method: 'GET',
-        headers: this.getHeaders(),
+        headers: this.getNonStreamHeaders(),
       });
 
       if (response.ok) {

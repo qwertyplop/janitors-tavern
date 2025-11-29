@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createProviderFromPreset } from '@/providers';
 import { ProviderRequest } from '@/providers/base';
+import { OpenAICompatibleProvider } from '@/providers/openai-compatible';
 import {
   ConnectionPreset,
   ChatCompletionPreset,
@@ -135,11 +136,22 @@ export async function POST(request: NextRequest) {
       chatCompletionPreset = await getDefaultChatCompletionPreset() || undefined;
     }
 
+    // Filter out identifying headers for logging (privacy)
+    const safeHeaders: Record<string, string> = {};
+    const sensitiveHeaderPrefixes = ['cf-', 'x-forwarded', 'x-real', 'origin', 'referer', 'sec-'];
+    for (const [key, value] of request.headers.entries()) {
+      const lowerKey = key.toLowerCase();
+      const isSensitive = sensitiveHeaderPrefixes.some(prefix => lowerKey.startsWith(prefix));
+      if (!isSensitive) {
+        safeHeaders[key] = value;
+      }
+    }
+
     // Log the raw incoming request
     await logRequest(requestId, {
       url: request.url,
       method: 'POST',
-      headers: Object.fromEntries(request.headers.entries()),
+      headers: safeHeaders,
       body: body,
       incomingMessages: body.messages,
       connectionPreset: connectionPreset ? {
@@ -248,8 +260,72 @@ export async function POST(request: NextRequest) {
       samplerSettings: samplerParams,
       providerUrl: connectionPreset.baseUrl,
       model: connectionPreset.model,
+      streaming: body.stream === true,
     });
 
+    // Calculate input tokens once for stats (used in both streaming and non-streaming)
+    const inputTokensEstimate = calculateMessageTokens(processedMessages);
+
+    // Handle streaming requests
+    if (body.stream === true && provider instanceof OpenAICompatibleProvider) {
+      const streamResult = await provider.sendChatCompletionStream(
+        providerRequest,
+        requestId,
+        async (content, usage) => {
+          // onComplete callback - record stats when stream finishes
+          try {
+            let inputTokens: number;
+            let outputTokens: number;
+
+            if (usage?.promptTokens && usage?.completionTokens) {
+              inputTokens = usage.promptTokens;
+              outputTokens = usage.completionTokens;
+            } else {
+              inputTokens = inputTokensEstimate;
+              outputTokens = content ? estimateTokens(content) : 0;
+            }
+
+            await recordUsage(inputTokens, outputTokens);
+            await logResponse(requestId, {
+              status: 200,
+              response: { streaming: true, contentLength: content.length },
+              message: content.substring(0, 200) + (content.length > 200 ? '...' : ''),
+              usage: usage ? {
+                prompt_tokens: usage.promptTokens,
+                completion_tokens: usage.completionTokens,
+                total_tokens: usage.totalTokens,
+              } : undefined,
+            }, Date.now() - startTime);
+          } catch (statsError) {
+            console.error('Failed to record streaming usage stats:', statsError);
+          }
+        }
+      );
+
+      if (streamResult.error) {
+        const errorResponse = { error: streamResult.error };
+        await logError(requestId, streamResult.error, 'provider');
+        await logResponse(requestId, {
+          status: 502,
+          response: errorResponse,
+        }, Date.now() - startTime);
+        return NextResponse.json(errorResponse, { status: 502 });
+      }
+
+      // Return SSE stream response
+      return new Response(streamResult.stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        },
+      });
+    }
+
+    // Non-streaming request
     const result = await provider.sendChatCompletion(providerRequest);
 
     if (result.error) {
@@ -306,7 +382,7 @@ export async function POST(request: NextRequest) {
         outputTokens = result.usage.completionTokens;
       } else {
         // Estimate tokens from messages
-        inputTokens = calculateMessageTokens(processedMessages);
+        inputTokens = inputTokensEstimate;
         outputTokens = result.message?.content ? estimateTokens(result.message.content) : 0;
       }
 

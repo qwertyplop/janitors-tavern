@@ -187,6 +187,7 @@ export async function logProcessedRequest(
     samplerSettings?: unknown;
     providerUrl: string;
     model: string;
+    streaming?: boolean;
   }
 ): Promise<void> {
   // Log to console
@@ -194,6 +195,7 @@ export async function logProcessedRequest(
     providerUrl: data.providerUrl,
     model: data.model,
     messageCount: data.processedMessages.length,
+    streaming: data.streaming ?? false,
   });
 
   // Detailed processed messages

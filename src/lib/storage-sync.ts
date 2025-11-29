@@ -142,6 +142,7 @@ function setLocalData(data: Partial<StorageData>): void {
 function getDefaultSettings(): AppSettings {
   return {
     theme: 'system',
+    language: 'en',
     showAdvancedOptions: false,
     logging: {
       enabled: false,

@@ -36,6 +36,7 @@ export interface StorageProvider {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
+  language: 'en',
   showAdvancedOptions: false,
   logging: {
     enabled: false,

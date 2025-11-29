@@ -37,6 +37,7 @@ async function fetchBlobJson<T>(key: string, defaultValue: T): Promise<T> {
 export async function getServerSettings(): Promise<AppSettings> {
   const defaultSettings: AppSettings = {
     theme: 'system',
+    language: 'en',
     showAdvancedOptions: false,
     logging: {
       enabled: false,

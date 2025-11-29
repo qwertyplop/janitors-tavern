@@ -381,8 +381,11 @@ export interface LoggingSettings {
   logFilePath: string;
 }
 
+export type Language = 'en' | 'ru';
+
 export interface AppSettings {
   theme: ThemeMode;
+  language: Language;
   defaultProfileId?: string;
   defaultConnectionId?: string;
   defaultPromptPresetId?: string;

@@ -19,6 +19,7 @@ import {
 import { ChatCompletionPreset, STChatCompletionPreset } from '@/types';
 import { downloadJson, readJsonFile, formatDate } from '@/lib/utils';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/components/providers/I18nProvider';
 
 export default function PresetsPage() {
   const [presets, setPresets] = useState<ChatCompletionPreset[]>([]);
@@ -27,6 +28,7 @@ export default function PresetsPage() {
   const [editingPreset, setEditingPreset] = useState<ChatCompletionPreset | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { t } = useI18n();
 
   useEffect(() => {
     const loaded = getChatCompletionPresets();
@@ -150,16 +152,16 @@ export default function PresetsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-            Chat Completion Presets
+            {t.presets.title}
           </h1>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Manage SillyTavern-compatible prompt and sampler presets
+            {t.presets.subtitle}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <input
             ref={fileInputRef}
             type="file"
@@ -169,25 +171,25 @@ export default function PresetsPage() {
             className="hidden"
           />
           <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-            Import ST Preset
+            {t.presets.importSTPreset}
           </Button>
           <Button variant="outline" onClick={handleExportAll} disabled={presets.length === 0}>
-            Export All
+            {t.common.exportAll}
           </Button>
-          <Button onClick={handleCreate}>New Preset</Button>
+          <Button onClick={handleCreate}>{t.presets.newPreset}</Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Panel - Preset List */}
-        <div className="col-span-1 space-y-2">
+        <div className="lg:col-span-1 space-y-2">
           <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">
-            Saved Presets
+            {t.presets.savedPresets}
           </h2>
           {presets.length === 0 ? (
             <Card className="p-4">
               <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
-                No presets yet
+                {t.presets.noPresetsYet}
               </p>
             </Card>
           ) : (
@@ -242,7 +244,7 @@ export default function PresetsPage() {
         </div>
 
         {/* Right Panel - Preset Details */}
-        <div className="col-span-2">
+        <div className="lg:col-span-2">
           {selectedPreset ? (
             <Card className="p-6">
               <CardHeader className="p-0 pb-4">
@@ -251,7 +253,7 @@ export default function PresetsPage() {
                     <CardTitle className="text-lg flex items-center gap-2">
                       {selectedPreset.name}
                       {selectedPreset.sourceFileName && (
-                        <Badge variant="outline">Imported</Badge>
+                        <Badge variant="outline">{t.presets.imported}</Badge>
                       )}
                     </CardTitle>
                     {selectedPreset.description && (
@@ -266,23 +268,23 @@ export default function PresetsPage() {
                 {/* Sampler Settings Overview */}
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 border-b pb-2">
-                    Sampler Settings
+                    {t.presets.samplerSettings}
                   </h3>
-                  <div className="grid grid-cols-4 gap-4 text-sm">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                     <div className="p-3 rounded-md bg-zinc-50 dark:bg-zinc-800">
-                      <span className="text-zinc-500 dark:text-zinc-400 block text-xs">Temperature</span>
+                      <span className="text-zinc-500 dark:text-zinc-400 block text-xs">{t.presets.temperature}</span>
                       <span className="font-medium">{selectedPreset.sampler.temperature}</span>
                     </div>
                     <div className="p-3 rounded-md bg-zinc-50 dark:bg-zinc-800">
-                      <span className="text-zinc-500 dark:text-zinc-400 block text-xs">Top P</span>
+                      <span className="text-zinc-500 dark:text-zinc-400 block text-xs">{t.presets.topP}</span>
                       <span className="font-medium">{selectedPreset.sampler.top_p}</span>
                     </div>
                     <div className="p-3 rounded-md bg-zinc-50 dark:bg-zinc-800">
-                      <span className="text-zinc-500 dark:text-zinc-400 block text-xs">Max Tokens</span>
+                      <span className="text-zinc-500 dark:text-zinc-400 block text-xs">{t.presets.maxTokens}</span>
                       <span className="font-medium">{selectedPreset.sampler.openai_max_tokens}</span>
                     </div>
                     <div className="p-3 rounded-md bg-zinc-50 dark:bg-zinc-800">
-                      <span className="text-zinc-500 dark:text-zinc-400 block text-xs">Max Context</span>
+                      <span className="text-zinc-500 dark:text-zinc-400 block text-xs">{t.presets.maxContext}</span>
                       <span className="font-medium">{selectedPreset.sampler.openai_max_context}</span>
                     </div>
                   </div>
@@ -311,13 +313,13 @@ export default function PresetsPage() {
                     return (
                       <>
                         <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 border-b pb-2">
-                          Prompt Blocks ({sortedEnabledBlocks.length} enabled of {selectedPreset.promptBlocks.length})
+                          {t.presets.promptBlocks} ({sortedEnabledBlocks.length} {t.presets.enabledOf} {selectedPreset.promptBlocks.length})
                         </h3>
                         {/* Header */}
                         <div className="grid grid-cols-[80px_1fr_80px] gap-3 px-3 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-700">
-                          <span>Role</span>
-                          <span>Name</span>
-                          <span className="text-right">Type</span>
+                          <span>{t.presets.role}</span>
+                          <span>{t.common.name}</span>
+                          <span className="text-right">{t.presets.type}</span>
                         </div>
                         <div className="max-h-56 overflow-y-auto space-y-2">
                           {sortedEnabledBlocks.map((block, idx) => (
@@ -344,13 +346,13 @@ export default function PresetsPage() {
                                 )}
                               </div>
                               <span className="text-right text-xs text-zinc-500 dark:text-zinc-400">
-                                {block.marker ? 'Marker' : (block.injection_position === 0 ? 'Relative' : 'In-Chat')}
+                                {block.marker ? t.presets.marker : (block.injection_position === 0 ? t.presets.relative : t.presets.inChat)}
                               </span>
                             </div>
                           ))}
                           {sortedEnabledBlocks.length === 0 && (
                             <p className="text-xs text-zinc-500 text-center py-4">
-                              No enabled blocks
+                              {t.presets.noEnabledBlocks}
                             </p>
                           )}
                         </div>
@@ -363,7 +365,7 @@ export default function PresetsPage() {
                 {selectedPreset.tags.length > 0 && (
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 border-b pb-2">
-                      Tags
+                      {t.common.tags}
                     </h3>
                     <div className="flex flex-wrap gap-2">
                       {selectedPreset.tags.map((tag) => (
@@ -377,19 +379,19 @@ export default function PresetsPage() {
 
                 {/* Metadata */}
                 <div className="text-xs text-zinc-400 dark:text-zinc-500">
-                  Last updated: {formatDate(selectedPreset.updatedAt)}
+                  {t.presets.lastUpdated} {formatDate(selectedPreset.updatedAt)}
                 </div>
 
                 {/* Actions */}
                 <div className="pt-4 border-t flex gap-2">
                   <Button onClick={() => handleEdit(selectedPreset)}>
-                    Edit Preset
+                    {t.presets.editPreset}
                   </Button>
                   <Button variant="outline" onClick={() => handleDuplicate(selectedPreset)}>
-                    Duplicate
+                    {t.common.duplicate}
                   </Button>
                   <Button variant="outline" onClick={() => handleExportST(selectedPreset)}>
-                    Export
+                    {t.common.export}
                   </Button>
                 </div>
               </CardContent>
@@ -399,15 +401,15 @@ export default function PresetsPage() {
               <div className="text-center">
                 <p className="text-zinc-500 dark:text-zinc-400 mb-4">
                   {presets.length === 0
-                    ? 'Create or import a preset to get started'
-                    : 'Select a preset from the list'}
+                    ? t.presets.createOrImport
+                    : t.presets.selectPresetFromList}
                 </p>
                 {presets.length === 0 && (
                   <div className="flex gap-2 justify-center">
                     <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-                      Import Preset
+                      {t.presets.importPreset}
                     </Button>
-                    <Button onClick={handleCreate}>New Preset</Button>
+                    <Button onClick={handleCreate}>{t.presets.newPreset}</Button>
                   </div>
                 )}
               </div>
@@ -420,20 +422,20 @@ export default function PresetsPage() {
       <Dialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Preset</DialogTitle>
+            <DialogTitle>{t.presets.deletePreset}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this preset? This action cannot be undone.
+              {t.presets.deletePresetConfirm}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button
               variant="destructive"
               onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}
             >
-              Delete
+              {t.common.delete}
             </Button>
           </DialogFooter>
         </DialogContent>

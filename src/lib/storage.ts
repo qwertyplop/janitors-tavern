@@ -294,6 +294,7 @@ export function saveExtensionsPipelines(pipelines: ExtensionsPipeline[]): void {
 
 const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
+  language: 'en',
   showAdvancedOptions: false,
   logging: {
     enabled: false,

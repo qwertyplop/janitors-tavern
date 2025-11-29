@@ -19,6 +19,7 @@ import {
 import { ConnectionPreset } from '@/types';
 import { downloadJson, readJsonFile } from '@/lib/utils';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/components/providers/I18nProvider';
 
 type ConnectionStatus = 'none' | 'connecting' | 'bypassed' | 'valid';
 
@@ -33,7 +34,7 @@ interface ModelsResponse {
   object?: string;
 }
 
-function StatusIndicator({ status }: { status: ConnectionStatus }) {
+function StatusIndicator({ status, t }: { status: ConnectionStatus; t: ReturnType<typeof useI18n>['t'] }) {
   const [dots, setDots] = useState(0);
 
   // Animate dots for connecting status
@@ -47,19 +48,26 @@ function StatusIndicator({ status }: { status: ConnectionStatus }) {
     return () => clearInterval(interval);
   }, [status]);
 
-  const config = {
-    none: { color: 'bg-red-500', label: 'No connection' },
-    connecting: { color: 'bg-amber-500', label: `Connecting${'.'.repeat(dots || 1)}` },
-    bypassed: { color: 'bg-amber-500', label: 'Status Check Bypassed' },
-    valid: { color: 'bg-green-500', label: 'Valid' },
+  const getLabel = () => {
+    switch (status) {
+      case 'none': return t.connections.statusNoConnection;
+      case 'connecting': return `${t.connections.statusConnecting}${'.'.repeat(dots || 1)}`;
+      case 'bypassed': return t.connections.statusBypassed;
+      case 'valid': return t.connections.statusValid;
+    }
   };
 
-  const { color, label } = config[status];
+  const color = {
+    none: 'bg-red-500',
+    connecting: 'bg-amber-500',
+    bypassed: 'bg-amber-500',
+    valid: 'bg-green-500',
+  }[status];
 
   return (
     <div className="flex items-center gap-2">
       <div className={`w-3 h-3 rounded-full ${color}`} />
-      <span className="text-sm text-zinc-600 dark:text-zinc-400 min-w-[140px]">{label}</span>
+      <span className="text-sm text-zinc-600 dark:text-zinc-400 min-w-[140px]">{getLabel()}</span>
     </div>
   );
 }
@@ -71,6 +79,7 @@ export default function ConnectionsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { t } = useI18n();
 
   // Form state for create/edit dialog
   const [formName, setFormName] = useState('');
@@ -221,7 +230,7 @@ export default function ConnectionsPage() {
   // Test connection by sending "hi!" message
   const testConnection = async () => {
     if (!selectedConnection || !selectedModel) {
-      setTestResult({ success: false, message: 'Please select a model first' });
+      setTestResult({ success: false, message: t.connections.selectModelFirst });
       return;
     }
 
@@ -378,14 +387,14 @@ export default function ConnectionsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">Connections</h1>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">{t.connections.title}</h1>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Manage API connection presets for different providers
+            {t.connections.subtitle}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <input
             ref={fileInputRef}
             type="file"
@@ -394,25 +403,25 @@ export default function ConnectionsPage() {
             className="hidden"
           />
           <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-            Import
+            {t.common.import}
           </Button>
           <Button variant="outline" onClick={handleExportAll} disabled={connections.length === 0}>
-            Export All
+            {t.common.exportAll}
           </Button>
-          <Button onClick={handleCreate}>New Connection</Button>
+          <Button onClick={handleCreate}>{t.connections.newConnection}</Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Panel - Connection List */}
-        <div className="col-span-1 space-y-2">
+        <div className="lg:col-span-1 space-y-2">
           <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">
-            Saved Connections
+            {t.connections.savedConnections}
           </h2>
           {connections.length === 0 ? (
             <Card className="p-4">
               <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
-                No connections yet
+                {t.connections.noConnectionsYet}
               </p>
             </Card>
           ) : (
@@ -467,7 +476,7 @@ export default function ConnectionsPage() {
         </div>
 
         {/* Right Panel - Connection Details & Actions */}
-        <div className="col-span-2">
+        <div className="lg:col-span-2">
           {selectedConnection ? (
             <Card className="p-6">
               <CardHeader className="p-0 pb-4">
@@ -480,16 +489,16 @@ export default function ConnectionsPage() {
                 {/* Connect Section */}
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 border-b pb-2">
-                    Connection
+                    {t.connections.connectionSection}
                   </h3>
                   <div className="flex items-center gap-4">
                     <Button
                       onClick={handleConnect}
                       disabled={isConnecting}
                     >
-                      {isConnecting ? 'Connecting...' : 'Connect'}
+                      {isConnecting ? t.connections.connecting : t.connections.connect}
                     </Button>
-                    <StatusIndicator status={connectionStatus} />
+                    <StatusIndicator status={connectionStatus} t={t} />
                   </div>
                   <div className="flex items-center gap-3 pt-2">
                     <button
@@ -509,10 +518,10 @@ export default function ConnectionsPage() {
                       />
                     </button>
                     <Label className="text-sm cursor-pointer" onClick={toggleAutoConnect}>
-                      Auto-Connect on Launch
+                      {t.connections.autoConnectOnLaunch}
                     </Label>
                     {autoConnectId === selectedId && (
-                      <span className="text-xs text-green-600 dark:text-green-400">Enabled</span>
+                      <span className="text-xs text-green-600 dark:text-green-400">{t.common.enabled}</span>
                     )}
                   </div>
                 </div>
@@ -520,7 +529,7 @@ export default function ConnectionsPage() {
                 {/* Model Selection */}
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 border-b pb-2">
-                    Model Selection
+                    {t.connections.modelSelection}
                   </h3>
                   <div className="flex items-center gap-3">
                     {availableModels.length > 0 ? (
@@ -529,7 +538,7 @@ export default function ConnectionsPage() {
                         onChange={(e) => setSelectedModel(e.target.value)}
                         className="flex-1"
                       >
-                        <option value="">Select a model...</option>
+                        <option value="">{t.connections.selectModel}</option>
                         {availableModels.map((model) => (
                           <option key={model.id} value={model.id}>
                             {model.id}
@@ -540,7 +549,7 @@ export default function ConnectionsPage() {
                       <Input
                         value={selectedModel}
                         onChange={(e) => setSelectedModel(e.target.value)}
-                        placeholder="Enter model ID or click Connect to fetch"
+                        placeholder={t.connections.enterModelId}
                         className="flex-1"
                       />
                     )}
@@ -549,12 +558,12 @@ export default function ConnectionsPage() {
                       onClick={handleSaveModel}
                       disabled={!selectedModel}
                     >
-                      Save Model
+                      {t.connections.saveModel}
                     </Button>
                   </div>
                   {selectedConnection.model && (
                     <p className="text-xs text-zinc-500">
-                      Saved model: {selectedConnection.model}
+                      {t.connections.savedModel} {selectedConnection.model}
                     </p>
                   )}
                 </div>
@@ -562,7 +571,7 @@ export default function ConnectionsPage() {
                 {/* Test Connection */}
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 border-b pb-2">
-                    Test Connection
+                    {t.connections.testConnection}
                   </h3>
                   <div className="flex items-center gap-4">
                     <Button
@@ -570,7 +579,7 @@ export default function ConnectionsPage() {
                       onClick={testConnection}
                       disabled={!selectedModel || isTestingConnection}
                     >
-                      {isTestingConnection ? 'Testing...' : 'Test Message'}
+                      {isTestingConnection ? t.connections.testing : t.connections.testMessage}
                     </Button>
                     {testResult && (
                       <span className={`text-sm ${testResult.success ? 'text-green-600' : 'text-red-600'}`}>
@@ -579,7 +588,7 @@ export default function ConnectionsPage() {
                     )}
                   </div>
                   <p className="text-xs text-zinc-500">
-                    Sends &quot;hi!&quot; to verify the connection works.
+                    {t.connections.testHint}
                   </p>
                 </div>
 
@@ -590,14 +599,14 @@ export default function ConnectionsPage() {
                     size="sm"
                     onClick={() => handleEdit(selectedConnection)}
                   >
-                    Edit Connection
+                    {t.connections.editConnection}
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handleExport(selectedConnection)}
                   >
-                    Export
+                    {t.common.export}
                   </Button>
                 </div>
               </CardContent>
@@ -607,11 +616,11 @@ export default function ConnectionsPage() {
               <div className="text-center">
                 <p className="text-zinc-500 dark:text-zinc-400 mb-4">
                   {connections.length === 0
-                    ? 'Create a connection to get started'
-                    : 'Select a connection from the list'}
+                    ? t.connections.createConnection
+                    : t.connections.selectFromList}
                 </p>
                 {connections.length === 0 && (
-                  <Button onClick={handleCreate}>New Connection</Button>
+                  <Button onClick={handleCreate}>{t.connections.newConnection}</Button>
                 )}
               </div>
             </Card>
@@ -623,11 +632,11 @@ export default function ConnectionsPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingId ? 'Edit Connection' : 'New Connection'}</DialogTitle>
+            <DialogTitle>{editingId ? t.connections.editConnectionTitle : t.connections.newConnectionTitle}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="name">{t.common.name}</Label>
               <Input
                 id="name"
                 value={formName}
@@ -636,7 +645,7 @@ export default function ConnectionsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="url">API URL</Label>
+              <Label htmlFor="url">{t.connections.apiUrl}</Label>
               <Input
                 id="url"
                 value={formUrl}
@@ -644,11 +653,11 @@ export default function ConnectionsPage() {
                 placeholder="https://api.openai.com/v1"
               />
               <p className="text-xs text-zinc-500">
-                Base URL for the API. Do not include /chat/completions.
+                {t.connections.apiUrlHint}
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="apiKey">API Key</Label>
+              <Label htmlFor="apiKey">{t.connections.apiKey}</Label>
               <Input
                 id="apiKey"
                 type="password"
@@ -657,16 +666,16 @@ export default function ConnectionsPage() {
                 placeholder="sk-..."
               />
               <p className="text-xs text-zinc-500">
-                Your API key will be stored locally in the browser.
+                {t.connections.apiKeyHint}
               </p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button onClick={handleSave} disabled={!formName || !formUrl}>
-              {editingId ? 'Save' : 'Create'}
+              {editingId ? t.common.save : t.common.create}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -676,17 +685,17 @@ export default function ConnectionsPage() {
       <Dialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Connection</DialogTitle>
+            <DialogTitle>{t.connections.deleteConnection}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Are you sure you want to delete this connection? This action cannot be undone.
+            {t.connections.deleteConnectionConfirm}
           </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button variant="destructive" onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}>
-              Delete
+              {t.common.delete}
             </Button>
           </DialogFooter>
         </DialogContent>

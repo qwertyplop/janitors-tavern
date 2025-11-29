@@ -13,6 +13,7 @@ import {
 } from '@/lib/storage';
 import { ConnectionPreset, ChatCompletionPreset, AppSettings } from '@/types';
 import { useSync } from '@/components/providers/SyncProvider';
+import { useI18n } from '@/components/providers/I18nProvider';
 
 interface UsageStats {
   totalRequests: number;
@@ -41,6 +42,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<UsageStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const { initialized } = useSync();
+  const { t } = useI18n();
 
   const fetchStats = useCallback(async () => {
     try {
@@ -98,25 +100,25 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">{t.dashboard.title}</h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Proxy control panel overview and quick access
+          {t.dashboard.subtitle}
         </p>
       </div>
 
       {/* Proxy Endpoint Info */}
       <Card>
         <CardHeader>
-          <CardTitle>Proxy Endpoint</CardTitle>
-          <CardDescription>Configure JanitorAI to use this endpoint</CardDescription>
+          <CardTitle>{t.dashboard.proxyEndpoint}</CardTitle>
+          <CardDescription>{t.dashboard.configureJanitor}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-md bg-zinc-100 p-3 font-mono text-sm dark:bg-zinc-800">
             <code>/api/proxy/chat-completion</code>
           </div>
           <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-            Send requests with <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">presetId</code> or
-            <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800 ml-1">connectionId</code> in the request body.
+            {t.dashboard.sendRequestsWith} <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">presetId</code> {t.dashboard.or}
+            <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800 ml-1">connectionId</code> {t.dashboard.inRequestBody}
           </p>
         </CardContent>
       </Card>
@@ -126,11 +128,11 @@ export default function DashboardPage() {
         <Link href="/connections">
           <Card className="cursor-pointer transition-shadow hover:shadow-md">
             <CardHeader className="pb-2">
-              <CardDescription>Connections</CardDescription>
+              <CardDescription>{t.dashboard.connections}</CardDescription>
               <CardTitle className="text-3xl">{connections.length}</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">API connection presets</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">{t.dashboard.apiConnectionPresets}</p>
             </CardContent>
           </Card>
         </Link>
@@ -138,11 +140,11 @@ export default function DashboardPage() {
         <Link href="/presets">
           <Card className="cursor-pointer transition-shadow hover:shadow-md">
             <CardHeader className="pb-2">
-              <CardDescription>Presets</CardDescription>
+              <CardDescription>{t.dashboard.presets}</CardDescription>
               <CardTitle className="text-3xl">{presets.length}</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">Chat completion presets (prompts + samplers)</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">{t.dashboard.chatCompletionPresets}</p>
             </CardContent>
           </Card>
         </Link>
@@ -151,19 +153,19 @@ export default function DashboardPage() {
       {/* Default Configuration */}
       <Card>
         <CardHeader>
-          <CardTitle>Active Presets</CardTitle>
-          <CardDescription>Select the presets to use for incoming JanitorAI requests</CardDescription>
+          <CardTitle>{t.dashboard.activePresets}</CardTitle>
+          <CardDescription>{t.dashboard.selectPresetsForJanitor}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="dashboardConnection">Connection</Label>
+              <Label htmlFor="dashboardConnection">{t.dashboard.connection}</Label>
               <Select
                 id="dashboardConnection"
                 value={settings?.defaultConnectionId || ''}
                 onChange={(e) => handleConnectionChange(e.target.value)}
               >
-                <option value="">Select a connection...</option>
+                <option value="">{t.dashboard.selectConnection}</option>
                 {connections.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} {c.model ? `(${c.model})` : ''}
@@ -177,13 +179,13 @@ export default function DashboardPage() {
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="dashboardPreset">Chat Completion Preset</Label>
+              <Label htmlFor="dashboardPreset">{t.dashboard.chatCompletionPreset}</Label>
               <Select
                 id="dashboardPreset"
                 value={settings?.defaultChatCompletionPresetId || ''}
                 onChange={(e) => handlePresetChange(e.target.value)}
               >
-                <option value="">Select a preset...</option>
+                <option value="">{t.dashboard.selectPreset}</option>
                 {presets.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -192,7 +194,7 @@ export default function DashboardPage() {
               </Select>
               {defaultPreset && (
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {defaultPreset.promptBlocks.length} blocks · Temp: {defaultPreset.sampler.temperature}
+                  {defaultPreset.promptBlocks.length} {t.dashboard.blocksTemp} {defaultPreset.sampler.temperature}
                 </p>
               )}
             </div>
@@ -200,14 +202,14 @@ export default function DashboardPage() {
           {(!settings?.defaultConnectionId || !settings?.defaultChatCompletionPresetId) && (
             <div className="rounded-md bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-3">
               <p className="text-sm text-amber-800 dark:text-amber-200">
-                Please select both a connection and a preset for JanitorAI requests to work.
+                {t.dashboard.selectBothWarning}
               </p>
             </div>
           )}
           {settings?.defaultConnectionId && settings?.defaultChatCompletionPresetId && (
             <div className="rounded-md bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 p-3">
               <p className="text-sm text-green-800 dark:text-green-200">
-                Ready to receive requests from JanitorAI.
+                {t.dashboard.readyToReceive}
               </p>
             </div>
           )}
@@ -217,53 +219,53 @@ export default function DashboardPage() {
       {/* Usage Statistics */}
       <Card>
         <CardHeader>
-          <CardTitle>Usage Statistics</CardTitle>
+          <CardTitle>{t.dashboard.usageStatistics}</CardTitle>
           <CardDescription>
-            Request and token usage tracking
+            {t.dashboard.requestAndTokenTracking}
             {stats?.timeUntilReset && (
               <span className="ml-2 text-zinc-400">
-                · Daily resets in {stats.timeUntilReset.hours}h {stats.timeUntilReset.minutes}m
+                · {t.dashboard.dailyResetsIn} {stats.timeUntilReset.hours}h {stats.timeUntilReset.minutes}m
               </span>
             )}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {loadingStats ? (
-            <div className="text-center py-4 text-zinc-500">Loading statistics...</div>
+            <div className="text-center py-4 text-zinc-500">{t.dashboard.loadingStatistics}</div>
           ) : stats ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
-                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Total Requests</p>
+                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t.dashboard.totalRequests}</p>
                 <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
                   {formatNumber(stats.totalRequests)}
                 </p>
-                <p className="text-xs text-zinc-400 dark:text-zinc-500">All time</p>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">{t.common.allTime}</p>
               </div>
               <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
-                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Daily Requests</p>
+                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t.dashboard.dailyRequests}</p>
                 <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                   {formatNumber(stats.dailyRequests)}
                 </p>
-                <p className="text-xs text-zinc-400 dark:text-zinc-500">Since 10 AM GMT+3</p>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">{t.dashboard.since10AM}</p>
               </div>
               <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
-                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Total Tokens</p>
+                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t.dashboard.totalTokens}</p>
                 <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
                   {formatNumber(stats.totalTokens)}
                 </p>
-                <p className="text-xs text-zinc-400 dark:text-zinc-500">All time</p>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">{t.common.allTime}</p>
               </div>
               <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
-                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Daily Tokens</p>
+                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t.dashboard.dailyTokens}</p>
                 <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                   {formatNumber(stats.dailyTokens)}
                 </p>
-                <p className="text-xs text-zinc-400 dark:text-zinc-500">Since 10 AM GMT+3</p>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">{t.dashboard.since10AM}</p>
               </div>
             </div>
           ) : (
             <div className="text-center py-4 text-zinc-500">
-              No statistics available yet. Send some requests to see usage data.
+              {t.dashboard.noStatisticsYet}
             </div>
           )}
         </CardContent>

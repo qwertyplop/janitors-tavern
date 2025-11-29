@@ -21,6 +21,7 @@ import {
 } from '@/lib/storage';
 import { downloadJson, readJsonFile } from '@/lib/utils';
 import { useSync } from '@/components/providers/SyncProvider';
+import { useI18n } from '@/components/providers/I18nProvider';
 import { AppSettings, Profile, ConnectionPreset, PromptPreset, SamplerPreset, ThemeMode, LoggingSettings, ChatCompletionPreset } from '@/types';
 
 interface ServerSettings {
@@ -60,6 +61,7 @@ export default function SettingsPage() {
 
   // Storage sync from context
   const { initialized, blobConfigured, lastSync, syncing, forcePush, forcePull } = useSync();
+  const { t } = useI18n();
 
   // Local sync status for UI feedback
   const [syncFeedback, setSyncFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -269,15 +271,15 @@ export default function SettingsPage() {
 
 
   if (!settings) {
-    return <div>Loading...</div>;
+    return <div>{t.common.loading}</div>;
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">Settings</h1>
+        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">{t.settings.title}</h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Application preferences and default configurations
+          {t.settings.subtitle}
         </p>
       </div>
 
@@ -285,15 +287,15 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            Request/Response Logging
+            {t.settings.requestResponseLogging}
             {serverSettings?.logging.enabled && (
               <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                Enabled
+                {t.common.enabled}
               </Badge>
             )}
           </CardTitle>
           <CardDescription>
-            Capture raw request and response bodies to a log file for debugging
+            {t.settings.loggingDescription}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -307,7 +309,7 @@ export default function SettingsPage() {
                   onChange={(e) => handleLoggingChange('enabled', e.target.checked)}
                   className="h-4 w-4 rounded border-zinc-300"
                 />
-                <Label htmlFor="loggingEnabled">Enable logging</Label>
+                <Label htmlFor="loggingEnabled">{t.settings.enableLogging}</Label>
               </div>
 
               <div className="flex items-center space-x-2">
@@ -319,7 +321,7 @@ export default function SettingsPage() {
                   disabled={!serverSettings.logging.enabled}
                   className="h-4 w-4 rounded border-zinc-300"
                 />
-                <Label htmlFor="logRequests">Log requests</Label>
+                <Label htmlFor="logRequests">{t.settings.logRequests}</Label>
               </div>
 
               <div className="flex items-center space-x-2">
@@ -331,11 +333,11 @@ export default function SettingsPage() {
                   disabled={!serverSettings.logging.enabled}
                   className="h-4 w-4 rounded border-zinc-300"
                 />
-                <Label htmlFor="logResponses">Log responses</Label>
+                <Label htmlFor="logResponses">{t.settings.logResponses}</Label>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="logFilePath">Log file path</Label>
+                <Label htmlFor="logFilePath">{t.settings.logFilePath}</Label>
                 <Input
                   id="logFilePath"
                   value={serverSettings.logging.logFilePath}
@@ -343,18 +345,18 @@ export default function SettingsPage() {
                   placeholder="logs/proxy.log"
                   disabled={!serverSettings.logging.enabled}
                 />
-                <p className="text-xs text-zinc-500">Relative to the project root</p>
+                <p className="text-xs text-zinc-500">{t.settings.logFilePathHint}</p>
               </div>
 
               <div className="flex items-center gap-4">
-                <Button onClick={handleSaveServerSettings}>Save Logging Settings</Button>
+                <Button onClick={handleSaveServerSettings}>{t.settings.saveLoggingSettings}</Button>
                 {serverSaved && (
-                  <span className="text-sm text-green-600 dark:text-green-400">Settings saved!</span>
+                  <span className="text-sm text-green-600 dark:text-green-400">{t.settings.settingsSaved}</span>
                 )}
               </div>
             </>
           ) : (
-            <p className="text-zinc-500">Loading server settings...</p>
+            <p className="text-zinc-500">{t.settings.loadingServerSettings}</p>
           )}
         </CardContent>
       </Card>
@@ -363,28 +365,28 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Log Viewer</span>
+            <span>{t.settings.logViewer}</span>
             {logCount > 0 && (
               <span className="text-sm font-normal text-zinc-500">
-                {logCount} entries
+                {logCount} {t.settings.entries}
               </span>
             )}
           </CardTitle>
-          <CardDescription>View recent request/response logs (stored in Vercel Blob)</CardDescription>
+          <CardDescription>{t.settings.viewRecentLogs}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2">
             <Button onClick={fetchLogs} disabled={loadingLogs} variant="outline">
-              {loadingLogs ? 'Loading...' : 'Refresh Logs'}
+              {loadingLogs ? t.common.loading : t.settings.refreshLogs}
             </Button>
             <Button onClick={clearLogs} variant="outline" className="text-red-600 hover:text-red-700">
-              Clear Logs
+              {t.settings.clearLogs}
             </Button>
           </div>
           <div className="max-h-[500px] overflow-auto rounded-md border border-zinc-200 dark:border-zinc-700">
             {logEntries.length === 0 ? (
               <div className="p-4 text-center text-zinc-500">
-                No logs yet. Click &quot;Refresh Logs&quot; to load.
+                {t.settings.noLogsYet}
               </div>
             ) : (
               <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
@@ -431,25 +433,25 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            Data Management
+            {t.settings.dataManagement}
             <Badge className={blobConfigured
               ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
               : 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200'
             }>
-              {blobConfigured ? 'Auto-Sync Enabled' : 'Local Only'}
+              {blobConfigured ? t.settings.autoSyncEnabled : t.settings.localOnly}
             </Badge>
           </CardTitle>
           <CardDescription>
-            Import, export, and sync your data
+            {t.settings.importExportSync}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Backup & Restore */}
           <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Backup & Restore</h4>
+            <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{t.settings.backupRestore}</h4>
             <div className="flex gap-2">
               <Button variant="outline" onClick={handleExportBackup}>
-                Export Backup
+                {t.settings.exportBackup}
               </Button>
               <input
                 ref={importFileRef}
@@ -459,32 +461,32 @@ export default function SettingsPage() {
                 className="hidden"
               />
               <Button variant="outline" onClick={() => importFileRef.current?.click()}>
-                Import Backup
+                {t.settings.importBackup}
               </Button>
             </div>
             <p className="text-xs text-zinc-500">
-              Export all connections, presets, and settings as a JSON file for backup or migration.
+              {t.settings.backupHint}
             </p>
           </div>
 
           {/* Cloud Sync */}
           {blobConfigured && (
             <div className="space-y-3 border-t pt-4">
-              <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Cloud Sync (Vercel Blob)</h4>
+              <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{t.settings.cloudSync}</h4>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
                   onClick={handlePushToBlob}
                   disabled={syncing}
                 >
-                  {syncing ? 'Syncing...' : 'Push to Cloud'}
+                  {syncing ? t.settings.syncingData : t.settings.pushToCloud}
                 </Button>
                 <Button
                   variant="outline"
                   onClick={handlePullFromBlob}
                   disabled={syncing}
                 >
-                  Pull from Cloud
+                  {t.settings.pullFromCloud}
                 </Button>
               </div>
               {syncFeedback && (
@@ -495,11 +497,11 @@ export default function SettingsPage() {
                 </p>
               )}
               <p className="text-xs text-zinc-500">
-                Changes are automatically synced to cloud. Use these buttons to force sync or recover data.
+                {t.settings.autoSyncHint}
               </p>
               {lastSync && (
                 <p className="text-xs text-zinc-400">
-                  Last sync: {new Date(lastSync).toLocaleString()}
+                  {t.settings.lastSync} {new Date(lastSync).toLocaleString()}
                 </p>
               )}
             </div>
@@ -510,13 +512,13 @@ export default function SettingsPage() {
             <p className="text-zinc-600 dark:text-zinc-400">
               {blobConfigured ? (
                 <>
-                  <span className="font-medium text-green-600 dark:text-green-400">Auto-sync is enabled.</span>
-                  {' '}Changes are automatically saved to cloud storage.
+                  <span className="font-medium text-green-600 dark:text-green-400">{t.settings.autoSyncEnabledMessage}</span>
+                  {' '}{t.settings.changesAutoSaved}
                 </>
               ) : (
                 <>
-                  <span className="font-medium">Local storage only.</span>
-                  {' '}To enable cloud storage, add a Blob store in your Vercel dashboard.
+                  <span className="font-medium">{t.settings.localStorageOnly}</span>
+                  {' '}{t.settings.addBlobStore}
                 </>
               )}
             </p>
@@ -526,20 +528,20 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Appearance</CardTitle>
-          <CardDescription>Customize how the app looks</CardDescription>
+          <CardTitle>{t.settings.appearance}</CardTitle>
+          <CardDescription>{t.settings.customizeAppLooks}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="theme">Theme</Label>
+            <Label htmlFor="theme">{t.settings.theme}</Label>
             <Select
               id="theme"
               value={settings.theme}
               onChange={(e) => handleChange('theme', e.target.value as ThemeMode)}
             >
-              <option value="system">System</option>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
+              <option value="system">{t.settings.themeSystem}</option>
+              <option value="light">{t.settings.themeLight}</option>
+              <option value="dark">{t.settings.themeDark}</option>
             </Select>
           </div>
           <div className="flex items-center space-x-2">
@@ -550,27 +552,27 @@ export default function SettingsPage() {
               onChange={(e) => handleChange('showAdvancedOptions', e.target.checked)}
               className="h-4 w-4 rounded border-zinc-300"
             />
-            <Label htmlFor="showAdvanced">Show advanced options</Label>
+            <Label htmlFor="showAdvanced">{t.settings.showAdvancedOptions}</Label>
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Default Presets</CardTitle>
+          <CardTitle>{t.settings.defaultPresets}</CardTitle>
           <CardDescription>
-            Default presets used when no specific preset is specified in requests
+            {t.settings.defaultPresetsHint}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="defaultProfile">Default Profile</Label>
+            <Label htmlFor="defaultProfile">{t.settings.defaultProfile}</Label>
             <Select
               id="defaultProfile"
               value={settings.defaultProfileId || ''}
               onChange={(e) => handleChange('defaultProfileId', e.target.value || undefined)}
             >
-              <option value="">None</option>
+              <option value="">{t.common.none}</option>
               {profiles.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -579,13 +581,13 @@ export default function SettingsPage() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="defaultConnection">Default Connection</Label>
+            <Label htmlFor="defaultConnection">{t.settings.defaultConnection}</Label>
             <Select
               id="defaultConnection"
               value={settings.defaultConnectionId || ''}
               onChange={(e) => handleChange('defaultConnectionId', e.target.value || undefined)}
             >
-              <option value="">None</option>
+              <option value="">{t.common.none}</option>
               {connections.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -594,29 +596,29 @@ export default function SettingsPage() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="defaultChatCompletion">Default Chat Completion Preset</Label>
+            <Label htmlFor="defaultChatCompletion">{t.settings.defaultChatCompletion}</Label>
             <Select
               id="defaultChatCompletion"
               value={settings.defaultChatCompletionPresetId || ''}
               onChange={(e) => handleChange('defaultChatCompletionPresetId', e.target.value || undefined)}
             >
-              <option value="">None (use first available)</option>
+              <option value="">{t.common.none}</option>
               {chatCompletionPresets.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
               ))}
             </Select>
-            <p className="text-xs text-zinc-500">Used when JanitorAI sends requests without a preset</p>
+            <p className="text-xs text-zinc-500">{t.settings.usedWhenNoPreset}</p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="defaultPrompt">Default Prompt Preset</Label>
+            <Label htmlFor="defaultPrompt">{t.settings.defaultPromptPreset}</Label>
             <Select
               id="defaultPrompt"
               value={settings.defaultPromptPresetId || ''}
               onChange={(e) => handleChange('defaultPromptPresetId', e.target.value || undefined)}
             >
-              <option value="">None</option>
+              <option value="">{t.common.none}</option>
               {prompts.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -625,13 +627,13 @@ export default function SettingsPage() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="defaultSampler">Default Sampler Preset</Label>
+            <Label htmlFor="defaultSampler">{t.settings.defaultSamplerPreset}</Label>
             <Select
               id="defaultSampler"
               value={settings.defaultSamplerPresetId || ''}
               onChange={(e) => handleChange('defaultSamplerPresetId', e.target.value || undefined)}
             >
-              <option value="">None</option>
+              <option value="">{t.common.none}</option>
               {samplers.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -644,24 +646,24 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Proxy Information</CardTitle>
-          <CardDescription>API endpoint details for JanitorAI integration</CardDescription>
+          <CardTitle>{t.settings.proxyInformation}</CardTitle>
+          <CardDescription>{t.settings.apiEndpointDetails}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label>Chat Completion Endpoint</Label>
+            <Label>{t.settings.chatCompletionEndpoint}</Label>
             <div className="mt-1 rounded-md bg-zinc-100 p-3 font-mono text-sm dark:bg-zinc-800">
               <code>POST /api/proxy/chat-completion</code>
             </div>
           </div>
           <div>
-            <Label>Health Check Endpoint</Label>
+            <Label>{t.settings.healthCheckEndpoint}</Label>
             <div className="mt-1 rounded-md bg-zinc-100 p-3 font-mono text-sm dark:bg-zinc-800">
               <code>GET /api/health</code>
             </div>
           </div>
           <div>
-            <Label>Test Connection Endpoint</Label>
+            <Label>{t.settings.testConnectionEndpoint}</Label>
             <div className="mt-1 rounded-md bg-zinc-100 p-3 font-mono text-sm dark:bg-zinc-800">
               <code>POST /api/proxy/test-connection</code>
             </div>
@@ -671,22 +673,22 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-red-600">Danger Zone</CardTitle>
-          <CardDescription>Irreversible actions</CardDescription>
+          <CardTitle className="text-red-600">{t.settings.dangerZone}</CardTitle>
+          <CardDescription>{t.settings.irreversibleActions}</CardDescription>
         </CardHeader>
         <CardContent>
           <Button variant="destructive" onClick={handleClearData}>
-            Clear All Data
+            {t.settings.clearAllData}
           </Button>
           <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-            This will delete all presets, profiles, and settings from local storage.
+            {t.settings.clearAllDataHint}
           </p>
         </CardContent>
       </Card>
 
       <div className="flex items-center gap-4">
-        <Button onClick={handleSave}>Save Settings</Button>
-        {saved && <span className="text-sm text-green-600 dark:text-green-400">Settings saved!</span>}
+        <Button onClick={handleSave}>{t.settings.saveSettings}</Button>
+        {saved && <span className="text-sm text-green-600 dark:text-green-400">{t.settings.settingsSaved}</span>}
       </div>
     </div>
   );

@@ -2,51 +2,51 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useI18n } from '@/components/providers/I18nProvider';
 
 export default function ExtensionsPage() {
+  const { t } = useI18n();
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">Extensions</h1>
+        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">{t.extensions.title}</h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Pre/post-processing extensions for request transformation
+          {t.extensions.subtitle}
         </p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            Coming Soon
-            <Badge variant="secondary">Planned</Badge>
+            {t.extensions.comingSoon}
+            <Badge variant="secondary">{t.extensions.planned}</Badge>
           </CardTitle>
           <CardDescription>
-            Extensions system is under development
+            {t.extensions.underDevelopment}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-zinc-600 dark:text-zinc-300">
-            Extensions will allow you to transform requests and responses with custom logic:
+            {t.extensions.extensionsWillAllow}
           </p>
           <div className="space-y-3">
             <div className="rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
-              <h4 className="font-medium">Pre-processing Extensions</h4>
+              <h4 className="font-medium">{t.extensions.preProcessing}</h4>
               <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                Modify incoming requests before prompt composition. Examples: language detection,
-                content filters, auto-tagging.
+                {t.extensions.preProcessingDesc}
               </p>
             </div>
             <div className="rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
-              <h4 className="font-medium">Prompt Extensions</h4>
+              <h4 className="font-medium">{t.extensions.promptExtensions}</h4>
               <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                Inject additional instructions or context. Examples: add style guidelines,
-                safety instructions.
+                {t.extensions.promptExtensionsDesc}
               </p>
             </div>
             <div className="rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
-              <h4 className="font-medium">Post-processing Extensions</h4>
+              <h4 className="font-medium">{t.extensions.postProcessing}</h4>
               <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                Modify model output. Examples: formatting, content filtering,
-                response splitting.
+                {t.extensions.postProcessingDesc}
               </p>
             </div>
           </div>
@@ -55,14 +55,14 @@ export default function ExtensionsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Extension Pipeline</CardTitle>
+          <CardTitle>{t.extensions.extensionPipeline}</CardTitle>
           <CardDescription>
-            Configure the order and settings for your extensions
+            {t.extensions.configureOrder}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8 text-zinc-400 dark:text-zinc-500">
-            No extensions configured
+            {t.extensions.noExtensionsConfigured}
           </div>
         </CardContent>
       </Card>

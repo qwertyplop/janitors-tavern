@@ -512,19 +512,10 @@ export function ChatCompletionPresetEditor({
                     <p className="text-xs text-zinc-500">Combine consecutive System messages into a single message (deprecated)</p>
                   </div>
                 </label>
-                <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
-                  <input
-                    type="checkbox"
-                    checked={preset.providerSettings.streamOpenai}
-                    onChange={(e) => handleProviderSettingsChange('streamOpenai', e.target.checked)}
-                    className="w-4 h-4 rounded"
-                  />
-                  <div>
-                    <span className="text-sm font-medium">Stream OpenAI Responses</span>
-                    <p className="text-xs text-zinc-500">Enable streaming for OpenAI-compatible endpoints</p>
-                  </div>
-                </label>
               </div>
+              <p className="text-xs text-zinc-500 mt-3">
+                Note: Streaming is controlled by the JanitorAI request, not preset settings.
+              </p>
             </Card>
 
             <Card className="p-4">

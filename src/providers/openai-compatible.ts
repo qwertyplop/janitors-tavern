@@ -179,15 +179,12 @@ export class OpenAICompatibleProvider extends ChatProvider {
 
   /**
    * Send a streaming chat completion request
-   * Returns a ReadableStream that can be piped directly to the response
+   * Returns the raw ReadableStream from the provider - pure passthrough like Python proxy
    */
   async sendChatCompletionStream(
-    request: ProviderRequest,
-    requestId: string,
-    onComplete?: (content: string, usage?: { promptTokens: number; completionTokens: number; totalTokens: number }) => void
-  ): Promise<{ stream: ReadableStream<Uint8Array>; error?: string }> {
+    request: ProviderRequest
+  ): Promise<{ stream: ReadableStream<Uint8Array>; error?: string; status: number; headers: Headers }> {
     const openaiRequest = this.buildOpenAIRequest(request, true);
-    const model = request.model || this.config.model;
 
     try {
       const response = await fetch(this.buildUrl('/chat/completions'), {
@@ -201,6 +198,8 @@ export class OpenAICompatibleProvider extends ChatProvider {
         return {
           stream: new ReadableStream(),
           error: `Provider error: ${response.status} - ${errorText}`,
+          status: response.status,
+          headers: response.headers,
         };
       }
 
@@ -208,71 +207,23 @@ export class OpenAICompatibleProvider extends ChatProvider {
         return {
           stream: new ReadableStream(),
           error: 'No response body',
+          status: 500,
+          headers: new Headers(),
         };
       }
 
-      // Track content for onComplete callback
-      let fullContent = '';
-      let usage: { promptTokens: number; completionTokens: number; totalTokens: number } | undefined;
-
-      const encoder = new TextEncoder();
-      const decoder = new TextDecoder();
-
-      // Transform the stream to ensure proper SSE format
-      const transformStream = new TransformStream<Uint8Array, Uint8Array>({
-        transform: (chunk, controller) => {
-          const text = decoder.decode(chunk, { stream: true });
-
-          // Parse SSE events and extract content
-          const lines = text.split('\n');
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6);
-              if (data === '[DONE]') {
-                // Call onComplete with accumulated content
-                if (onComplete) {
-                  onComplete(fullContent, usage);
-                }
-              } else {
-                try {
-                  const parsed: OpenAIStreamChunk = JSON.parse(data);
-                  const content = parsed.choices[0]?.delta?.content;
-                  if (content) {
-                    fullContent += content;
-                  }
-                  // Some providers send usage in the final chunk
-                  if (parsed.usage) {
-                    usage = {
-                      promptTokens: parsed.usage.prompt_tokens,
-                      completionTokens: parsed.usage.completion_tokens,
-                      totalTokens: parsed.usage.total_tokens,
-                    };
-                  }
-                } catch {
-                  // Ignore parse errors for partial chunks
-                }
-              }
-            }
-          }
-
-          // Pass through the original chunk
-          controller.enqueue(chunk);
-        },
-        flush: (controller) => {
-          // Ensure onComplete is called even if [DONE] wasn't received
-          if (onComplete && fullContent) {
-            onComplete(fullContent, usage);
-          }
-        },
-      });
-
-      const transformedStream = response.body.pipeThrough(transformStream);
-
-      return { stream: transformedStream };
+      // Pure passthrough - no transformation, just like Python proxy
+      return {
+        stream: response.body,
+        status: response.status,
+        headers: response.headers,
+      };
     } catch (error) {
       return {
         stream: new ReadableStream(),
         error: `Request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        status: 500,
+        headers: new Headers(),
       };
     }
   }

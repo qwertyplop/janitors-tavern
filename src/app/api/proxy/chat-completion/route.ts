@@ -268,39 +268,7 @@ export async function POST(request: NextRequest) {
 
     // Handle streaming requests
     if (body.stream === true && provider instanceof OpenAICompatibleProvider) {
-      const streamResult = await provider.sendChatCompletionStream(
-        providerRequest,
-        requestId,
-        async (content, usage) => {
-          // onComplete callback - record stats when stream finishes
-          try {
-            let inputTokens: number;
-            let outputTokens: number;
-
-            if (usage?.promptTokens && usage?.completionTokens) {
-              inputTokens = usage.promptTokens;
-              outputTokens = usage.completionTokens;
-            } else {
-              inputTokens = inputTokensEstimate;
-              outputTokens = content ? estimateTokens(content) : 0;
-            }
-
-            await recordUsage(inputTokens, outputTokens);
-            await logResponse(requestId, {
-              status: 200,
-              response: { streaming: true, contentLength: content.length },
-              message: content.substring(0, 200) + (content.length > 200 ? '...' : ''),
-              usage: usage ? {
-                prompt_tokens: usage.promptTokens,
-                completion_tokens: usage.completionTokens,
-                total_tokens: usage.totalTokens,
-              } : undefined,
-            }, Date.now() - startTime);
-          } catch (statsError) {
-            console.error('Failed to record streaming usage stats:', statsError);
-          }
-        }
-      );
+      const streamResult = await provider.sendChatCompletionStream(providerRequest);
 
       if (streamResult.error) {
         const errorResponse = { error: streamResult.error };
@@ -312,16 +280,39 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(errorResponse, { status: 502 });
       }
 
-      // Return SSE stream response
+      // Build response headers - pass through provider headers except excluded ones
+      // (Same approach as Python proxy)
+      const excludedHeaders = ['content-encoding', 'content-length', 'transfer-encoding', 'connection'];
+      const responseHeaders: Record<string, string> = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      };
+
+      // Pass through provider's headers (filtered)
+      streamResult.headers.forEach((value, key) => {
+        if (!excludedHeaders.includes(key.toLowerCase())) {
+          responseHeaders[key] = value;
+        }
+      });
+
+      // Log streaming response (stats skipped for streaming - can't track without breaking stream)
+      await logResponse(requestId, {
+        status: streamResult.status,
+        response: { streaming: true },
+      }, Date.now() - startTime);
+
+      // Record estimated usage for streaming (input only, output unknown)
+      try {
+        await recordUsage(inputTokensEstimate, 0);
+      } catch (statsError) {
+        console.error('Failed to record streaming usage stats:', statsError);
+      }
+
+      // Return SSE stream response - pure passthrough like Python proxy
       return new Response(streamResult.stream, {
-        headers: {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        },
+        status: streamResult.status,
+        headers: responseHeaders,
       });
     }
 

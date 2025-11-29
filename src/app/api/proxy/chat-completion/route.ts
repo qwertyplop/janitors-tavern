@@ -20,6 +20,7 @@ import {
   getDefaultConnectionPreset,
   getDefaultChatCompletionPreset,
 } from '@/lib/server-storage';
+import { recordUsage, calculateMessageTokens, estimateTokens } from '@/lib/stats';
 
 // ============================================
 // Request Types
@@ -274,6 +275,27 @@ export async function POST(request: NextRequest) {
       message: result.message?.content,
       usage: result.usage,
     }, Date.now() - startTime);
+
+    // Record usage statistics
+    try {
+      let inputTokens: number;
+      let outputTokens: number;
+
+      if (result.usage?.promptTokens && result.usage?.completionTokens) {
+        // Use actual token counts from API response
+        inputTokens = result.usage.promptTokens;
+        outputTokens = result.usage.completionTokens;
+      } else {
+        // Estimate tokens from messages
+        inputTokens = calculateMessageTokens(processedMessages);
+        outputTokens = result.message?.content ? estimateTokens(result.message.content) : 0;
+      }
+
+      await recordUsage(inputTokens, outputTokens);
+    } catch (statsError) {
+      // Don't fail the request if stats recording fails
+      console.error('Failed to record usage stats:', statsError);
+    }
 
     return NextResponse.json(successResponse);
   } catch (error) {

@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import {
@@ -15,23 +14,67 @@ import {
 import { ConnectionPreset, ChatCompletionPreset, AppSettings } from '@/types';
 import { useSync } from '@/components/providers/SyncProvider';
 
+interface UsageStats {
+  totalRequests: number;
+  totalTokens: number;
+  dailyRequests: number;
+  dailyTokens: number;
+  lastDailyReset: string;
+  lastUpdated: string;
+  timeUntilReset: { hours: number; minutes: number };
+}
+
+function formatNumber(num: number): string {
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + 'M';
+  }
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1) + 'K';
+  }
+  return num.toString();
+}
+
 export default function DashboardPage() {
   const [connections, setConnections] = useState<ConnectionPreset[]>([]);
   const [presets, setPresets] = useState<ChatCompletionPreset[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [stats, setStats] = useState<UsageStats | null>(null);
+  const [loadingStats, setLoadingStats] = useState(true);
   const { initialized } = useSync();
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const response = await fetch('/api/storage/stats');
+      if (response.ok) {
+        const data = await response.json();
+        setStats(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch stats:', error);
+    } finally {
+      setLoadingStats(false);
+    }
+  }, []);
 
   // Load data on mount
   useEffect(() => {
     loadData();
-  }, []);
+    fetchStats();
+  }, [fetchStats]);
 
   // Reload data when sync initializes (data may have been pulled from blob)
   useEffect(() => {
     if (initialized) {
       loadData();
+      fetchStats();
     }
-  }, [initialized]);
+  }, [initialized, fetchStats]);
+
+  // Refresh stats every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(fetchStats, 30000);
+    return () => clearInterval(interval);
+  }, [fetchStats]);
 
   const loadData = () => {
     setConnections(getConnectionPresets());
@@ -171,39 +214,60 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Recent Presets */}
-      {presets.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Presets</CardTitle>
-            <CardDescription>Quick access to your chat completion presets</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {presets.slice(0, 5).map((preset) => (
-                <div
-                  key={preset.id}
-                  className="flex items-center justify-between rounded-md border border-zinc-200 p-3 dark:border-zinc-800"
-                >
-                  <div>
-                    <p className="font-medium">{preset.name}</p>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                      {preset.promptBlocks.length} blocks · Temp: {preset.sampler.temperature}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    {preset.tags.slice(0, 2).map((tag) => (
-                      <Badge key={tag} variant="outline">
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              ))}
+      {/* Usage Statistics */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Usage Statistics</CardTitle>
+          <CardDescription>
+            Request and token usage tracking
+            {stats?.timeUntilReset && (
+              <span className="ml-2 text-zinc-400">
+                · Daily resets in {stats.timeUntilReset.hours}h {stats.timeUntilReset.minutes}m
+              </span>
+            )}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingStats ? (
+            <div className="text-center py-4 text-zinc-500">Loading statistics...</div>
+          ) : stats ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
+                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Total Requests</p>
+                <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+                  {formatNumber(stats.totalRequests)}
+                </p>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">All time</p>
+              </div>
+              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
+                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Daily Requests</p>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {formatNumber(stats.dailyRequests)}
+                </p>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">Since 10 AM GMT+3</p>
+              </div>
+              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
+                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Total Tokens</p>
+                <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+                  {formatNumber(stats.totalTokens)}
+                </p>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">All time</p>
+              </div>
+              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
+                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Daily Tokens</p>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {formatNumber(stats.dailyTokens)}
+                </p>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">Since 10 AM GMT+3</p>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <div className="text-center py-4 text-zinc-500">
+              No statistics available yet. Send some requests to see usage data.
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

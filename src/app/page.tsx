@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import {
   getConnectionPresets,
   getChatCompletionPresets,
@@ -41,6 +42,7 @@ export default function DashboardPage() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [stats, setStats] = useState<UsageStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
+  const [confirmed, setConfirmed] = useState(false);
   const { initialized } = useSync();
   const { t } = useI18n();
 
@@ -87,11 +89,13 @@ export default function DashboardPage() {
   const handleConnectionChange = (connectionId: string) => {
     const newSettings = updateSettings({ defaultConnectionId: connectionId || undefined });
     setSettings(newSettings);
+    setConfirmed(false);
   };
 
   const handlePresetChange = (presetId: string) => {
     const newSettings = updateSettings({ defaultChatCompletionPresetId: presetId || undefined });
     setSettings(newSettings);
+    setConfirmed(false);
   };
 
   const handlePostProcessingChange = (mode: string) => {
@@ -99,6 +103,13 @@ export default function DashboardPage() {
       defaultPostProcessing: (mode || 'none') as PromptPostProcessingMode
     });
     setSettings(newSettings);
+    setConfirmed(false);
+  };
+
+  const handleConfirmChoice = () => {
+    setConfirmed(true);
+    // Auto-hide after 3 seconds
+    setTimeout(() => setConfirmed(false), 3000);
   };
 
   const defaultConnection = connections.find((c) => c.id === settings?.defaultConnectionId);
@@ -233,6 +244,19 @@ export default function DashboardPage() {
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
               {t.dashboard.postProcessingTips[settings?.defaultPostProcessing || 'none']}
             </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={handleConfirmChoice}
+              disabled={!settings?.defaultConnectionId || !settings?.defaultChatCompletionPresetId}
+            >
+              {t.dashboard.confirmChoice}
+            </Button>
+            {confirmed && (
+              <span className="text-sm text-green-600 dark:text-green-400 animate-pulse">
+                {t.dashboard.choiceConfirmed}
+              </span>
+            )}
           </div>
           {(!settings?.defaultConnectionId || !settings?.defaultChatCompletionPresetId) && (
             <div className="rounded-md bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-3">

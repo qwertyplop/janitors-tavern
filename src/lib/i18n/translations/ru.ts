@@ -93,6 +93,8 @@ export const ru: TranslationKeys = {
       'strict-tools': 'Как Strict, но сохраняет вызовы инструментов в отдельных сообщениях.',
       'single-user': 'Объединяет все сообщения в одно сообщение пользователя. Для простых промптов.',
     } as Record<string, string>,
+    confirmChoice: 'Подтвердить выбор',
+    choiceConfirmed: 'Выбор подтверждён!',
   },
 
   // Connections

@@ -91,6 +91,8 @@ export const en = {
       'strict-tools': 'Same as Strict, but preserves tool calls in separate messages.',
       'single-user': 'Combines all messages into a single user message. For simple prompts.',
     } as Record<string, string>,
+    confirmChoice: 'Confirm choice',
+    choiceConfirmed: 'Choice confirmed!',
   },
 
   // Connections

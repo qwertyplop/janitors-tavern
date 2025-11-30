@@ -122,7 +122,7 @@ export default function ConnectionsPage() {
     setTestResult(null);
   }, [selectedId]);
 
-  // Connect handler - fetches models and updates status
+  // Connect handler - fetches models via server-side proxy to bypass CORS
   const connectToPresetDirect = async (connection: ConnectionPreset) => {
     setIsConnecting(true);
     setConnectionStatus('connecting');
@@ -130,46 +130,25 @@ export default function ConnectionsPage() {
     setSelectedModel(connection.model || '');
 
     try {
-      // Normalize the base URL - handle various formats
-      let baseUrl = connection.baseUrl.replace(/\/+$/, '');
+      console.log('[Connections] Fetching models via proxy for:', connection.baseUrl);
 
-      // Remove /v1 suffix if present (we'll add it back)
-      baseUrl = baseUrl.replace(/\/v1$/i, '');
-
-      // Build models URL
-      const modelsUrl = `${baseUrl}/v1/models`;
-
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-
-      const apiKey = connection.apiKeyLocalEncrypted;
-      if (apiKey) {
-        headers['Authorization'] = `Bearer ${apiKey}`;
-      }
-
-      console.log('[Connections] Fetching models from:', modelsUrl);
-      const response = await fetch(modelsUrl, { headers });
+      // Use our server-side proxy to bypass CORS
+      const response = await fetch('/api/proxy/models', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          baseUrl: connection.baseUrl,
+          apiKey: connection.apiKeyLocalEncrypted,
+        }),
+      });
 
       if (response.ok) {
         const data = await response.json();
         console.log('[Connections] Models response:', data);
 
-        // Handle different response formats
-        let models: ModelInfo[] = [];
-
-        if (Array.isArray(data)) {
-          // Some APIs return array directly
-          models = data.map((m: string | ModelInfo) =>
-            typeof m === 'string' ? { id: m } : m
-          );
-        } else if (data.data && Array.isArray(data.data)) {
-          // OpenAI format: { data: [...] }
-          models = data.data;
-        } else if (data.models && Array.isArray(data.models)) {
-          // Some APIs use { models: [...] }
-          models = data.models;
-        }
+        const models: ModelInfo[] = data.models || [];
 
         if (models.length > 0) {
           setAvailableModels(models);
@@ -185,7 +164,8 @@ export default function ConnectionsPage() {
           setConnectionStatus('valid');
         }
       } else {
-        console.log('[Connections] Models request failed:', response.status);
+        const errorData = await response.json().catch(() => ({}));
+        console.log('[Connections] Models request failed:', response.status, errorData);
         if (connection.bypassStatusCheck) {
           setConnectionStatus('bypassed');
         } else {

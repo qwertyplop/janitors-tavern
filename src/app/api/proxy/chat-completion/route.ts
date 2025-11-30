@@ -147,8 +147,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Log the raw incoming request
-    await logRequest(requestId, {
+    // Fire-and-forget: Log the raw incoming request (don't block processing)
+    logRequest(requestId, {
       url: request.url,
       method: 'POST',
       headers: safeHeaders,
@@ -162,19 +162,19 @@ export async function POST(request: NextRequest) {
       chatCompletionPreset: chatCompletionPreset ? {
         name: chatCompletionPreset.name,
       } : undefined,
-    });
+    }).catch(() => {});
 
     // Validate required fields
     if (!body.messages || body.messages.length === 0) {
       const errorResponse = { error: 'Messages are required' };
-      await logError(requestId, 'Messages are required', 'validation');
+      logError(requestId, 'Messages are required', 'validation').catch(() => {});
       return NextResponse.json(errorResponse, { status: 400 });
     }
 
     // Connection preset is required
     if (!connectionPreset) {
       const errorResponse = { error: 'Connection preset is required' };
-      await logError(requestId, 'Connection preset is required', 'validation');
+      logError(requestId, 'Connection preset is required', 'validation').catch(() => {});
       return NextResponse.json(errorResponse, { status: 400 });
     }
 
@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
 
     if (!apiKey) {
       const errorResponse = { error: 'API key not configured' };
-      await logError(requestId, 'API key not configured', 'validation');
+      logError(requestId, 'API key not configured', 'validation').catch(() => {});
       return NextResponse.json(errorResponse, { status: 400 });
     }
 
@@ -254,14 +254,14 @@ export async function POST(request: NextRequest) {
       extraHeaders: connectionPreset.extraHeaders,
     };
 
-    // Log the processed request being sent to provider
-    await logProcessedRequest(requestId, {
+    // Fire-and-forget: Log the processed request (don't block the actual request)
+    logProcessedRequest(requestId, {
       processedMessages,
       samplerSettings: samplerParams,
       providerUrl: connectionPreset.baseUrl,
       model: connectionPreset.model,
       streaming: body.stream === true,
-    });
+    }).catch(() => {});
 
     // Calculate input tokens once for stats (used in both streaming and non-streaming)
     const inputTokensEstimate = calculateMessageTokens(processedMessages);
@@ -272,11 +272,12 @@ export async function POST(request: NextRequest) {
 
       if (streamResult.error) {
         const errorResponse = { error: streamResult.error };
-        await logError(requestId, streamResult.error, 'provider');
-        await logResponse(requestId, {
+        // Fire-and-forget logging for errors (don't block response)
+        logError(requestId, streamResult.error, 'provider').catch(() => {});
+        logResponse(requestId, {
           status: 502,
           response: errorResponse,
-        }, Date.now() - startTime);
+        }, Date.now() - startTime).catch(() => {});
         return NextResponse.json(errorResponse, { status: 502 });
       }
 
@@ -296,20 +297,16 @@ export async function POST(request: NextRequest) {
         }
       });
 
-      // Log streaming response (stats skipped for streaming - can't track without breaking stream)
-      await logResponse(requestId, {
+      // Fire-and-forget: Log and record stats without blocking the stream
+      // This is critical - awaiting these would delay/break the stream response
+      logResponse(requestId, {
         status: streamResult.status,
         response: { streaming: true },
-      }, Date.now() - startTime);
+      }, Date.now() - startTime).catch(() => {});
 
-      // Record estimated usage for streaming (input only, output unknown)
-      try {
-        await recordUsage(inputTokensEstimate, 0);
-      } catch (statsError) {
-        console.error('Failed to record streaming usage stats:', statsError);
-      }
+      recordUsage(inputTokensEstimate, 0).catch(() => {});
 
-      // Return SSE stream response - pure passthrough like Python proxy
+      // Return SSE stream response immediately - pure passthrough like Python proxy
       return new Response(streamResult.stream, {
         status: streamResult.status,
         headers: responseHeaders,
@@ -321,11 +318,12 @@ export async function POST(request: NextRequest) {
 
     if (result.error) {
       const errorResponse = { error: result.error };
-      await logError(requestId, result.error, 'provider');
-      await logResponse(requestId, {
+      // Fire-and-forget logging (don't block response)
+      logError(requestId, result.error, 'provider').catch(() => {});
+      logResponse(requestId, {
         status: 502,
         response: errorResponse,
-      }, Date.now() - startTime);
+      }, Date.now() - startTime).catch(() => {});
       return NextResponse.json(errorResponse, { status: 502 });
     }
 
@@ -354,49 +352,42 @@ export async function POST(request: NextRequest) {
         : undefined,
     };
 
-    // Log the successful response
-    await logResponse(requestId, {
+    // Fire-and-forget: Log and record stats without blocking the response
+    const responseTime = Date.now() - startTime;
+    logResponse(requestId, {
       status: 200,
       response: successResponse,
       message: successResponse.choices[0]?.message?.content,
       usage: successResponse.usage,
-    }, Date.now() - startTime);
+    }, responseTime).catch(() => {});
 
-    // Record usage statistics
-    try {
-      let inputTokens: number;
-      let outputTokens: number;
-
-      if (result.usage?.promptTokens && result.usage?.completionTokens) {
-        // Use actual token counts from API response
-        inputTokens = result.usage.promptTokens;
-        outputTokens = result.usage.completionTokens;
-      } else {
-        // Estimate tokens from messages
-        inputTokens = inputTokensEstimate;
-        outputTokens = result.message?.content ? estimateTokens(result.message.content) : 0;
-      }
-
-      await recordUsage(inputTokens, outputTokens);
-    } catch (statsError) {
-      // Don't fail the request if stats recording fails
-      console.error('Failed to record usage stats:', statsError);
+    // Calculate tokens for stats
+    let inputTokens: number;
+    let outputTokens: number;
+    if (result.usage?.promptTokens && result.usage?.completionTokens) {
+      inputTokens = result.usage.promptTokens;
+      outputTokens = result.usage.completionTokens;
+    } else {
+      inputTokens = inputTokensEstimate;
+      outputTokens = result.message?.content ? estimateTokens(result.message.content) : 0;
     }
+    recordUsage(inputTokens, outputTokens).catch(() => {});
 
     return NextResponse.json(successResponse);
   } catch (error) {
     console.error('Proxy error:', error);
 
-    await logError(requestId, error, 'proxy');
+    // Fire-and-forget logging (don't block error response)
+    logError(requestId, error, 'proxy').catch(() => {});
 
     const errorResponse = {
       error: `Proxy error: ${error instanceof Error ? error.message : 'Unknown error'}`,
     };
 
-    await logResponse(requestId, {
+    logResponse(requestId, {
       status: 500,
       response: errorResponse,
-    }, Date.now() - startTime);
+    }, Date.now() - startTime).catch(() => {});
 
     return NextResponse.json(errorResponse, { status: 500 });
   }

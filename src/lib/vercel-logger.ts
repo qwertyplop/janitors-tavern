@@ -88,21 +88,32 @@ export async function logProcessedRequest(
     providerUrl: string;
     model: string;
     streaming?: boolean;
+    postProcessingMode?: string;
   }
 ): Promise<void> {
   try {
-    consoleLog('info', requestId, 'PROCESSED REQUEST', {
-      providerUrl: data.providerUrl,
-      model: data.model,
-      messageCount: data.processedMessages.length,
-      streaming: data.streaming ?? false,
-    });
+    const timestamp = new Date().toISOString();
 
-    // Detailed log for debugging
-    if (process.env.VERBOSE_LOGGING === 'true') {
-      console.log(`${LOG_PREFIX} [${requestId}] Processed messages:`,
-        JSON.stringify(data.processedMessages, null, 2));
-    }
+    // Build messages preview
+    const messagesPreview = data.processedMessages.map((msg: unknown, index: number) => {
+      const message = msg as { role?: string; content?: string };
+      const contentPreview = message.content?.substring(0, 500) || '';
+      const truncated = (message.content?.length || 0) > 500 ? '...[truncated]' : '';
+      return `  [${index}] ${message.role}: ${contentPreview}${truncated}`;
+    }).join('\n');
+
+    // Single log entry with all info
+    console.log(`${LOG_PREFIX} [${timestamp}] [${requestId}] PROCESSED REQUEST
+Provider: ${data.providerUrl}
+Model: ${data.model}
+Streaming: ${data.streaming ?? false}
+Post-processing: ${data.postProcessingMode || 'none'}
+Message count: ${data.processedMessages.length}
+Sampler: ${JSON.stringify(data.samplerSettings || {})}
+--- MESSAGES ---
+${messagesPreview}
+--- END ---`);
+
   } catch (error) {
     console.error(`${LOG_PREFIX} [${requestId}] Failed to log processed request:`, error);
   }

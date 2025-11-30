@@ -382,6 +382,7 @@ export async function POST(request: NextRequest) {
       providerUrl: connectionPreset.baseUrl,
       model: connectionPreset.model,
       streaming: body.stream === true,
+      postProcessingMode: postProcessingMode,
     }).catch(() => {});
 
     // Calculate input tokens once for stats (used in both streaming and non-streaming)

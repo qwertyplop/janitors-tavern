@@ -81,6 +81,16 @@ export const en = {
     postProcessingStrict: 'Strict',
     postProcessingStrictTools: 'Strict (with tools)',
     postProcessingSingleUser: 'Single user message',
+    postProcessingTips: {
+      'none': 'No changes. Messages are sent exactly as processed by the preset.',
+      'merge': 'Combines consecutive messages with the same role into one message.',
+      'merge-tools': 'Same as Merge, but preserves tool calls in separate messages.',
+      'semi-strict': 'Ensures user/assistant alternation. Merges consecutive same-role messages.',
+      'semi-strict-tools': 'Same as Semi-strict, but preserves tool calls in separate messages.',
+      'strict': 'Forces strict user→assistant→user pattern. First message becomes system.',
+      'strict-tools': 'Same as Strict, but preserves tool calls in separate messages.',
+      'single-user': 'Combines all messages into a single user message. For simple prompts.',
+    } as Record<string, string>,
   },
 
   // Connections

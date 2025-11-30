@@ -231,7 +231,7 @@ export default function DashboardPage() {
               ))}
             </Select>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              {t.dashboard.postProcessingHint}
+              {t.dashboard.postProcessingTips[settings?.defaultPostProcessing || 'none']}
             </p>
           </div>
           {(!settings?.defaultConnectionId || !settings?.defaultChatCompletionPresetId) && (

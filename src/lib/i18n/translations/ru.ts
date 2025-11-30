@@ -83,6 +83,16 @@ export const ru: TranslationKeys = {
     postProcessingStrict: 'Строгий',
     postProcessingStrictTools: 'Строгий (с инструментами)',
     postProcessingSingleUser: 'Одно сообщение пользователя',
+    postProcessingTips: {
+      'none': 'Без изменений. Сообщения отправляются как есть после обработки пресетом.',
+      'merge': 'Объединяет последовательные сообщения с одинаковой ролью в одно.',
+      'merge-tools': 'Как Merge, но сохраняет вызовы инструментов в отдельных сообщениях.',
+      'semi-strict': 'Обеспечивает чередование user/assistant. Объединяет сообщения с одной ролью.',
+      'semi-strict-tools': 'Как Semi-strict, но сохраняет вызовы инструментов отдельно.',
+      'strict': 'Строгий паттерн user→assistant→user. Первое сообщение становится system.',
+      'strict-tools': 'Как Strict, но сохраняет вызовы инструментов в отдельных сообщениях.',
+      'single-user': 'Объединяет все сообщения в одно сообщение пользователя. Для простых промптов.',
+    } as Record<string, string>,
   },
 
   // Connections

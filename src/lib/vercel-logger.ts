@@ -94,15 +94,13 @@ export async function logProcessedRequest(
   try {
     const timestamp = new Date().toISOString();
 
-    // Build messages preview
+    // Build full messages - no truncation for debugging
     const messagesPreview = data.processedMessages.map((msg: unknown, index: number) => {
       const message = msg as { role?: string; content?: string };
-      const contentPreview = message.content?.substring(0, 500) || '';
-      const truncated = (message.content?.length || 0) > 500 ? '...[truncated]' : '';
-      return `  [${index}] ${message.role}: ${contentPreview}${truncated}`;
-    }).join('\n');
+      return `  [${index}] ${message.role}:\n${message.content || ''}`;
+    }).join('\n\n');
 
-    // Single log entry with all info
+    // Single log entry with all info - full body for debugging
     console.log(`${LOG_PREFIX} [${timestamp}] [${requestId}] PROCESSED REQUEST
 Provider: ${data.providerUrl}
 Model: ${data.model}

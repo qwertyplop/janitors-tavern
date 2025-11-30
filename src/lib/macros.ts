@@ -303,6 +303,7 @@ export function processMacros(content: string, context: MacroContext = {}): stri
     // Chat history macros
     if (macroLower === 'lastmessageid') return context.lastMessageId?.toString() || '';
     if (macroLower === 'lastmessage') return context.lastMessage || '';
+    if (macroLower === 'lastchatmessage') return context.lastMessage || ''; // Alias for lastMessage
     if (macroLower === 'firstincludedmessageid') return context.firstIncludedMessageId?.toString() || '';
     if (macroLower === 'lastcharmessage') return context.lastCharMessage || '';
     if (macroLower === 'lastusermessage') return context.lastUserMessage || '';

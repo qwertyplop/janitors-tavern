@@ -91,6 +91,90 @@ function processBlockContent(block: STPromptBlock, context: MacroContext): strin
 }
 
 /**
+ * Get content for marker blocks based on their identifier
+ */
+function getMarkerContent(
+  identifier: string,
+  janitorData: ParsedJanitorData,
+  context: MacroContext
+): OutputMessage[] {
+  const messages: OutputMessage[] = [];
+
+  switch (identifier) {
+    case 'dialogueExamples':
+      // Insert example dialogs from JanitorAI
+      if (context.mesExamples?.trim()) {
+        messages.push({
+          role: 'system',
+          content: context.mesExamples,
+        });
+      }
+      break;
+
+    case 'chatHistory':
+      // Insert chat history from JanitorAI
+      for (const msg of janitorData.chatHistory) {
+        messages.push({
+          role: msg.role,
+          content: msg.content,
+        });
+      }
+      break;
+
+    case 'charDescription':
+      // Insert character description
+      if (context.charDescription?.trim()) {
+        messages.push({
+          role: 'system',
+          content: context.charDescription,
+        });
+      }
+      break;
+
+    case 'charPersonality':
+      // Insert character personality
+      if (context.charPersonality?.trim()) {
+        messages.push({
+          role: 'system',
+          content: context.charPersonality,
+        });
+      }
+      break;
+
+    case 'scenario':
+      // Insert scenario
+      if (context.charScenario?.trim()) {
+        messages.push({
+          role: 'system',
+          content: context.charScenario,
+        });
+      }
+      break;
+
+    case 'personaDescription':
+      // Insert user persona
+      if (context.persona?.trim()) {
+        messages.push({
+          role: 'system',
+          content: context.persona,
+        });
+      }
+      break;
+
+    case 'worldInfoBefore':
+    case 'worldInfoAfter':
+      // World info not available from JanitorAI - skip
+      break;
+
+    default:
+      // Unknown marker - skip
+      break;
+  }
+
+  return messages;
+}
+
+/**
  * Build messages array from preset and parsed JanitorAI data
  */
 export function buildMessages(
@@ -116,8 +200,12 @@ export function buildMessages(
   const systemMessages: OutputMessage[] = [];
 
   for (const block of relativeBlocks) {
-    // Skip marker blocks (they define where content goes, not content itself)
-    if (block.marker) continue;
+    // Handle marker blocks - they inject predefined content
+    if (block.marker) {
+      const markerMessages = getMarkerContent(block.identifier, janitorData, context);
+      systemMessages.push(...markerMessages);
+      continue;
+    }
 
     // Skip empty content
     const content = processBlockContent(block, context);
@@ -138,26 +226,52 @@ export function buildMessages(
     finalMessages = systemMessages;
   }
 
-  // Add chat history
-  const chatHistory = janitorData.chatHistory || [];
+  // Check if chatHistory marker is in relativeBlocks (already processed above)
+  const chatHistoryInRelative = relativeBlocks.some(b => b.marker && b.identifier === 'chatHistory');
 
-  // Sort in-chat blocks by depth (higher depth = inserted earlier in history)
-  const sortedInChatBlocks = [...inChatBlocks].sort((a, b) =>
-    (b.injection_depth || 0) - (a.injection_depth || 0)
-  );
+  // If chatHistory wasn't in relative blocks, add it from inChatBlocks processing
+  if (!chatHistoryInRelative) {
+    const chatHistory = janitorData.chatHistory || [];
 
-  // Build chat messages with injections
-  const chatMessages: OutputMessage[] = [];
+    // Sort in-chat blocks by depth (higher depth = inserted earlier in history)
+    const sortedInChatBlocks = [...inChatBlocks].sort((a, b) =>
+      (b.injection_depth || 0) - (a.injection_depth || 0)
+    );
 
-  for (let i = 0; i < chatHistory.length; i++) {
-    const msg = chatHistory[i];
-    const depthFromEnd = chatHistory.length - 1 - i;
+    // Build chat messages with injections
+    const chatMessages: OutputMessage[] = [];
 
-    // Check for injections at this depth
+    for (let i = 0; i < chatHistory.length; i++) {
+      const msg = chatHistory[i];
+      const depthFromEnd = chatHistory.length - 1 - i;
+
+      // Check for injections at this depth
+      for (const block of sortedInChatBlocks) {
+        if (block.marker) continue; // Skip markers in in-chat position
+        const blockDepth = block.injection_depth || 0;
+        if (blockDepth === depthFromEnd + 1) {
+          // Inject before this message
+          const content = processBlockContent(block, context);
+          if (content.trim()) {
+            chatMessages.push({
+              role: block.role,
+              content: content,
+            });
+          }
+        }
+      }
+
+      // Add the actual chat message
+      chatMessages.push({
+        role: msg.role,
+        content: msg.content,
+      });
+    }
+
+    // Add depth 0 injections at the very end
     for (const block of sortedInChatBlocks) {
-      const blockDepth = block.injection_depth || 0;
-      if (blockDepth === depthFromEnd + 1) {
-        // Inject before this message
+      if (block.marker) continue; // Skip markers
+      if ((block.injection_depth || 0) === 0) {
         const content = processBlockContent(block, context);
         if (content.trim()) {
           chatMessages.push({
@@ -168,28 +282,9 @@ export function buildMessages(
       }
     }
 
-    // Add the actual chat message
-    chatMessages.push({
-      role: msg.role,
-      content: msg.content,
-    });
+    // Combine system messages with chat messages
+    finalMessages.push(...chatMessages);
   }
-
-  // Add depth 0 injections at the very end
-  for (const block of sortedInChatBlocks) {
-    if ((block.injection_depth || 0) === 0) {
-      const content = processBlockContent(block, context);
-      if (content.trim()) {
-        chatMessages.push({
-          role: block.role,
-          content: content,
-        });
-      }
-    }
-  }
-
-  // Combine system messages with chat messages
-  finalMessages.push(...chatMessages);
 
   // Filter out empty messages
   return finalMessages.filter(msg => msg.content.trim());

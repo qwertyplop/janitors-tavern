@@ -93,8 +93,19 @@ export function parseJanitorRequest(request: JanitorRequest): ParsedJanitorData 
   // Parse the system message
   const parsed = parseSystemMessage(systemContent);
 
-  // Chat history is everything after the system message
-  const chatHistory = messages.slice(1);
+  // Chat history is all non-system messages
+  const chatHistory = messages.filter(m => m.role !== 'system');
+
+  // Log parsed data for debugging
+  console.log('[JanitorParser] Parsed data:', {
+    user: parsed.user,
+    char: parsed.char,
+    personalityLength: parsed.personality.length,
+    scenarioLength: parsed.scenario.length,
+    personaLength: parsed.persona.length,
+    mesExamplesLength: parsed.mesExamples.length,
+    chatHistoryCount: chatHistory.length,
+  });
 
   // Extract other params
   const { messages: _, model, ...otherParams } = request;
@@ -124,7 +135,7 @@ export function janitorDataToMacroContext(data: ParsedJanitorData): MacroContext
     .reverse()
     .find(m => m.role === 'user')?.content || '';
 
-  return {
+  const context: MacroContext = {
     user: data.user,
     char: data.char,
     charDescription: data.personality, // In JanitorAI, personality is the main description
@@ -144,6 +155,18 @@ export function janitorDataToMacroContext(data: ParsedJanitorData): MacroContext
     },
     outlets: new Map(),
   };
+
+  // Log macro context for debugging
+  console.log('[JanitorParser] Macro context:', {
+    user: context.user,
+    char: context.char,
+    descriptionPreview: context.charDescription?.substring(0, 100),
+    scenarioPreview: context.charScenario?.substring(0, 100),
+    personaPreview: context.persona?.substring(0, 100),
+    mesExamplesPreview: context.mesExamples?.substring(0, 100),
+  });
+
+  return context;
 }
 
 /**

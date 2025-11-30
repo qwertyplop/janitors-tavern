@@ -192,94 +192,106 @@ export function buildMessages(
     }
   }
 
-  // Build relative blocks (system prompt area)
-  const systemMessages: OutputMessage[] = [];
+  // Find where chatHistory marker is in relativeBlocks
+  const chatHistoryIndex = relativeBlocks.findIndex(b => b.marker && b.identifier === 'chatHistory');
+  const chatHistoryInRelative = chatHistoryIndex !== -1;
 
-  for (const block of relativeBlocks) {
-    // Handle marker blocks - they inject predefined content
+  // Split relativeBlocks into before and after chatHistory
+  const blocksBeforeChatHistory = chatHistoryInRelative
+    ? relativeBlocks.slice(0, chatHistoryIndex)
+    : relativeBlocks;
+  const blocksAfterChatHistory = chatHistoryInRelative
+    ? relativeBlocks.slice(chatHistoryIndex + 1)
+    : [];
+
+  // Sort in-chat blocks by depth (higher depth = inserted earlier in history)
+  // injection_order determines the order within the same depth
+  // originalIndex is used as tiebreaker to preserve prompt_order sequence
+  const sortedInChatBlocks = [...inChatBlocks].sort((a, b) => {
+    const depthDiff = (b.injection_depth || 0) - (a.injection_depth || 0);
+    if (depthDiff !== 0) return depthDiff;
+    // Within same depth, use injection_order (lower = first)
+    const orderDiff = (a.injection_order || 100) - (b.injection_order || 100);
+    if (orderDiff !== 0) return orderDiff;
+    // Use originalIndex as final tiebreaker
+    return a.originalIndex - b.originalIndex;
+  });
+
+  // Helper function to process a block
+  const processBlock = (block: ProcessedBlock): OutputMessage | null => {
+    if (block.marker) {
+      // For markers, use getMarkerContent - but we handle them specially below
+      return null;
+    }
+    const content = processBlockContent(block, context);
+    if (!content.trim()) return null;
+    return { role: block.role, content };
+  };
+
+  // Build messages in proper order
+  const allMessages: OutputMessage[] = [];
+
+  // 1. Process blocks before chatHistory
+  for (const block of blocksBeforeChatHistory) {
     if (block.marker) {
       const markerMessages = getMarkerContent(block.identifier, janitorData, context);
-      systemMessages.push(...markerMessages);
-      continue;
+      allMessages.push(...markerMessages);
+    } else {
+      const msg = processBlock(block);
+      if (msg) allMessages.push(msg);
+    }
+  }
+
+  // 2. Add chat history with in-chat injections (depth > 0)
+  const chatHistory = janitorData.chatHistory || [];
+  for (let i = 0; i < chatHistory.length; i++) {
+    const msg = chatHistory[i];
+    const depthFromEnd = chatHistory.length - 1 - i;
+
+    // Check for injections BEFORE this message (at depth = depthFromEnd + 1)
+    for (const block of sortedInChatBlocks) {
+      if (block.marker) continue;
+      const blockDepth = block.injection_depth || 0;
+      if (blockDepth === depthFromEnd + 1) {
+        const content = processBlockContent(block, context);
+        if (content.trim()) {
+          allMessages.push({ role: block.role, content });
+        }
+      }
     }
 
-    // Skip empty content
-    const content = processBlockContent(block, context);
-    if (!content.trim()) continue;
+    // Add the chat message
+    allMessages.push({ role: msg.role, content: msg.content });
+  }
 
-    systemMessages.push({
-      role: block.role,
-      content: content,
-    });
+  // 3. Add depth-0 in-chat injections (right after chat history, before remaining blocks)
+  for (const block of sortedInChatBlocks) {
+    if (block.marker) continue;
+    if ((block.injection_depth || 0) === 0) {
+      const content = processBlockContent(block, context);
+      if (content.trim()) {
+        allMessages.push({ role: block.role, content });
+      }
+    }
+  }
+
+  // 4. Process blocks after chatHistory (e.g., assistant prefill)
+  for (const block of blocksAfterChatHistory) {
+    if (block.marker) {
+      const markerMessages = getMarkerContent(block.identifier, janitorData, context);
+      allMessages.push(...markerMessages);
+    } else {
+      const msg = processBlock(block);
+      if (msg) allMessages.push(msg);
+    }
   }
 
   // Squash system messages if enabled
-  let finalMessages: OutputMessage[] = [];
-
+  let finalMessages: OutputMessage[];
   if (preset.providerSettings?.squashSystemMessages) {
-    finalMessages = squashMessages(systemMessages);
+    finalMessages = squashMessages(allMessages);
   } else {
-    finalMessages = systemMessages;
-  }
-
-  // Check if chatHistory marker is in relativeBlocks (already processed above)
-  const chatHistoryInRelative = relativeBlocks.some(b => b.marker && b.identifier === 'chatHistory');
-
-  // If chatHistory wasn't in relative blocks, add it from inChatBlocks processing
-  if (!chatHistoryInRelative) {
-    const chatHistory = janitorData.chatHistory || [];
-
-    // Sort in-chat blocks by depth (higher depth = inserted earlier in history)
-    const sortedInChatBlocks = [...inChatBlocks].sort((a, b) =>
-      (b.injection_depth || 0) - (a.injection_depth || 0)
-    );
-
-    // Build chat messages with injections
-    const chatMessages: OutputMessage[] = [];
-
-    for (let i = 0; i < chatHistory.length; i++) {
-      const msg = chatHistory[i];
-      const depthFromEnd = chatHistory.length - 1 - i;
-
-      // Check for injections at this depth
-      for (const block of sortedInChatBlocks) {
-        if (block.marker) continue; // Skip markers in in-chat position
-        const blockDepth = block.injection_depth || 0;
-        if (blockDepth === depthFromEnd + 1) {
-          // Inject before this message
-          const content = processBlockContent(block, context);
-          if (content.trim()) {
-            chatMessages.push({
-              role: block.role,
-              content: content,
-            });
-          }
-        }
-      }
-
-      // Add the actual chat message
-      chatMessages.push({
-        role: msg.role,
-        content: msg.content,
-      });
-    }
-
-    // Add depth 0 injections at the very end
-    for (const block of sortedInChatBlocks) {
-      if (block.marker) continue; // Skip markers
-      if ((block.injection_depth || 0) === 0) {
-        const content = processBlockContent(block, context);
-        if (content.trim()) {
-          chatMessages.push({
-            role: block.role,
-            content: content,
-          });
-        }
-      }
-    }
-
-    // Combine system messages with chat messages
-    finalMessages.push(...chatMessages);
+    finalMessages = allMessages;
   }
 
   // Filter out empty messages

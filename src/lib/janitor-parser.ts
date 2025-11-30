@@ -135,11 +135,13 @@ export function janitorDataToMacroContext(data: ParsedJanitorData): MacroContext
     .reverse()
     .find(m => m.role === 'user')?.content || '';
 
+  // In JanitorAI, description and personality come from the SAME field (<CHAR's Persona>)
+  // Deduplication is handled via _usedContentGroups tracking in macros.ts and prompt-builder.ts
   const context: MacroContext = {
     user: data.user,
     char: data.char,
-    charDescription: data.personality, // In JanitorAI, personality is the main description
-    charPersonality: data.personality,
+    charDescription: data.personality, // Main character info from JanitorAI
+    charPersonality: data.personality, // Same as description - deduplication handled elsewhere
     charScenario: data.scenario,
     persona: data.persona,
     mesExamples: data.mesExamples,

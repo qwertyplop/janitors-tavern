@@ -122,21 +122,17 @@ function getMarkerContent(
       break;
 
     case 'charDescription':
-      // Insert character description
-      if (context.charDescription?.trim()) {
+    case 'charPersonality':
+      // In JanitorAI, description and personality are the same field
+      // Use deduplication to prevent double output when both markers are enabled
+      if (!context._usedContentGroups) {
+        context._usedContentGroups = new Set();
+      }
+      if (!context._usedContentGroups.has('charPersona') && context.charDescription?.trim()) {
+        context._usedContentGroups.add('charPersona');
         messages.push({
           role: 'system',
           content: context.charDescription,
-        });
-      }
-      break;
-
-    case 'charPersonality':
-      // Insert character personality
-      if (context.charPersonality?.trim()) {
-        messages.push({
-          role: 'system',
-          content: context.charPersonality,
         });
       }
       break;

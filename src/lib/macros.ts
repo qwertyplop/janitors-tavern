@@ -65,6 +65,11 @@ export interface MacroContext {
 
   // World Info outlets
   outlets?: Map<string, string>;
+
+  // Internal: Track used content to prevent duplication
+  // When JanitorAI provides same data for multiple fields (e.g., description = personality),
+  // this tracks which content groups have been output to prevent duplicates
+  _usedContentGroups?: Set<string>;
 }
 
 // ============================================
@@ -278,9 +283,27 @@ export function processMacros(content: string, context: MacroContext = {}): stri
     // User/Character macros
     if (macroLower === 'user' || macroContent === '<USER>') return context.user || '';
     if (macroLower === 'char' || macroContent === '<BOT>') return context.char || '';
-    if (macroLower === 'description') return context.charDescription || '';
+
+    // Description and Personality - with deduplication for JanitorAI
+    // In JanitorAI, both come from the same field, so we track usage to prevent duplicates
+    if (macroLower === 'description' || macroLower === 'personality') {
+      // Initialize tracking set if not exists
+      if (!context._usedContentGroups) {
+        context._usedContentGroups = new Set();
+      }
+      // Check if character persona content was already output
+      if (context._usedContentGroups.has('charPersona')) {
+        return ''; // Already used, prevent duplication
+      }
+      // Get the content (both macros use charDescription as the source)
+      const content = context.charDescription || '';
+      if (content) {
+        context._usedContentGroups.add('charPersona');
+      }
+      return content;
+    }
+
     if (macroLower === 'scenario') return context.charScenario || '';
-    if (macroLower === 'personality') return context.charPersonality || '';
     if (macroLower === 'persona') return context.persona || '';
     if (macroLower === 'mesexamples') return context.mesExamples || '';
     if (macroLower === 'mesexamplesraw') return context.mesExamplesRaw || '';

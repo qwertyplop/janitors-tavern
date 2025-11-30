@@ -11,7 +11,7 @@ import {
   getSettings,
   updateSettings,
 } from '@/lib/storage';
-import { ConnectionPreset, ChatCompletionPreset, AppSettings } from '@/types';
+import { ConnectionPreset, ChatCompletionPreset, AppSettings, PromptPostProcessingMode } from '@/types';
 import { useSync } from '@/components/providers/SyncProvider';
 import { useI18n } from '@/components/providers/I18nProvider';
 
@@ -94,8 +94,26 @@ export default function DashboardPage() {
     setSettings(newSettings);
   };
 
+  const handlePostProcessingChange = (mode: string) => {
+    const newSettings = updateSettings({
+      defaultPostProcessing: (mode || 'none') as PromptPostProcessingMode
+    });
+    setSettings(newSettings);
+  };
+
   const defaultConnection = connections.find((c) => c.id === settings?.defaultConnectionId);
   const defaultPreset = presets.find((p) => p.id === settings?.defaultChatCompletionPresetId);
+
+  const postProcessingOptions: { value: PromptPostProcessingMode; label: string }[] = [
+    { value: 'none', label: t.dashboard.postProcessingNone },
+    { value: 'merge', label: t.dashboard.postProcessingMerge },
+    { value: 'merge-tools', label: t.dashboard.postProcessingMergeTools },
+    { value: 'semi-strict', label: t.dashboard.postProcessingSemiStrict },
+    { value: 'semi-strict-tools', label: t.dashboard.postProcessingSemiStrictTools },
+    { value: 'strict', label: t.dashboard.postProcessingStrict },
+    { value: 'strict-tools', label: t.dashboard.postProcessingStrictTools },
+    { value: 'single-user', label: t.dashboard.postProcessingSingleUser },
+  ];
 
   return (
     <div className="space-y-6">
@@ -198,6 +216,23 @@ export default function DashboardPage() {
                 </p>
               )}
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="dashboardPostProcessing">{t.dashboard.postProcessing}</Label>
+            <Select
+              id="dashboardPostProcessing"
+              value={settings?.defaultPostProcessing || 'none'}
+              onChange={(e) => handlePostProcessingChange(e.target.value)}
+            >
+              {postProcessingOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </Select>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              {t.dashboard.postProcessingHint}
+            </p>
           </div>
           {(!settings?.defaultConnectionId || !settings?.defaultChatCompletionPresetId) && (
             <div className="rounded-md bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-3">

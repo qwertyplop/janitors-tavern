@@ -6,6 +6,7 @@ import {
   ConnectionPreset,
   ChatCompletionPreset,
   ChatMessage,
+  PromptPostProcessingMode,
 } from '@/types';
 import {
   logRequest,
@@ -20,6 +21,7 @@ import { buildMessages as buildPresetMessages, OutputMessage } from '@/lib/promp
 import {
   getDefaultConnectionPreset,
   getDefaultChatCompletionPreset,
+  getServerSettings,
 } from '@/lib/server-storage';
 import { recordUsage, calculateMessageTokens } from '@/lib/stats';
 
@@ -77,40 +79,144 @@ function buildMessagesWithPreset(
 }
 
 // ============================================
-// Squash Consecutive System Messages
+// Post-Processing Functions
 // ============================================
 
-function squashSystemMessages(messages: OutputMessage[]): OutputMessage[] {
+/**
+ * Merge consecutive messages from the same role
+ */
+function mergeConsecutiveMessages(messages: OutputMessage[]): OutputMessage[] {
   if (messages.length === 0) return [];
 
   const result: OutputMessage[] = [];
-  let currentSystemContent: string[] = [];
+  let currentRole: string | null = null;
+  let currentContent: string[] = [];
 
   for (const msg of messages) {
-    if (msg.role === 'system') {
-      currentSystemContent.push(msg.content);
+    if (msg.role === currentRole) {
+      currentContent.push(msg.content);
     } else {
-      // Flush accumulated system messages
-      if (currentSystemContent.length > 0) {
+      // Flush accumulated messages
+      if (currentRole && currentContent.length > 0) {
         result.push({
-          role: 'system',
-          content: currentSystemContent.join('\n'),
+          role: currentRole as 'system' | 'user' | 'assistant',
+          content: currentContent.join('\n\n'),
         });
-        currentSystemContent = [];
       }
-      result.push(msg);
+      currentRole = msg.role;
+      currentContent = [msg.content];
     }
   }
 
-  // Flush any remaining system messages
-  if (currentSystemContent.length > 0) {
+  // Flush remaining messages
+  if (currentRole && currentContent.length > 0) {
     result.push({
-      role: 'system',
-      content: currentSystemContent.join('\n'),
+      role: currentRole as 'system' | 'user' | 'assistant',
+      content: currentContent.join('\n\n'),
     });
   }
 
   return result;
+}
+
+/**
+ * Semi-strict mode: Merge roles, allow only one optional system message at start
+ */
+function semiStrictProcess(messages: OutputMessage[]): OutputMessage[] {
+  const merged = mergeConsecutiveMessages(messages);
+  if (merged.length === 0) return [];
+
+  // Collect all system messages into one at the start
+  const systemContents: string[] = [];
+  const nonSystemMessages: OutputMessage[] = [];
+
+  for (const msg of merged) {
+    if (msg.role === 'system') {
+      systemContents.push(msg.content);
+    } else {
+      nonSystemMessages.push(msg);
+    }
+  }
+
+  const result: OutputMessage[] = [];
+  if (systemContents.length > 0) {
+    result.push({
+      role: 'system',
+      content: systemContents.join('\n\n'),
+    });
+  }
+
+  return [...result, ...nonSystemMessages];
+}
+
+/**
+ * Strict mode: Merge roles, one system msg, ensure user message comes first after system
+ */
+function strictProcess(messages: OutputMessage[]): OutputMessage[] {
+  const semiStrict = semiStrictProcess(messages);
+  if (semiStrict.length === 0) return [];
+
+  // Find system message and non-system messages
+  const systemMsg = semiStrict.find(m => m.role === 'system');
+  const nonSystem = semiStrict.filter(m => m.role !== 'system');
+
+  // Ensure first non-system message is from user
+  if (nonSystem.length > 0 && nonSystem[0].role !== 'user') {
+    // Prepend an empty user message or adjust
+    nonSystem.unshift({
+      role: 'user',
+      content: '[Start]',
+    });
+  }
+
+  const result: OutputMessage[] = [];
+  if (systemMsg) result.push(systemMsg);
+  result.push(...nonSystem);
+
+  return result;
+}
+
+/**
+ * Single user mode: Merge all messages into a single user message
+ */
+function singleUserProcess(messages: OutputMessage[]): OutputMessage[] {
+  if (messages.length === 0) return [];
+
+  const allContent = messages.map(m => {
+    const roleLabel = m.role.charAt(0).toUpperCase() + m.role.slice(1);
+    return `[${roleLabel}]\n${m.content}`;
+  }).join('\n\n');
+
+  return [{
+    role: 'user',
+    content: allContent,
+  }];
+}
+
+/**
+ * Apply post-processing based on mode
+ */
+function applyPostProcessing(
+  messages: OutputMessage[],
+  mode: PromptPostProcessingMode
+): OutputMessage[] {
+  switch (mode) {
+    case 'none':
+      return messages;
+    case 'merge':
+    case 'merge-tools':
+      return mergeConsecutiveMessages(messages);
+    case 'semi-strict':
+    case 'semi-strict-tools':
+      return semiStrictProcess(messages);
+    case 'strict':
+    case 'strict-tools':
+      return strictProcess(messages);
+    case 'single-user':
+      return singleUserProcess(messages);
+    default:
+      return messages;
+  }
 }
 
 // ============================================
@@ -213,6 +319,13 @@ export async function POST(request: NextRequest) {
     const janitorData = parseJanitorRequest(janitorRequest);
     const macroContext = janitorDataToMacroContext(janitorData);
 
+    // Get settings for post-processing mode
+    const settings = await getServerSettings();
+    const postProcessingMode: PromptPostProcessingMode =
+      connectionPreset.promptPostProcessing ||
+      settings.defaultPostProcessing ||
+      'none';
+
     // Build messages
     let processedMessages: OutputMessage[];
 
@@ -223,14 +336,14 @@ export async function POST(request: NextRequest) {
         janitorRequest,
         macroContext
       );
-
-      // Apply squash if enabled in preset
-      if (chatCompletionPreset.providerSettings?.squashSystemMessages) {
-        processedMessages = squashSystemMessages(processedMessages);
-      }
     } else {
       // Legacy: just process macros in existing messages
       processedMessages = buildMessagesLegacy(body.messages, macroContext);
+    }
+
+    // Apply post-processing based on mode
+    if (postProcessingMode !== 'none') {
+      processedMessages = applyPostProcessing(processedMessages, postProcessingMode);
     }
 
     // Get sampler parameters from preset

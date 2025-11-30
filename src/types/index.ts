@@ -391,6 +391,7 @@ export interface AppSettings {
   defaultPromptPresetId?: string;
   defaultSamplerPresetId?: string;
   defaultChatCompletionPresetId?: string;
+  defaultPostProcessing?: PromptPostProcessingMode;
   showAdvancedOptions: boolean;
   logging: LoggingSettings;
 }

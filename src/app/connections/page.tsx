@@ -96,33 +96,11 @@ export default function ConnectionsPage() {
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  // Auto-connect state
-  const [autoConnectId, setAutoConnectId] = useState<string | null>(null);
-  const autoConnectTriggered = useRef(false);
-
   useEffect(() => {
     const presets = getConnectionPresets();
     setConnections(presets);
 
-    // Load auto-connect setting
-    const savedAutoConnectId = localStorage.getItem('jt.autoConnectId');
-    if (savedAutoConnectId && presets.some(p => p.id === savedAutoConnectId)) {
-      setAutoConnectId(savedAutoConnectId);
-      setSelectedId(savedAutoConnectId);
-
-      // Trigger auto-connect
-      if (!autoConnectTriggered.current) {
-        autoConnectTriggered.current = true;
-        const connectionToConnect = presets.find(p => p.id === savedAutoConnectId);
-        if (connectionToConnect) {
-          // Delay to allow state to settle
-          setTimeout(() => {
-            connectToPresetDirect(connectionToConnect);
-          }, 300);
-        }
-      }
-    } else if (presets.length > 0) {
-      // Auto-select first connection if available
+    if (presets.length > 0) {
       setSelectedId(presets[0].id);
     }
   }, []);
@@ -136,32 +114,15 @@ export default function ConnectionsPage() {
     updateSettings({ defaultConnectionId: id });
   };
 
-  // Reset connection state when selection changes (but not during initial auto-connect)
+  // Reset connection state when selection changes
   useEffect(() => {
-    if (autoConnectTriggered.current && autoConnectId === selectedId) {
-      // Don't reset during auto-connect
-      return;
-    }
     setConnectionStatus('none');
     setAvailableModels([]);
     setSelectedModel(selectedConnection?.model || '');
     setTestResult(null);
   }, [selectedId]);
 
-  // Toggle auto-connect for current connection
-  const toggleAutoConnect = () => {
-    if (autoConnectId === selectedId) {
-      // Disable auto-connect
-      setAutoConnectId(null);
-      localStorage.removeItem('jt.autoConnectId');
-    } else if (selectedId) {
-      // Enable auto-connect for this connection
-      setAutoConnectId(selectedId);
-      localStorage.setItem('jt.autoConnectId', selectedId);
-    }
-  };
-
-  // Connect handler - fetches models and updates status (direct version for auto-connect)
+  // Connect handler - fetches models and updates status
   const connectToPresetDirect = async (connection: ConnectionPreset) => {
     setIsConnecting(true);
     setConnectionStatus('connecting');
@@ -169,12 +130,14 @@ export default function ConnectionsPage() {
     setSelectedModel(connection.model || '');
 
     try {
-      // Normalize the base URL
-      let modelsUrl = connection.baseUrl.replace(/\/+$/, '');
-      if (!modelsUrl.endsWith('/v1')) {
-        modelsUrl += '/v1';
-      }
-      modelsUrl += '/models';
+      // Normalize the base URL - handle various formats
+      let baseUrl = connection.baseUrl.replace(/\/+$/, '');
+
+      // Remove /v1 suffix if present (we'll add it back)
+      baseUrl = baseUrl.replace(/\/v1$/i, '');
+
+      // Build models URL
+      const modelsUrl = `${baseUrl}/v1/models`;
 
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -185,23 +148,44 @@ export default function ConnectionsPage() {
         headers['Authorization'] = `Bearer ${apiKey}`;
       }
 
+      console.log('[Connections] Fetching models from:', modelsUrl);
       const response = await fetch(modelsUrl, { headers });
 
       if (response.ok) {
-        const data: ModelsResponse = await response.json();
-        if (data.data && data.data.length > 0) {
-          setAvailableModels(data.data);
+        const data = await response.json();
+        console.log('[Connections] Models response:', data);
+
+        // Handle different response formats
+        let models: ModelInfo[] = [];
+
+        if (Array.isArray(data)) {
+          // Some APIs return array directly
+          models = data.map((m: string | ModelInfo) =>
+            typeof m === 'string' ? { id: m } : m
+          );
+        } else if (data.data && Array.isArray(data.data)) {
+          // OpenAI format: { data: [...] }
+          models = data.data;
+        } else if (data.models && Array.isArray(data.models)) {
+          // Some APIs use { models: [...] }
+          models = data.models;
+        }
+
+        if (models.length > 0) {
+          setAvailableModels(models);
           setConnectionStatus('valid');
           // Keep saved model selected if it exists in the list
-          if (connection.model && data.data.some(m => m.id === connection.model)) {
+          if (connection.model && models.some(m => m.id === connection.model)) {
             setSelectedModel(connection.model);
           }
         } else if (connection.bypassStatusCheck) {
           setConnectionStatus('bypassed');
         } else {
-          setConnectionStatus('none');
+          // No models found but connection worked - still valid, user can enter model manually
+          setConnectionStatus('valid');
         }
       } else {
+        console.log('[Connections] Models request failed:', response.status);
         if (connection.bypassStatusCheck) {
           setConnectionStatus('bypassed');
         } else {
@@ -209,7 +193,7 @@ export default function ConnectionsPage() {
         }
       }
     } catch (error) {
-      console.error('Connection error:', error);
+      console.error('[Connections] Connection error:', error);
       if (connection.bypassStatusCheck) {
         setConnectionStatus('bypassed');
       } else {
@@ -500,30 +484,9 @@ export default function ConnectionsPage() {
                     </Button>
                     <StatusIndicator status={connectionStatus} t={t} />
                   </div>
-                  <div className="flex items-center gap-3 pt-2">
-                    <button
-                      onClick={toggleAutoConnect}
-                      className={cn(
-                        'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
-                        autoConnectId === selectedId ? 'bg-blue-600' : 'bg-zinc-300 dark:bg-zinc-600'
-                      )}
-                      role="switch"
-                      aria-checked={autoConnectId === selectedId}
-                    >
-                      <span
-                        className={cn(
-                          'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
-                          autoConnectId === selectedId ? 'translate-x-4' : 'translate-x-0'
-                        )}
-                      />
-                    </button>
-                    <Label className="text-sm cursor-pointer" onClick={toggleAutoConnect}>
-                      {t.connections.autoConnectOnLaunch}
-                    </Label>
-                    {autoConnectId === selectedId && (
-                      <span className="text-xs text-green-600 dark:text-green-400">{t.common.enabled}</span>
-                    )}
-                  </div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {t.connections.connectHint}
+                  </p>
                 </div>
 
                 {/* Model Selection */}

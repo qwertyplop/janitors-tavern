@@ -104,19 +104,20 @@ async function isBlobConfigured(): Promise<boolean> {
 }
 
 async function loadStats(): Promise<UsageStats> {
-  if (!(await isBlobConfigured())) {
-    return getDefaultStats();
-  }
-
   try {
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      return getDefaultStats();
+    }
+
     const blobInfo = await head(STATS_BLOB_PATH);
     if (blobInfo) {
       const response = await fetch(blobInfo.url);
       const data = await response.json();
       return data as UsageStats;
     }
-  } catch {
-    // Blob doesn't exist or error
+  } catch (error) {
+    // Blob doesn't exist or error - log and continue
+    console.error('[Stats] Failed to load stats:', error);
   }
 
   return getDefaultStats();
@@ -153,51 +154,66 @@ async function saveStats(stats: UsageStats): Promise<void> {
 
 /**
  * Get current usage stats
+ *
+ * NOTE: This function is designed to never throw - all errors are caught and logged
  */
 export async function getStats(): Promise<UsageStats> {
-  let stats = await loadStats();
+  try {
+    let stats = await loadStats();
 
-  // Check if daily reset is needed
-  if (shouldResetDaily(stats.lastDailyReset)) {
-    stats = {
-      ...stats,
-      dailyRequests: 0,
-      dailyTokens: 0,
-      lastDailyReset: new Date().toISOString(),
-    };
-    await saveStats(stats);
+    // Check if daily reset is needed
+    if (shouldResetDaily(stats.lastDailyReset)) {
+      stats = {
+        ...stats,
+        dailyRequests: 0,
+        dailyTokens: 0,
+        lastDailyReset: new Date().toISOString(),
+      };
+      await saveStats(stats);
+    }
+
+    return stats;
+  } catch (error) {
+    console.error('[Stats] Failed to get stats:', error);
+    return getDefaultStats();
   }
-
-  return stats;
 }
 
 /**
  * Increment request count and add tokens
  * @param inputTokens - Tokens in the request (prompt)
  * @param outputTokens - Tokens in the response (completion)
+ *
+ * NOTE: This function is designed to never throw - all errors are caught and logged
  */
 export async function recordUsage(inputTokens: number, outputTokens: number): Promise<UsageStats> {
-  let stats = await loadStats();
+  try {
+    let stats = await loadStats();
 
-  // Check if daily reset is needed first
-  if (shouldResetDaily(stats.lastDailyReset)) {
-    stats.dailyRequests = 0;
-    stats.dailyTokens = 0;
-    stats.lastDailyReset = new Date().toISOString();
+    // Check if daily reset is needed first
+    if (shouldResetDaily(stats.lastDailyReset)) {
+      stats.dailyRequests = 0;
+      stats.dailyTokens = 0;
+      stats.lastDailyReset = new Date().toISOString();
+    }
+
+    const totalTokensUsed = inputTokens + outputTokens;
+
+    // Update stats
+    stats.totalRequests += 1;
+    stats.totalTokens += totalTokensUsed;
+    stats.dailyRequests += 1;
+    stats.dailyTokens += totalTokensUsed;
+    stats.lastUpdated = new Date().toISOString();
+
+    await saveStats(stats);
+
+    return stats;
+  } catch (error) {
+    // Never let stats recording fail the main request
+    console.error('[Stats] Failed to record usage:', error);
+    return getDefaultStats();
   }
-
-  const totalTokensUsed = inputTokens + outputTokens;
-
-  // Update stats
-  stats.totalRequests += 1;
-  stats.totalTokens += totalTokensUsed;
-  stats.dailyRequests += 1;
-  stats.dailyTokens += totalTokensUsed;
-  stats.lastUpdated = new Date().toISOString();
-
-  await saveStats(stats);
-
-  return stats;
 }
 
 /**

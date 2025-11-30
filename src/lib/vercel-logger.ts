@@ -143,41 +143,46 @@ export async function logRequest(
     chatCompletionPreset?: { name: string };
   }
 ): Promise<void> {
-  // Always log to console
-  consoleLog('info', requestId, 'REQUEST', {
-    url: data.url,
-    method: data.method,
-    connection: data.connectionPreset?.name,
-    model: data.connectionPreset?.model,
-    preset: data.chatCompletionPreset?.name,
-    messageCount: data.incomingMessages?.length,
-  });
-
-  // Detailed log to console for debugging
-  console.log(`${LOG_PREFIX} [${requestId}] Full request body:`, JSON.stringify(data.body, null, 2));
-
-  // Store in Blob
-  const entry: LogEntry = {
-    id: `req-${requestId}`,
-    timestamp: new Date().toISOString(),
-    type: 'request',
-    requestId,
-    data: {
+  try {
+    // Always log to console
+    consoleLog('info', requestId, 'REQUEST', {
       url: data.url,
       method: data.method,
-      connection: data.connectionPreset ? {
-        name: data.connectionPreset.name,
-        baseUrl: data.connectionPreset.baseUrl,
-        model: data.connectionPreset.model,
-      } : undefined,
+      connection: data.connectionPreset?.name,
+      model: data.connectionPreset?.model,
       preset: data.chatCompletionPreset?.name,
       messageCount: data.incomingMessages?.length,
-      messages: data.incomingMessages,
-      rawBody: data.body,
-    },
-  };
+    });
 
-  await appendToLogStore(entry);
+    // Detailed log to console for debugging
+    console.log(`${LOG_PREFIX} [${requestId}] Full request body:`, JSON.stringify(data.body, null, 2));
+
+    // Store in Blob
+    const entry: LogEntry = {
+      id: `req-${requestId}`,
+      timestamp: new Date().toISOString(),
+      type: 'request',
+      requestId,
+      data: {
+        url: data.url,
+        method: data.method,
+        connection: data.connectionPreset ? {
+          name: data.connectionPreset.name,
+          baseUrl: data.connectionPreset.baseUrl,
+          model: data.connectionPreset.model,
+        } : undefined,
+        preset: data.chatCompletionPreset?.name,
+        messageCount: data.incomingMessages?.length,
+        messages: data.incomingMessages,
+        rawBody: data.body,
+      },
+    };
+
+    await appendToLogStore(entry);
+  } catch (error) {
+    // Never let logging fail the main request
+    console.error(`${LOG_PREFIX} [${requestId}] Failed to log request:`, error);
+  }
 }
 
 export async function logProcessedRequest(
@@ -190,35 +195,40 @@ export async function logProcessedRequest(
     streaming?: boolean;
   }
 ): Promise<void> {
-  // Log to console
-  consoleLog('info', requestId, 'PROCESSED REQUEST', {
-    providerUrl: data.providerUrl,
-    model: data.model,
-    messageCount: data.processedMessages.length,
-    streaming: data.streaming ?? false,
-  });
-
-  // Detailed processed messages
-  console.log(`${LOG_PREFIX} [${requestId}] Processed messages being sent to provider:`,
-    JSON.stringify(data.processedMessages, null, 2));
-
-  // Store in Blob
-  const entry: LogEntry = {
-    id: `proc-${requestId}`,
-    timestamp: new Date().toISOString(),
-    type: 'info',
-    requestId,
-    data: {
-      stage: 'processed',
+  try {
+    // Log to console
+    consoleLog('info', requestId, 'PROCESSED REQUEST', {
       providerUrl: data.providerUrl,
       model: data.model,
-      samplerSettings: data.samplerSettings,
       messageCount: data.processedMessages.length,
-      processedMessages: data.processedMessages,
-    },
-  };
+      streaming: data.streaming ?? false,
+    });
 
-  await appendToLogStore(entry);
+    // Detailed processed messages
+    console.log(`${LOG_PREFIX} [${requestId}] Processed messages being sent to provider:`,
+      JSON.stringify(data.processedMessages, null, 2));
+
+    // Store in Blob
+    const entry: LogEntry = {
+      id: `proc-${requestId}`,
+      timestamp: new Date().toISOString(),
+      type: 'info',
+      requestId,
+      data: {
+        stage: 'processed',
+        providerUrl: data.providerUrl,
+        model: data.model,
+        samplerSettings: data.samplerSettings,
+        messageCount: data.processedMessages.length,
+        processedMessages: data.processedMessages,
+      },
+    };
+
+    await appendToLogStore(entry);
+  } catch (error) {
+    // Never let logging fail the main request
+    console.error(`${LOG_PREFIX} [${requestId}] Failed to log processed request:`, error);
+  }
 }
 
 export async function logResponse(
@@ -231,32 +241,37 @@ export async function logResponse(
   },
   durationMs: number
 ): Promise<void> {
-  // Log to console
-  consoleLog('info', requestId, `RESPONSE (${durationMs}ms)`, {
-    status: data.status,
-    message: data.message?.substring(0, 100),
-    usage: data.usage,
-  });
-
-  // Full response to console
-  console.log(`${LOG_PREFIX} [${requestId}] Full response:`, JSON.stringify(data.response, null, 2));
-
-  // Store in Blob
-  const entry: LogEntry = {
-    id: `res-${requestId}`,
-    timestamp: new Date().toISOString(),
-    type: 'response',
-    requestId,
-    durationMs,
-    data: {
+  try {
+    // Log to console
+    consoleLog('info', requestId, `RESPONSE (${durationMs}ms)`, {
       status: data.status,
-      message: data.message,
+      message: data.message?.substring(0, 100),
       usage: data.usage,
-      fullResponse: data.response,
-    },
-  };
+    });
 
-  await appendToLogStore(entry);
+    // Full response to console
+    console.log(`${LOG_PREFIX} [${requestId}] Full response:`, JSON.stringify(data.response, null, 2));
+
+    // Store in Blob
+    const entry: LogEntry = {
+      id: `res-${requestId}`,
+      timestamp: new Date().toISOString(),
+      type: 'response',
+      requestId,
+      durationMs,
+      data: {
+        status: data.status,
+        message: data.message,
+        usage: data.usage,
+        fullResponse: data.response,
+      },
+    };
+
+    await appendToLogStore(entry);
+  } catch (error) {
+    // Never let logging fail the main request
+    console.error(`${LOG_PREFIX} [${requestId}] Failed to log response:`, error);
+  }
 }
 
 export async function logError(
@@ -264,30 +279,35 @@ export async function logError(
   error: unknown,
   context?: string
 ): Promise<void> {
-  const errorMessage = error instanceof Error ? error.message : String(error);
-  const errorStack = error instanceof Error ? error.stack : undefined;
+  try {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
 
-  // Log to console
-  consoleLog('error', requestId, `ERROR${context ? ` (${context})` : ''}`, {
-    message: errorMessage,
-    stack: errorStack,
-  });
-
-  // Store in Blob
-  const entry: LogEntry = {
-    id: `err-${requestId}`,
-    timestamp: new Date().toISOString(),
-    type: 'error',
-    requestId,
-    data: {
-      context,
+    // Log to console
+    consoleLog('error', requestId, `ERROR${context ? ` (${context})` : ''}`, {
       message: errorMessage,
       stack: errorStack,
-      raw: String(error),
-    },
-  };
+    });
 
-  await appendToLogStore(entry);
+    // Store in Blob
+    const entry: LogEntry = {
+      id: `err-${requestId}`,
+      timestamp: new Date().toISOString(),
+      type: 'error',
+      requestId,
+      data: {
+        context,
+        message: errorMessage,
+        stack: errorStack,
+        raw: String(error),
+      },
+    };
+
+    await appendToLogStore(entry);
+  } catch (loggingError) {
+    // Never let error logging fail the main request
+    console.error(`${LOG_PREFIX} [${requestId}] Failed to log error:`, loggingError);
+  }
 }
 
 // ============================================

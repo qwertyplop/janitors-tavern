@@ -2,8 +2,9 @@
 // Usage Statistics Tracking
 // ============================================
 // Tracks request counts and token usage with daily resets
+// Optimized to minimize Vercel Blob operations
 
-import { head, put, del } from '@vercel/blob';
+import { put, head } from '@vercel/blob';
 
 // ============================================
 // Types
@@ -31,6 +32,18 @@ export interface UsageStats {
 
 const STATS_BLOB_PATH = 'janitors-tavern/stats.json';
 const RESET_HOUR_UTC = 7; // 10 AM GMT+3 = 7 AM UTC
+
+// Save to blob every N requests (reduces advanced operations drastically)
+const SAVE_INTERVAL = 10;
+
+// ============================================
+// In-Memory Cache
+// ============================================
+
+let cachedStats: UsageStats | null = null;
+let pendingChanges = 0;
+let lastLoadTime = 0;
+const CACHE_TTL = 60000; // 1 minute cache for reads
 
 // ============================================
 // Helper Functions
@@ -96,53 +109,65 @@ export function calculateMessageTokens(messages: Array<{ content?: string; role?
 }
 
 // ============================================
-// Blob Storage Functions
+// Blob Storage Functions (Optimized)
 // ============================================
 
-async function isBlobConfigured(): Promise<boolean> {
+function isBlobConfigured(): boolean {
   return !!process.env.BLOB_READ_WRITE_TOKEN;
 }
 
+/**
+ * Load stats from blob (with caching)
+ * Uses head() which is a simple operation
+ */
 async function loadStats(): Promise<UsageStats> {
-  try {
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      return getDefaultStats();
-    }
-
-    const blobInfo = await head(STATS_BLOB_PATH);
-    if (blobInfo) {
-      const response = await fetch(blobInfo.url);
-      const data = await response.json();
-      return data as UsageStats;
-    }
-  } catch (error) {
-    // Blob doesn't exist or error - log and continue
-    console.error('[Stats] Failed to load stats:', error);
+  // Return cached if fresh enough
+  if (cachedStats && Date.now() - lastLoadTime < CACHE_TTL) {
+    return cachedStats;
   }
 
-  return getDefaultStats();
-}
-
-async function saveStats(stats: UsageStats): Promise<void> {
-  if (!(await isBlobConfigured())) return;
+  if (!isBlobConfigured()) {
+    cachedStats = getDefaultStats();
+    lastLoadTime = Date.now();
+    return cachedStats;
+  }
 
   try {
-    // Delete existing blob
-    try {
-      const existingBlob = await head(STATS_BLOB_PATH);
-      if (existingBlob) {
-        await del(existingBlob.url);
-      }
-    } catch {
-      // Blob doesn't exist
+    // head() is a simple operation
+    const blobInfo = await head(STATS_BLOB_PATH);
+    if (blobInfo) {
+      // Fetching by URL is simple (or free if cached)
+      const response = await fetch(blobInfo.url);
+      const data = await response.json();
+      cachedStats = data as UsageStats;
+      lastLoadTime = Date.now();
+      return cachedStats;
     }
+  } catch {
+    // Blob doesn't exist or error
+  }
 
-    // Save new stats
+  cachedStats = getDefaultStats();
+  lastLoadTime = Date.now();
+  return cachedStats;
+}
+
+/**
+ * Save stats to blob
+ * Uses put() which is an advanced operation - call sparingly!
+ */
+async function saveStats(stats: UsageStats): Promise<void> {
+  if (!isBlobConfigured()) return;
+
+  try {
+    // Direct put() overwrites - no need to delete first
+    // This is 1 advanced operation instead of 2 (head + del + put was 1 simple + 1 advanced)
     await put(STATS_BLOB_PATH, JSON.stringify(stats, null, 2), {
       access: 'public',
       contentType: 'application/json',
       addRandomSuffix: false,
     });
+    console.log('[Stats] Saved to blob');
   } catch (error) {
     console.error('[Stats] Failed to save stats:', error);
   }
@@ -154,8 +179,6 @@ async function saveStats(stats: UsageStats): Promise<void> {
 
 /**
  * Get current usage stats
- *
- * NOTE: This function is designed to never throw - all errors are caught and logged
  */
 export async function getStats(): Promise<UsageStats> {
   try {
@@ -169,6 +192,8 @@ export async function getStats(): Promise<UsageStats> {
         dailyTokens: 0,
         lastDailyReset: new Date().toISOString(),
       };
+      cachedStats = stats;
+      // Save the reset immediately
       await saveStats(stats);
     }
 
@@ -181,14 +206,12 @@ export async function getStats(): Promise<UsageStats> {
 
 /**
  * Increment request count and add tokens
- * @param inputTokens - Tokens in the request (prompt)
- * @param outputTokens - Tokens in the response (completion)
- *
- * NOTE: This function is designed to never throw - all errors are caught and logged
+ * Batches writes to blob - only saves every SAVE_INTERVAL requests
  */
 export async function recordUsage(inputTokens: number, outputTokens: number): Promise<UsageStats> {
   try {
-    let stats = await loadStats();
+    // Load or use cached stats
+    let stats = cachedStats || await loadStats();
 
     // Check if daily reset is needed first
     if (shouldResetDaily(stats.lastDailyReset)) {
@@ -199,20 +222,37 @@ export async function recordUsage(inputTokens: number, outputTokens: number): Pr
 
     const totalTokensUsed = inputTokens + outputTokens;
 
-    // Update stats
+    // Update stats in memory
     stats.totalRequests += 1;
     stats.totalTokens += totalTokensUsed;
     stats.dailyRequests += 1;
     stats.dailyTokens += totalTokensUsed;
     stats.lastUpdated = new Date().toISOString();
 
-    await saveStats(stats);
+    // Update cache
+    cachedStats = stats;
+    pendingChanges++;
+
+    // Only save to blob every N requests (reduces advanced operations by ~90%)
+    if (pendingChanges >= SAVE_INTERVAL) {
+      pendingChanges = 0;
+      saveStats(stats).catch(() => {}); // Fire and forget
+    }
 
     return stats;
   } catch (error) {
-    // Never let stats recording fail the main request
     console.error('[Stats] Failed to record usage:', error);
-    return getDefaultStats();
+    return cachedStats || getDefaultStats();
+  }
+}
+
+/**
+ * Force save pending stats (call on shutdown or periodically)
+ */
+export async function flushStats(): Promise<void> {
+  if (cachedStats && pendingChanges > 0) {
+    pendingChanges = 0;
+    await saveStats(cachedStats);
   }
 }
 

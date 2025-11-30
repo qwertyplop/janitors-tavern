@@ -1,9 +1,8 @@
 // ============================================
 // Vercel-Compatible Logger
 // ============================================
-// Logs to console (Vercel Functions logs) and Vercel Blob for persistence
-
-import { put, head, del } from '@vercel/blob';
+// Logs to console only (visible in Vercel Function logs)
+// No blob storage to save on quota
 
 // ============================================
 // Types
@@ -18,22 +17,14 @@ export interface LogEntry {
   durationMs?: number;
 }
 
-export interface LogStore {
-  entries: LogEntry[];
-  maxEntries: number;
-  lastUpdated: string;
-}
-
 // ============================================
 // Constants
 // ============================================
 
-const LOG_BLOB_PATH = 'janitors-tavern/logs.json';
-const MAX_LOG_ENTRIES = 100; // Keep last 100 entries
 const LOG_PREFIX = '[JT]';
 
 // ============================================
-// Console Logging (Always enabled - shows in Vercel dashboard)
+// Console Logging (Shows in Vercel dashboard)
 // ============================================
 
 function consoleLog(level: 'info' | 'warn' | 'error', requestId: string, message: string, data?: unknown): void {
@@ -46,80 +37,6 @@ function consoleLog(level: 'info' | 'warn' | 'error', requestId: string, message
     logFn(`${prefix} ${message}`, JSON.stringify(data, null, 2));
   } else {
     logFn(`${prefix} ${message}`);
-  }
-}
-
-// ============================================
-// Blob Storage (Persistent logs)
-// ============================================
-
-async function isBlobConfigured(): Promise<boolean> {
-  return !!process.env.BLOB_READ_WRITE_TOKEN;
-}
-
-async function loadLogStore(): Promise<LogStore> {
-  const defaultStore: LogStore = {
-    entries: [],
-    maxEntries: MAX_LOG_ENTRIES,
-    lastUpdated: new Date().toISOString(),
-  };
-
-  try {
-    const blobInfo = await head(LOG_BLOB_PATH);
-    if (blobInfo) {
-      const response = await fetch(blobInfo.url);
-      const data = await response.json();
-      return data as LogStore;
-    }
-  } catch {
-    // Blob doesn't exist or error - return default
-  }
-
-  return defaultStore;
-}
-
-async function saveLogStore(store: LogStore): Promise<void> {
-  try {
-    // Delete existing blob
-    try {
-      const existingBlob = await head(LOG_BLOB_PATH);
-      if (existingBlob) {
-        await del(existingBlob.url);
-      }
-    } catch {
-      // Blob doesn't exist
-    }
-
-    // Save new data
-    await put(LOG_BLOB_PATH, JSON.stringify(store, null, 2), {
-      access: 'public',
-      contentType: 'application/json',
-      addRandomSuffix: false,
-    });
-  } catch (error) {
-    console.error(`${LOG_PREFIX} Failed to save logs to blob:`, error);
-  }
-}
-
-async function appendToLogStore(entry: LogEntry): Promise<void> {
-  if (!(await isBlobConfigured())) return;
-
-  try {
-    const store = await loadLogStore();
-
-    // Add new entry
-    store.entries.push(entry);
-
-    // Trim to max entries (keep most recent)
-    if (store.entries.length > store.maxEntries) {
-      store.entries = store.entries.slice(-store.maxEntries);
-    }
-
-    store.lastUpdated = new Date().toISOString();
-
-    await saveLogStore(store);
-  } catch (error) {
-    console.error(`${LOG_PREFIX} Failed to append log:`, error);
   }
 }
 
@@ -144,7 +61,7 @@ export async function logRequest(
   }
 ): Promise<void> {
   try {
-    // Always log to console
+    // Log summary to console
     consoleLog('info', requestId, 'REQUEST', {
       url: data.url,
       method: data.method,
@@ -154,33 +71,11 @@ export async function logRequest(
       messageCount: data.incomingMessages?.length,
     });
 
-    // Detailed log to console for debugging
-    console.log(`${LOG_PREFIX} [${requestId}] Full request body:`, JSON.stringify(data.body, null, 2));
-
-    // Store in Blob
-    const entry: LogEntry = {
-      id: `req-${requestId}`,
-      timestamp: new Date().toISOString(),
-      type: 'request',
-      requestId,
-      data: {
-        url: data.url,
-        method: data.method,
-        connection: data.connectionPreset ? {
-          name: data.connectionPreset.name,
-          baseUrl: data.connectionPreset.baseUrl,
-          model: data.connectionPreset.model,
-        } : undefined,
-        preset: data.chatCompletionPreset?.name,
-        messageCount: data.incomingMessages?.length,
-        messages: data.incomingMessages,
-        rawBody: data.body,
-      },
-    };
-
-    await appendToLogStore(entry);
+    // Detailed log for debugging (can be disabled in production if too verbose)
+    if (process.env.VERBOSE_LOGGING === 'true') {
+      console.log(`${LOG_PREFIX} [${requestId}] Full request body:`, JSON.stringify(data.body, null, 2));
+    }
   } catch (error) {
-    // Never let logging fail the main request
     console.error(`${LOG_PREFIX} [${requestId}] Failed to log request:`, error);
   }
 }
@@ -196,7 +91,6 @@ export async function logProcessedRequest(
   }
 ): Promise<void> {
   try {
-    // Log to console
     consoleLog('info', requestId, 'PROCESSED REQUEST', {
       providerUrl: data.providerUrl,
       model: data.model,
@@ -204,29 +98,12 @@ export async function logProcessedRequest(
       streaming: data.streaming ?? false,
     });
 
-    // Detailed processed messages
-    console.log(`${LOG_PREFIX} [${requestId}] Processed messages being sent to provider:`,
-      JSON.stringify(data.processedMessages, null, 2));
-
-    // Store in Blob
-    const entry: LogEntry = {
-      id: `proc-${requestId}`,
-      timestamp: new Date().toISOString(),
-      type: 'info',
-      requestId,
-      data: {
-        stage: 'processed',
-        providerUrl: data.providerUrl,
-        model: data.model,
-        samplerSettings: data.samplerSettings,
-        messageCount: data.processedMessages.length,
-        processedMessages: data.processedMessages,
-      },
-    };
-
-    await appendToLogStore(entry);
+    // Detailed log for debugging
+    if (process.env.VERBOSE_LOGGING === 'true') {
+      console.log(`${LOG_PREFIX} [${requestId}] Processed messages:`,
+        JSON.stringify(data.processedMessages, null, 2));
+    }
   } catch (error) {
-    // Never let logging fail the main request
     console.error(`${LOG_PREFIX} [${requestId}] Failed to log processed request:`, error);
   }
 }
@@ -242,34 +119,17 @@ export async function logResponse(
   durationMs: number
 ): Promise<void> {
   try {
-    // Log to console
     consoleLog('info', requestId, `RESPONSE (${durationMs}ms)`, {
       status: data.status,
-      message: data.message?.substring(0, 100),
+      messagePreview: data.message?.substring(0, 100),
       usage: data.usage,
     });
 
-    // Full response to console
-    console.log(`${LOG_PREFIX} [${requestId}] Full response:`, JSON.stringify(data.response, null, 2));
-
-    // Store in Blob
-    const entry: LogEntry = {
-      id: `res-${requestId}`,
-      timestamp: new Date().toISOString(),
-      type: 'response',
-      requestId,
-      durationMs,
-      data: {
-        status: data.status,
-        message: data.message,
-        usage: data.usage,
-        fullResponse: data.response,
-      },
-    };
-
-    await appendToLogStore(entry);
+    // Detailed log for debugging
+    if (process.env.VERBOSE_LOGGING === 'true') {
+      console.log(`${LOG_PREFIX} [${requestId}] Full response:`, JSON.stringify(data.response, null, 2));
+    }
   } catch (error) {
-    // Never let logging fail the main request
     console.error(`${LOG_PREFIX} [${requestId}] Failed to log response:`, error);
   }
 }
@@ -283,79 +143,32 @@ export async function logError(
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;
 
-    // Log to console
     consoleLog('error', requestId, `ERROR${context ? ` (${context})` : ''}`, {
       message: errorMessage,
       stack: errorStack,
     });
-
-    // Store in Blob
-    const entry: LogEntry = {
-      id: `err-${requestId}`,
-      timestamp: new Date().toISOString(),
-      type: 'error',
-      requestId,
-      data: {
-        context,
-        message: errorMessage,
-        stack: errorStack,
-        raw: String(error),
-      },
-    };
-
-    await appendToLogStore(entry);
   } catch (loggingError) {
-    // Never let error logging fail the main request
     console.error(`${LOG_PREFIX} [${requestId}] Failed to log error:`, loggingError);
   }
 }
 
 // ============================================
-// Log Reading (for UI)
+// Stub functions for backward compatibility
+// (These no longer use blob storage)
 // ============================================
 
 export async function getLogs(): Promise<LogEntry[]> {
-  if (!(await isBlobConfigured())) {
-    return [];
-  }
-
-  try {
-    const store = await loadLogStore();
-    // Return in reverse chronological order
-    return [...store.entries].reverse();
-  } catch (error) {
-    console.error(`${LOG_PREFIX} Failed to read logs:`, error);
-    return [];
-  }
+  // Logs are in Vercel Function logs, not stored in blob
+  console.log(`${LOG_PREFIX} getLogs() called - logs are available in Vercel Function logs dashboard`);
+  return [];
 }
 
 export async function clearLogs(): Promise<void> {
-  if (!(await isBlobConfigured())) return;
-
-  try {
-    const store: LogStore = {
-      entries: [],
-      maxEntries: MAX_LOG_ENTRIES,
-      lastUpdated: new Date().toISOString(),
-    };
-    await saveLogStore(store);
-  } catch (error) {
-    console.error(`${LOG_PREFIX} Failed to clear logs:`, error);
-  }
+  // No-op - logs are managed by Vercel
+  console.log(`${LOG_PREFIX} clearLogs() called - logs are managed by Vercel dashboard`);
 }
 
 export async function getLogStats(): Promise<{ count: number; lastUpdated: string | null }> {
-  if (!(await isBlobConfigured())) {
-    return { count: 0, lastUpdated: null };
-  }
-
-  try {
-    const store = await loadLogStore();
-    return {
-      count: store.entries.length,
-      lastUpdated: store.lastUpdated,
-    };
-  } catch {
-    return { count: 0, lastUpdated: null };
-  }
+  // No blob storage for logs
+  return { count: 0, lastUpdated: null };
 }

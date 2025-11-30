@@ -47,17 +47,6 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [serverSaved, setServerSaved] = useState(false);
 
-  // Cloud logs state
-  const [logEntries, setLogEntries] = useState<Array<{
-    id: string;
-    timestamp: string;
-    type: string;
-    requestId: string;
-    data: unknown;
-    durationMs?: number;
-  }>>([]);
-  const [logCount, setLogCount] = useState(0);
-  const [loadingLogs, setLoadingLogs] = useState(false);
 
   // Storage sync from context
   const { initialized, blobConfigured, lastSync, syncing, forcePush, forcePull } = useSync();
@@ -236,38 +225,6 @@ export default function SettingsPage() {
     // If successful, the page will reload automatically
   };
 
-  const fetchLogs = async () => {
-    setLoadingLogs(true);
-    try {
-      const response = await fetch('/api/storage/logs');
-      if (response.ok) {
-        const data = await response.json();
-        setLogEntries(data.logs || []);
-        setLogCount(data.count || 0);
-      }
-    } catch (error) {
-      console.error('Failed to fetch logs:', error);
-    } finally {
-      setLoadingLogs(false);
-    }
-  };
-
-  const clearLogs = async () => {
-    if (!confirm('Are you sure you want to clear all logs?')) return;
-
-    try {
-      const response = await fetch('/api/storage/logs', {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        setLogEntries([]);
-        setLogCount(0);
-      }
-    } catch (error) {
-      console.error('Failed to clear logs:', error);
-    }
-  };
 
 
   if (!settings) {
@@ -364,67 +321,17 @@ export default function SettingsPage() {
       {/* Log Viewer */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>{t.settings.logViewer}</span>
-            {logCount > 0 && (
-              <span className="text-sm font-normal text-zinc-500">
-                {logCount} {t.settings.entries}
-              </span>
-            )}
-          </CardTitle>
+          <CardTitle>{t.settings.logViewer}</CardTitle>
           <CardDescription>{t.settings.viewRecentLogs}</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Button onClick={fetchLogs} disabled={loadingLogs} variant="outline">
-              {loadingLogs ? t.common.loading : t.settings.refreshLogs}
-            </Button>
-            <Button onClick={clearLogs} variant="outline" className="text-red-600 hover:text-red-700">
-              {t.settings.clearLogs}
-            </Button>
-          </div>
-          <div className="max-h-[500px] overflow-auto rounded-md border border-zinc-200 dark:border-zinc-700">
-            {logEntries.length === 0 ? (
-              <div className="p-4 text-center text-zinc-500">
-                {t.settings.noLogsYet}
-              </div>
-            ) : (
-              <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
-                {logEntries.map((entry) => (
-                  <details key={entry.id} className="group">
-                    <summary className="flex cursor-pointer items-center gap-3 p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800">
-                      <Badge className={
-                        entry.type === 'error'
-                          ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                          : entry.type === 'request'
-                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                          : entry.type === 'response'
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          : 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200'
-                      }>
-                        {entry.type}
-                      </Badge>
-                      <span className="font-mono text-xs text-zinc-500">
-                        {new Date(entry.timestamp).toLocaleString()}
-                      </span>
-                      <span className="font-mono text-xs text-zinc-400">
-                        [{entry.requestId}]
-                      </span>
-                      {entry.durationMs && (
-                        <span className="text-xs text-zinc-500">
-                          {entry.durationMs}ms
-                        </span>
-                      )}
-                    </summary>
-                    <div className="bg-zinc-50 p-3 dark:bg-zinc-900">
-                      <pre className="max-h-[300px] overflow-auto whitespace-pre-wrap break-all font-mono text-xs text-zinc-700 dark:text-zinc-300">
-                        {JSON.stringify(entry.data, null, 2)}
-                      </pre>
-                    </div>
-                  </details>
-                ))}
-              </div>
-            )}
+        <CardContent>
+          <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-900">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              Logs are available in the Vercel Function logs dashboard.
+            </p>
+            <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-500">
+              Go to your Vercel project → Logs → Runtime Logs to view request/response logs.
+            </p>
           </div>
         </CardContent>
       </Card>

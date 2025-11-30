@@ -21,7 +21,7 @@ import {
   getDefaultConnectionPreset,
   getDefaultChatCompletionPreset,
 } from '@/lib/server-storage';
-import { recordUsage, calculateMessageTokens, estimateTokens } from '@/lib/stats';
+import { recordUsage, calculateMessageTokens } from '@/lib/stats';
 
 // ============================================
 // Request Types
@@ -164,18 +164,28 @@ export async function POST(request: NextRequest) {
       } : undefined,
     }).catch(() => {});
 
+    // Helper for error responses with CORS
+    const errorWithCors = (message: string, status: number) => {
+      logError(requestId, message, 'validation').catch(() => {});
+      return new Response(JSON.stringify({ error: message }), {
+        status,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        },
+      });
+    };
+
     // Validate required fields
     if (!body.messages || body.messages.length === 0) {
-      const errorResponse = { error: 'Messages are required' };
-      logError(requestId, 'Messages are required', 'validation').catch(() => {});
-      return NextResponse.json(errorResponse, { status: 400 });
+      return errorWithCors('Messages are required', 400);
     }
 
     // Connection preset is required
     if (!connectionPreset) {
-      const errorResponse = { error: 'Connection preset is required' };
-      logError(requestId, 'Connection preset is required', 'validation').catch(() => {});
-      return NextResponse.json(errorResponse, { status: 400 });
+      return errorWithCors('Connection preset is required', 400);
     }
 
     // Get API key
@@ -187,9 +197,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!apiKey) {
-      const errorResponse = { error: 'API key not configured' };
-      logError(requestId, 'API key not configured', 'validation').catch(() => {});
-      return NextResponse.json(errorResponse, { status: 400 });
+      return errorWithCors('API key not configured', 400);
     }
 
     // Build the JanitorAI request object
@@ -271,14 +279,20 @@ export async function POST(request: NextRequest) {
       const streamResult = await provider.sendChatCompletionStream(providerRequest);
 
       if (streamResult.error) {
-        const errorResponse = { error: streamResult.error };
-        // Fire-and-forget logging for errors (don't block response)
         logError(requestId, streamResult.error, 'provider').catch(() => {});
         logResponse(requestId, {
           status: 502,
-          response: errorResponse,
+          response: { error: streamResult.error },
         }, Date.now() - startTime).catch(() => {});
-        return NextResponse.json(errorResponse, { status: 502 });
+        return new Response(JSON.stringify({ error: streamResult.error }), {
+          status: 502,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          },
+        });
       }
 
       // Build response headers - pass through provider headers except excluded ones
@@ -313,21 +327,56 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Non-streaming request
+    // Non-streaming request - use raw passthrough like Python proxy
+    if (provider instanceof OpenAICompatibleProvider) {
+      const rawResult = await provider.sendChatCompletionRaw(providerRequest);
+
+      // Fire-and-forget logging
+      logResponse(requestId, {
+        status: rawResult.status,
+        response: { raw: true, length: rawResult.body.length },
+      }, Date.now() - startTime).catch(() => {});
+
+      recordUsage(inputTokensEstimate, 0).catch(() => {});
+
+      // Build response headers - pass through provider headers except excluded ones
+      const excludedHeaders = ['content-encoding', 'content-length', 'transfer-encoding', 'connection'];
+      const responseHeaders: Record<string, string> = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Content-Type': 'application/json',
+      };
+
+      rawResult.headers.forEach((value, key) => {
+        if (!excludedHeaders.includes(key.toLowerCase())) {
+          responseHeaders[key] = value;
+        }
+      });
+
+      // Pure passthrough - return provider's response as-is
+      return new Response(rawResult.body, {
+        status: rawResult.status,
+        headers: responseHeaders,
+      });
+    }
+
+    // Fallback for non-OpenAI providers (shouldn't happen normally)
     const result = await provider.sendChatCompletion(providerRequest);
 
     if (result.error) {
-      const errorResponse = { error: result.error };
-      // Fire-and-forget logging (don't block response)
       logError(requestId, result.error, 'provider').catch(() => {});
-      logResponse(requestId, {
+      return new Response(JSON.stringify({ error: result.error }), {
         status: 502,
-        response: errorResponse,
-      }, Date.now() - startTime).catch(() => {});
-      return NextResponse.json(errorResponse, { status: 502 });
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        },
+      });
     }
 
-    // Format response in OpenAI-compatible format for JanitorAI
     const successResponse = {
       id: `chatcmpl-${requestId}`,
       object: 'chat.completion',
@@ -343,39 +392,24 @@ export async function POST(request: NextRequest) {
           finish_reason: 'stop',
         },
       ],
-      usage: result.usage
-        ? {
-            prompt_tokens: result.usage.promptTokens || 0,
-            completion_tokens: result.usage.completionTokens || 0,
-            total_tokens: result.usage.totalTokens || 0,
-          }
-        : undefined,
     };
 
-    // Fire-and-forget: Log and record stats without blocking the response
-    const responseTime = Date.now() - startTime;
-    logResponse(requestId, {
+    recordUsage(inputTokensEstimate, 0).catch(() => {});
+    return new Response(JSON.stringify(successResponse), {
       status: 200,
-      response: successResponse,
-      message: successResponse.choices[0]?.message?.content,
-      usage: successResponse.usage,
-    }, responseTime).catch(() => {});
-
-    // Calculate tokens for stats
-    let inputTokens: number;
-    let outputTokens: number;
-    if (result.usage?.promptTokens && result.usage?.completionTokens) {
-      inputTokens = result.usage.promptTokens;
-      outputTokens = result.usage.completionTokens;
-    } else {
-      inputTokens = inputTokensEstimate;
-      outputTokens = result.message?.content ? estimateTokens(result.message.content) : 0;
-    }
-    recordUsage(inputTokens, outputTokens).catch(() => {});
-
-    return NextResponse.json(successResponse);
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
+    });
   } catch (error) {
+    // Log full error details for debugging
     console.error('Proxy error:', error);
+    if (error instanceof Error) {
+      console.error('Error stack:', error.stack);
+    }
 
     // Fire-and-forget logging (don't block error response)
     logError(requestId, error, 'proxy').catch(() => {});
@@ -389,7 +423,16 @@ export async function POST(request: NextRequest) {
       response: errorResponse,
     }, Date.now() - startTime).catch(() => {});
 
-    return NextResponse.json(errorResponse, { status: 500 });
+    // Include CORS headers in error response
+    return new Response(JSON.stringify(errorResponse), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
+    });
   }
 }
 

@@ -178,6 +178,39 @@ export class OpenAICompatibleProvider extends ChatProvider {
   }
 
   /**
+   * Send a non-streaming request and return raw response for passthrough
+   * This is like the Python proxy - just forward the response as-is
+   */
+  async sendChatCompletionRaw(
+    request: ProviderRequest
+  ): Promise<{ body: string; status: number; headers: Headers; error?: string }> {
+    const openaiRequest = this.buildOpenAIRequest(request, false);
+
+    try {
+      const response = await fetch(this.buildUrl('/chat/completions'), {
+        method: 'POST',
+        headers: this.getNonStreamHeaders(),
+        body: JSON.stringify(openaiRequest),
+      });
+
+      const body = await response.text();
+
+      return {
+        body,
+        status: response.status,
+        headers: response.headers,
+      };
+    } catch (error) {
+      return {
+        body: JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+        status: 500,
+        headers: new Headers({ 'Content-Type': 'application/json' }),
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
    * Send a streaming chat completion request
    * Returns the raw ReadableStream from the provider - pure passthrough like Python proxy
    */

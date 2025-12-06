@@ -12,6 +12,7 @@ import {
   getSettings,
   updateSettings,
 } from '@/lib/storage';
+import { forceSync } from '@/lib/storage-sync';
 import { ConnectionPreset, ChatCompletionPreset, AppSettings, PromptPostProcessingMode } from '@/types';
 import { useSync } from '@/components/providers/SyncProvider';
 import { useI18n } from '@/components/providers/I18nProvider';
@@ -43,6 +44,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<UsageStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [confirmed, setConfirmed] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const { initialized } = useSync();
   const { t } = useI18n();
 
@@ -106,10 +108,21 @@ export default function DashboardPage() {
     setConfirmed(false);
   };
 
-  const handleConfirmChoice = () => {
-    setConfirmed(true);
-    // Auto-hide after 3 seconds
-    setTimeout(() => setConfirmed(false), 3000);
+  const handleConfirmChoice = async () => {
+    setConfirming(true);
+    setConfirmed(false);
+
+    try {
+      // Force push to blob storage to ensure proxy has latest settings
+      await forceSync('push');
+      setConfirmed(true);
+      // Auto-hide after 3 seconds
+      setTimeout(() => setConfirmed(false), 3000);
+    } catch (error) {
+      console.error('Failed to sync settings:', error);
+    } finally {
+      setConfirming(false);
+    }
   };
 
   const defaultConnection = connections.find((c) => c.id === settings?.defaultConnectionId);
@@ -248,9 +261,9 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3">
             <Button
               onClick={handleConfirmChoice}
-              disabled={!settings?.defaultConnectionId || !settings?.defaultChatCompletionPresetId}
+              disabled={!settings?.defaultConnectionId || !settings?.defaultChatCompletionPresetId || confirming}
             >
-              {t.dashboard.confirmChoice}
+              {confirming ? t.common.loading : t.dashboard.confirmChoice}
             </Button>
             {confirmed && (
               <span className="text-sm text-green-600 dark:text-green-400 animate-pulse">

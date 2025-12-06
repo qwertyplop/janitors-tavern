@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { put, head, del } from '@vercel/blob';
+import { put, head } from '@vercel/blob';
+import { invalidateCache } from '@/lib/server-storage';
 
 // Valid storage keys
 const VALID_KEYS = ['connections', 'presets', 'settings'] as const;
@@ -101,22 +102,16 @@ export async function PUT(
     const data = await request.json();
     const blobPath = getBlobPath(key);
 
-    // Delete existing blob if it exists
-    try {
-      const existingBlob = await head(blobPath);
-      if (existingBlob) {
-        await del(existingBlob.url);
-      }
-    } catch {
-      // Blob doesn't exist, that's fine
-    }
-
-    // Upload new data
+    // put() with addRandomSuffix: false already overwrites existing blobs
+    // No need for head() + del() - saves 1 simple + 1 advanced operation!
     const blob = await put(blobPath, JSON.stringify(data, null, 2), {
       access: 'public',
       contentType: 'application/json',
       addRandomSuffix: false,
     });
+
+    // Invalidate server-side cache so proxy picks up new data
+    invalidateCache(key);
 
     return NextResponse.json({
       success: true,

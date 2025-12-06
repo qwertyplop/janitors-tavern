@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { put, head, del, list } from '@vercel/blob';
+import { put, head, list, del } from '@vercel/blob';
+import { invalidateCache } from '@/lib/server-storage';
 
 const STORAGE_PREFIX = 'janitors-tavern/';
 
@@ -41,17 +42,8 @@ async function fetchBlobData(key: string): Promise<unknown> {
 async function saveBlobData(key: string, data: unknown): Promise<void> {
   const blobPath = `${STORAGE_PREFIX}${key}.json`;
 
-  // Delete existing blob if it exists
-  try {
-    const existingBlob = await head(blobPath);
-    if (existingBlob) {
-      await del(existingBlob.url);
-    }
-  } catch {
-    // Blob doesn't exist
-  }
-
-  // Upload new data
+  // put() with addRandomSuffix: false already overwrites existing blobs
+  // No need for head() + del() - saves 1 simple + 1 advanced operation!
   await put(blobPath, JSON.stringify(data, null, 2), {
     access: 'public',
     contentType: 'application/json',
@@ -115,6 +107,9 @@ export async function PUT(request: NextRequest) {
 
     await Promise.all(savePromises);
 
+    // Invalidate server-side cache so proxy picks up new data
+    invalidateCache();
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error saving all data:', error);
@@ -143,6 +138,9 @@ export async function DELETE() {
     if (blobs.length > 0) {
       await del(blobs.map(b => b.url));
     }
+
+    // Invalidate server-side cache
+    invalidateCache();
 
     return NextResponse.json({ success: true, deleted: blobs.length });
   } catch (error) {

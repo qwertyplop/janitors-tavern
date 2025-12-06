@@ -2,6 +2,7 @@
 // Server-Side Storage Reader
 // ============================================
 // Reads presets and settings from Vercel Blob storage for server-side use (API routes)
+// Includes in-memory caching to minimize blob operations
 
 import { head } from '@vercel/blob';
 import { ConnectionPreset, ChatCompletionPreset, AppSettings } from '@/types';
@@ -9,10 +10,49 @@ import { ConnectionPreset, ChatCompletionPreset, AppSettings } from '@/types';
 const STORAGE_PREFIX = 'janitors-tavern/';
 
 // ============================================
+// In-Memory Cache (reduces blob operations drastically)
+// ============================================
+
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+const cache = new Map<string, CacheEntry<unknown>>();
+const CACHE_TTL = 60000; // 1 minute - balances freshness vs blob operations
+
+function getCached<T>(key: string): T | null {
+  const entry = cache.get(key);
+  if (entry && Date.now() - entry.timestamp < CACHE_TTL) {
+    return entry.data as T;
+  }
+  return null;
+}
+
+function setCache<T>(key: string, data: T): void {
+  cache.set(key, { data, timestamp: Date.now() });
+}
+
+// Call this when data is updated via UI to invalidate cache
+export function invalidateCache(key?: string): void {
+  if (key) {
+    cache.delete(key);
+  } else {
+    cache.clear();
+  }
+}
+
+// ============================================
 // Blob Fetchers
 // ============================================
 
 async function fetchBlobJson<T>(key: string, defaultValue: T): Promise<T> {
+  // Check cache first - avoids blob operations entirely
+  const cached = getCached<T>(key);
+  if (cached !== null) {
+    return cached;
+  }
+
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     return defaultValue;
   }
@@ -22,11 +62,15 @@ async function fetchBlobJson<T>(key: string, defaultValue: T): Promise<T> {
     const blobInfo = await head(blobPath);
     if (blobInfo) {
       const response = await fetch(blobInfo.url);
-      return await response.json();
+      const data = await response.json();
+      setCache(key, data);
+      return data;
     }
   } catch {
     // Blob doesn't exist or error
   }
+
+  setCache(key, defaultValue);
   return defaultValue;
 }
 

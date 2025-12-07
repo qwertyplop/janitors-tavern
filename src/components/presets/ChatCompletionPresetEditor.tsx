@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChatCompletionPreset, STPromptBlock, STPromptOrder, STSamplerSettings } from '@/types';
+import { ChatCompletionPreset, STPromptBlock, STPromptOrder, STSamplerSettings, SamplerSettingKey } from '@/types';
 import { PromptBlockList } from './PromptBlockList';
 import { SamplerSettingsPanel } from './SamplerSettingsPanel';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,6 @@ interface ChatCompletionPresetEditorProps {
   onChange: (preset: ChatCompletionPreset) => void;
   onSave: (preset: ChatCompletionPreset) => void;
   onCancel: () => void;
-  onExport?: (preset: ChatCompletionPreset) => void;
 }
 
 type TabId = 'prompts' | 'sampler' | 'special' | 'utility' | 'advanced';
@@ -62,7 +61,6 @@ export function ChatCompletionPresetEditor({
   onChange,
   onSave,
   onCancel,
-  onExport,
 }: ChatCompletionPresetEditorProps) {
   const [activeTab, setActiveTab] = useState<TabId>('prompts');
 
@@ -75,6 +73,10 @@ export function ChatCompletionPresetEditor({
 
   const handleSamplerChange = (sampler: STSamplerSettings) => {
     onChange({ ...preset, sampler });
+  };
+
+  const handleSamplerEnabledChange = (enabled: Partial<Record<SamplerSettingKey, boolean>>) => {
+    onChange({ ...preset, samplerEnabled: enabled });
   };
 
   const handleSpecialPromptsChange = (
@@ -172,16 +174,9 @@ export function ChatCompletionPresetEditor({
 
       {/* Action buttons */}
       <div className="flex items-center justify-between border-b pb-4">
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          {onExport && (
-            <Button variant="outline" onClick={() => onExport(preset)}>
-              Export to ST Format
-            </Button>
-          )}
-        </div>
+        <Button variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
         <Button onClick={() => onSave(preset)}>Save Preset</Button>
       </div>
 
@@ -219,6 +214,8 @@ export function ChatCompletionPresetEditor({
           <SamplerSettingsPanel
             settings={preset.sampler}
             onChange={handleSamplerChange}
+            enabledSettings={preset.samplerEnabled}
+            onEnabledChange={handleSamplerEnabledChange}
           />
         )}
 

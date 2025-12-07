@@ -185,6 +185,19 @@ export interface STChatCompletionPreset {
 // Chat Completion Preset (Our internal format)
 // ============================================
 
+// Sampler settings that can be enabled/disabled
+export type SamplerSettingKey =
+  | 'temperature'
+  | 'top_p'
+  | 'top_k'
+  | 'top_a'
+  | 'min_p'
+  | 'frequency_penalty'
+  | 'presence_penalty'
+  | 'repetition_penalty'
+  | 'openai_max_tokens'
+  | 'seed';
+
 export interface ChatCompletionPreset {
   id: string;
   name: string;
@@ -193,6 +206,9 @@ export interface ChatCompletionPreset {
 
   // Sampler settings
   sampler: STSamplerSettings;
+
+  // Track which sampler settings are enabled (default: all enabled)
+  samplerEnabled?: Partial<Record<SamplerSettingKey, boolean>>;
 
   // Prompt blocks (the actual content)
   promptBlocks: STPromptBlock[];

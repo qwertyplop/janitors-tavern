@@ -310,15 +310,51 @@ export function buildRequestBody(
 
   // Build sampler parameters from preset
   const sampler = preset.sampler || {};
+  const enabled = preset.samplerEnabled || {};
 
-  return {
+  // Helper to check if a setting is enabled (default: true)
+  const isEnabled = (key: string): boolean => {
+    return enabled[key as keyof typeof enabled] !== false;
+  };
+
+  // Start with required fields
+  const body: Record<string, unknown> = {
     model: janitorData.model || '',
     messages,
-    temperature: sampler.temperature ?? 1,
-    top_p: sampler.top_p ?? 1,
-    max_tokens: sampler.openai_max_tokens ?? 4096,
     stream: janitorData.originalParams?.stream ?? false,
-    frequency_penalty: sampler.frequency_penalty ?? 0,
-    presence_penalty: sampler.presence_penalty ?? 0,
   };
+
+  // Add sampler settings only if enabled
+  if (isEnabled('temperature')) {
+    body.temperature = sampler.temperature ?? 1;
+  }
+  if (isEnabled('top_p')) {
+    body.top_p = sampler.top_p ?? 1;
+  }
+  if (isEnabled('openai_max_tokens')) {
+    body.max_tokens = sampler.openai_max_tokens ?? 4096;
+  }
+  if (isEnabled('frequency_penalty')) {
+    body.frequency_penalty = sampler.frequency_penalty ?? 0;
+  }
+  if (isEnabled('presence_penalty')) {
+    body.presence_penalty = sampler.presence_penalty ?? 0;
+  }
+  if (isEnabled('top_k') && sampler.top_k !== undefined && sampler.top_k > 0) {
+    body.top_k = sampler.top_k;
+  }
+  if (isEnabled('top_a') && sampler.top_a !== undefined && sampler.top_a > 0) {
+    body.top_a = sampler.top_a;
+  }
+  if (isEnabled('min_p') && sampler.min_p !== undefined && sampler.min_p > 0) {
+    body.min_p = sampler.min_p;
+  }
+  if (isEnabled('repetition_penalty') && sampler.repetition_penalty !== undefined && sampler.repetition_penalty !== 1) {
+    body.repetition_penalty = sampler.repetition_penalty;
+  }
+  if (isEnabled('seed') && sampler.seed !== undefined && sampler.seed !== -1) {
+    body.seed = sampler.seed;
+  }
+
+  return body;
 }

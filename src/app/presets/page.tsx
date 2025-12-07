@@ -12,12 +12,11 @@ import {
   updateChatCompletionPreset,
   deleteChatCompletionPreset,
   importSTPreset,
-  exportToSTPreset,
   createDefaultChatCompletionPreset,
   updateSettings,
 } from '@/lib/storage';
 import { ChatCompletionPreset, STChatCompletionPreset } from '@/types';
-import { downloadJson, readJsonFile, formatDate } from '@/lib/utils';
+import { readJsonFile, formatDate } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/components/providers/I18nProvider';
 
@@ -86,18 +85,6 @@ export default function PresetsPage() {
     setDeleteConfirmId(null);
   };
 
-  const handleExportST = (preset: ChatCompletionPreset) => {
-    const stPreset = exportToSTPreset(preset);
-    downloadJson(stPreset, `${preset.name.replace(/\s+/g, '-').toLowerCase()}.json`);
-  };
-
-  const handleExportAll = () => {
-    presets.forEach((preset) => {
-      const stPreset = exportToSTPreset(preset);
-      downloadJson(stPreset, `${preset.name.replace(/\s+/g, '-').toLowerCase()}.json`);
-    });
-  };
-
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files?.length) return;
@@ -143,7 +130,6 @@ export default function PresetsPage() {
             setIsEditing(false);
             setEditingPreset(null);
           }}
-          onExport={handleExportST}
         />
       </div>
     );
@@ -172,9 +158,6 @@ export default function PresetsPage() {
           />
           <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
             {t.presets.importSTPreset}
-          </Button>
-          <Button variant="outline" onClick={handleExportAll} disabled={presets.length === 0}>
-            {t.common.exportAll}
           </Button>
           <Button onClick={handleCreate}>{t.presets.newPreset}</Button>
         </div>
@@ -389,9 +372,6 @@ export default function PresetsPage() {
                   </Button>
                   <Button variant="outline" onClick={() => handleDuplicate(selectedPreset)}>
                     {t.common.duplicate}
-                  </Button>
-                  <Button variant="outline" onClick={() => handleExportST(selectedPreset)}>
-                    {t.common.export}
                   </Button>
                 </div>
               </CardContent>

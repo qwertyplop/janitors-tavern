@@ -660,6 +660,42 @@ export function ChatCompletionPresetEditor({
                 </label>
               </div>
             </Card>
+
+            <Card className="p-4">
+              <h3 className="text-lg font-semibold mb-4">Start Reply With</h3>
+              <p className="text-sm text-zinc-500 mb-4">
+                Prepend text to the beginning of every AI response. Useful for forcing a specific format or style.
+              </p>
+              <div className="space-y-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={preset.advancedSettings.startReplyWith?.enabled ?? false}
+                    onChange={(e) => handleAdvancedSettingsChange('startReplyWith', {
+                      ...preset.advancedSettings.startReplyWith,
+                      enabled: e.target.checked,
+                    })}
+                    className="w-4 h-4 rounded"
+                  />
+                  <span className="text-sm font-medium">Enable Start Reply With</span>
+                </label>
+                <div className={preset.advancedSettings.startReplyWith?.enabled ? '' : 'opacity-50'}>
+                  <Label htmlFor="startReplyContent">Content to prepend</Label>
+                  <Textarea
+                    id="startReplyContent"
+                    value={preset.advancedSettings.startReplyWith?.content ?? ''}
+                    onChange={(e) => handleAdvancedSettingsChange('startReplyWith', {
+                      ...preset.advancedSettings.startReplyWith,
+                      enabled: preset.advancedSettings.startReplyWith?.enabled ?? false,
+                      content: e.target.value,
+                    })}
+                    disabled={!preset.advancedSettings.startReplyWith?.enabled}
+                    className="h-20 font-mono text-sm"
+                    placeholder="Text to prepend to AI responses..."
+                  />
+                </div>
+              </div>
+            </Card>
           </div>
         )}
       </div>

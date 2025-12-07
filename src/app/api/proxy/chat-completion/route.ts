@@ -387,6 +387,10 @@ export async function POST(request: NextRequest) {
       parameters.repetitionPenalty = samplerParams.repetition_penalty;
     }
 
+    // Get "Start Reply With" settings
+    const startReplyWith = chatCompletionPreset?.advancedSettings?.startReplyWith;
+    const startReplyContent = startReplyWith?.enabled ? startReplyWith.content : '';
+
     // Create provider and send request
     const provider = createProviderFromPreset(connectionPreset, apiKey);
 
@@ -456,6 +460,47 @@ export async function POST(request: NextRequest) {
 
       recordUsage(inputTokensEstimate, 0).catch(() => {});
 
+      // If startReplyWith is enabled, create a transform stream to prepend content
+      if (startReplyContent) {
+        let prefixSent = false;
+        const encoder = new TextEncoder();
+        const decoder = new TextDecoder();
+
+        const transformStream = new TransformStream({
+          transform(chunk, controller) {
+            // If prefix already sent, pass through as-is
+            if (prefixSent) {
+              controller.enqueue(chunk);
+              return;
+            }
+
+            // Decode chunk to inspect it
+            const text = decoder.decode(chunk, { stream: true });
+
+            // Check if this chunk contains content delta
+            if (text.includes('"delta"') && text.includes('"content"')) {
+              // Inject our prefix into the first content chunk
+              // SSE format: data: {"choices":[{"delta":{"content":"..."}}]}
+              const modifiedText = text.replace(
+                /"delta":\s*\{\s*"content":\s*"/,
+                `"delta":{"content":"${startReplyContent.replace(/"/g, '\\"').replace(/\n/g, '\\n')}`
+              );
+              controller.enqueue(encoder.encode(modifiedText));
+              prefixSent = true;
+            } else {
+              controller.enqueue(chunk);
+            }
+          },
+        });
+
+        const modifiedStream = streamResult.stream.pipeThrough(transformStream);
+
+        return new Response(modifiedStream, {
+          status: streamResult.status,
+          headers: responseHeaders,
+        });
+      }
+
       // Return SSE stream response immediately - pure passthrough like Python proxy
       return new Response(streamResult.stream, {
         status: streamResult.status,
@@ -489,6 +534,24 @@ export async function POST(request: NextRequest) {
           responseHeaders[key] = value;
         }
       });
+
+      // If startReplyWith is enabled, modify the response content
+      if (startReplyContent) {
+        try {
+          const responseJson = JSON.parse(rawResult.body);
+          // Prepend content to the first choice's message content
+          if (responseJson.choices?.[0]?.message?.content) {
+            responseJson.choices[0].message.content =
+              startReplyContent + responseJson.choices[0].message.content;
+          }
+          return new Response(JSON.stringify(responseJson), {
+            status: rawResult.status,
+            headers: responseHeaders,
+          });
+        } catch {
+          // If parsing fails, return as-is
+        }
+      }
 
       // Pure passthrough - return provider's response as-is
       return new Response(rawResult.body, {

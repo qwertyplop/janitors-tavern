@@ -482,6 +482,10 @@ export function importSTPreset(
       sendIfEmpty: rawJson.send_if_empty || '',
       biasPresetSelected: rawJson.bias_preset_selected || 'Default (none)',
       maxContextUnlocked: rawJson.max_context_unlocked ?? true,
+      startReplyWith: {
+        enabled: false,
+        content: '',
+      },
     },
     sourceFileName: fileName,
     createdAt: now,
@@ -588,6 +592,10 @@ export function createDefaultChatCompletionPreset(): Omit<ChatCompletionPreset, 
       sendIfEmpty: '',
       biasPresetSelected: 'Default (none)',
       maxContextUnlocked: true,
+      startReplyWith: {
+        enabled: false,
+        content: '',
+      },
     },
   };
 }

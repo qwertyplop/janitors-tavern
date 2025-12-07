@@ -270,6 +270,10 @@ export interface ChatCompletionPreset {
     sendIfEmpty: string;
     biasPresetSelected: string;
     maxContextUnlocked: boolean;
+    startReplyWith: {
+      enabled: boolean;
+      content: string;
+    };
   };
 
   // Source file info (for imported presets)

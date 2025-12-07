@@ -346,7 +346,7 @@ export async function POST(request: NextRequest) {
       processedMessages = applyPostProcessing(processedMessages, postProcessingMode);
     }
 
-    // Get sampler parameters from preset
+    // Get sampler parameters from preset (only include enabled ones)
     const samplerParams = chatCompletionPreset?.sampler ?? {
       temperature: 1,
       top_p: 1,
@@ -356,6 +356,36 @@ export async function POST(request: NextRequest) {
       top_k: 0,
       repetition_penalty: 1,
     };
+    const samplerEnabled = chatCompletionPreset?.samplerEnabled ?? {};
+
+    // Helper to check if a setting is enabled (default: true)
+    const isEnabled = (key: string): boolean => {
+      return samplerEnabled[key as keyof typeof samplerEnabled] !== false;
+    };
+
+    // Build parameters object with only enabled settings
+    const parameters: ProviderRequest['parameters'] = {};
+    if (isEnabled('temperature')) {
+      parameters.temperature = samplerParams.temperature;
+    }
+    if (isEnabled('top_p')) {
+      parameters.topP = samplerParams.top_p;
+    }
+    if (isEnabled('openai_max_tokens')) {
+      parameters.maxTokens = samplerParams.openai_max_tokens;
+    }
+    if (isEnabled('frequency_penalty')) {
+      parameters.frequencyPenalty = samplerParams.frequency_penalty;
+    }
+    if (isEnabled('presence_penalty')) {
+      parameters.presencePenalty = samplerParams.presence_penalty;
+    }
+    if (isEnabled('top_k') && samplerParams.top_k !== undefined) {
+      parameters.topK = samplerParams.top_k;
+    }
+    if (isEnabled('repetition_penalty') && samplerParams.repetition_penalty !== undefined) {
+      parameters.repetitionPenalty = samplerParams.repetition_penalty;
+    }
 
     // Create provider and send request
     const provider = createProviderFromPreset(connectionPreset, apiKey);
@@ -363,22 +393,14 @@ export async function POST(request: NextRequest) {
     const providerRequest: ProviderRequest = {
       messages: processedMessages as ChatMessage[],
       model: connectionPreset.model,
-      parameters: {
-        temperature: samplerParams.temperature,
-        topP: samplerParams.top_p,
-        maxTokens: samplerParams.openai_max_tokens,
-        frequencyPenalty: samplerParams.frequency_penalty,
-        presencePenalty: samplerParams.presence_penalty,
-        topK: samplerParams.top_k,
-        repetitionPenalty: samplerParams.repetition_penalty,
-      },
+      parameters,
       extraHeaders: connectionPreset.extraHeaders,
     };
 
     // Fire-and-forget: Log the processed request (don't block the actual request)
     logProcessedRequest(requestId, {
       processedMessages,
-      samplerSettings: samplerParams,
+      samplerSettings: parameters, // Only log enabled settings
       providerUrl: connectionPreset.baseUrl,
       model: connectionPreset.model,
       streaming: body.stream === true,

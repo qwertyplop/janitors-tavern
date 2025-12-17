@@ -5,7 +5,7 @@
 // Includes in-memory caching to minimize blob operations
 
 import { head } from '@vercel/blob';
-import { ConnectionPreset, ChatCompletionPreset, AppSettings } from '@/types';
+import { ConnectionPreset, ChatCompletionPreset, AppSettings, Extension, ExtensionsPipeline } from '@/types';
 
 const STORAGE_PREFIX = 'janitors-tavern/';
 
@@ -133,4 +133,26 @@ export async function getDefaultChatCompletionPreset(): Promise<ChatCompletionPr
     return presets.length > 0 ? presets[0] : null;
   }
   return getServerChatCompletionPreset(settings.defaultChatCompletionPresetId);
+}
+
+// ============================================
+// Extensions Storage
+// ============================================
+
+export async function getServerExtensions(): Promise<Extension[]> {
+  return fetchBlobJson<Extension[]>('extensions', []);
+}
+
+export async function getServerExtensionsPipelines(): Promise<ExtensionsPipeline[]> {
+  return fetchBlobJson<ExtensionsPipeline[]>('extensions-pipelines', []);
+}
+
+export async function getExtensionById(id: string): Promise<Extension | null> {
+  const extensions = await getServerExtensions();
+  return extensions.find(e => e.id === id) || null;
+}
+
+export async function getExtensionsPipeline(id: string): Promise<ExtensionsPipeline | null> {
+  const pipelines = await getServerExtensionsPipelines();
+  return pipelines.find(p => p.id === id) || null;
 }

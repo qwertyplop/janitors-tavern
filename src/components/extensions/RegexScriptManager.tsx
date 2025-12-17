@@ -402,7 +402,7 @@ export default function RegexScriptManager() {
               />
               <p className="text-xs text-zinc-500">
                 Text to replace matches with. Can include capture groups like $1, $2, etc.
-                Use {{match}} to insert the trimmed matched text. Leave empty to delete matches.
+                Use {'{{match}}'} to insert the trimmed matched text. Leave empty to delete matches.
               </p>
             </div>
             <div className="space-y-2">
@@ -447,7 +447,7 @@ export default function RegexScriptManager() {
                   <option value={2}>Escaped</option>
                 </select>
                 <p className="text-xs text-zinc-500">
-                  Whether to substitute macros (e.g., {{char}}, {{user}}) in the find regex.
+                  Whether to substitute macros (e.g., {'{{char}}'}, {'{{user}}'}) in the find regex.
                   Raw = replace with macro values; Escaped = also escape regex special characters.
                 </p>
               </div>

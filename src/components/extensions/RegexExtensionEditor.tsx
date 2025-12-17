@@ -381,9 +381,17 @@ export function RegexExtensionEditor({
                         id={`script-flags-${script.id}`}
                         value={script.flags}
                         onChange={(e) => updateScript(script.id, { flags: e.target.value })}
-                        placeholder={t.extensions.regexFlagsPlaceholder}
+                        placeholder="e.g., g (global), gi (global+case insensitive), gms (global+multiline+dot all)"
                         className="font-mono"
                       />
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                        Common flags: <code className="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">g</code> (global),
+                        <code className="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">i</code> (case insensitive),
+                        <code className="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">m</code> (multiline),
+                        <code className="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">s</code> (dot matches newline).
+                        Combine flags: <code className="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">gi</code>,
+                        <code className="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">gms</code>
+                      </p>
                     </div>
                   </CardContent>
                 </Card>

@@ -138,21 +138,26 @@ export function RegexExtensionEditor({
           try {
             const content = event.target?.result as string;
             const parsed = JSON.parse(content);
-            if (Array.isArray(parsed)) {
-              const importedScripts = parsed.map((script, index) => ({
-                id: script.id || `imported-${Date.now()}-${index}`,
-                name: script.name || 'Imported Script',
-                description: script.description || '',
-                pattern: script.pattern || '',
-                replacement: script.replacement || '',
-                flags: script.flags || 'g',
-                enabled: script.enabled !== false,
-                order: scripts.length + index
-              }));
-              setScripts([...scripts, ...importedScripts]);
-            } else {
-              setError('Invalid JSON format. Expected an array of scripts.');
+
+            // Validate SillyTavern format
+            if (!parsed.scriptName || !parsed.findRegex) {
+              setError('Invalid format. Expected SillyTavern regex script format with scriptName and findRegex properties.');
+              return;
             }
+
+            // Convert ST format to our internal format
+            const importedScript: RegexScript = {
+              id: parsed.id || `imported-${Date.now()}`,
+              name: parsed.scriptName,
+              description: parsed.description || '',
+              pattern: parsed.findRegex,
+              replacement: parsed.replaceString || '',
+              flags: 'g', // Default flag
+              enabled: parsed.disabled !== true,
+              order: scripts.length
+            };
+
+            setScripts([...scripts, importedScript]);
           } catch (err) {
             setError('Failed to parse JSON file');
           }
@@ -164,7 +169,26 @@ export function RegexExtensionEditor({
   };
 
   const exportScriptsToJson = () => {
-    const jsonContent = JSON.stringify(scripts, null, 2);
+    // Convert our internal format to SillyTavern format for export
+    const stFormatScripts = scripts.map(script => ({
+      id: script.id,
+      scriptName: script.name,
+      description: script.description,
+      findRegex: script.pattern,
+      replaceString: script.replacement,
+      disabled: !script.enabled,
+      // Include other common ST properties
+      trimStrings: [],
+      placement: [2],
+      markdownOnly: true,
+      promptOnly: false,
+      runOnEdit: true,
+      substituteRegex: 0,
+      minDepth: null,
+      maxDepth: null
+    }));
+
+    const jsonContent = JSON.stringify(stFormatScripts, null, 2);
     const blob = new Blob([jsonContent], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

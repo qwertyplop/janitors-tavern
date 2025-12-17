@@ -62,15 +62,48 @@ export function processChatHistoryWithRegex(
 }
 
 /**
- * Import regex scripts from JSON
+ * Import regex scripts from JSON (SillyTavern format)
  */
 export async function importRegexScriptsFromJson(jsonContent: string): Promise<RegexScriptCollection> {
   try {
     const parsed = JSON.parse(jsonContent);
+
+    // Handle both single script and array of scripts in ST format
+    let scripts: RegexScript[] = [];
+
+    if (Array.isArray(parsed)) {
+      // Array of ST format scripts
+      scripts = parsed.map((stScript: any) => ({
+        name: stScript.scriptName || 'Unnamed Script',
+        description: stScript.description || '',
+        pattern: stScript.findRegex || '',
+        replacement: stScript.replaceString || '',
+        flags: 'g', // Default flag
+        enabled: stScript.disabled !== true
+      }));
+    } else if (parsed.scriptName && parsed.findRegex) {
+      // Single ST format script
+      scripts = [{
+        name: parsed.scriptName,
+        description: parsed.description || '',
+        pattern: parsed.findRegex,
+        replacement: parsed.replaceString || '',
+        flags: 'g', // Default flag
+        enabled: parsed.disabled !== true
+      }];
+    } else {
+      console.error('Invalid SillyTavern regex script format');
+      return {
+        scripts: [],
+        version: '1.0',
+        description: 'Invalid ST format'
+      };
+    }
+
     return {
-      scripts: parsed.scripts || [],
-      version: parsed.version,
-      description: parsed.description
+      scripts: scripts,
+      version: '1.0',
+      description: 'Imported from SillyTavern format'
     };
   } catch (error) {
     console.error('Error parsing regex scripts JSON:', error);

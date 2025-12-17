@@ -211,7 +211,7 @@ export async function getStats(): Promise<UsageStats> {
 export async function recordUsage(inputTokens: number, outputTokens: number): Promise<UsageStats> {
   try {
     // Load or use cached stats
-    let stats = cachedStats || await loadStats();
+    const stats = cachedStats || await loadStats();
 
     // Check if daily reset is needed first
     if (shouldResetDaily(stats.lastDailyReset)) {

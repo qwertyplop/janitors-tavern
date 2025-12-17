@@ -22,8 +22,10 @@ import {
   getDefaultConnectionPreset,
   getDefaultChatCompletionPreset,
   getServerSettings,
+  getServerRegexScripts,
 } from '@/lib/server-storage';
 import { recordUsage, calculateMessageTokens } from '@/lib/stats';
+import { applyRegexScripts } from '@/lib/regex-processor';
 
 // ============================================
 // Request Types
@@ -326,6 +328,9 @@ export async function POST(request: NextRequest) {
       settings.defaultPostProcessing ||
       'none';
 
+    // Load regex scripts for processing
+    const regexScripts = await getServerRegexScripts();
+
     // Build messages
     let processedMessages: OutputMessage[];
 
@@ -339,6 +344,14 @@ export async function POST(request: NextRequest) {
     } else {
       // Legacy: just process macros in existing messages
       processedMessages = buildMessagesLegacy(body.messages, macroContext);
+    }
+
+    // Apply regex scripts (placement 1) to each message
+    if (regexScripts.length > 0) {
+      processedMessages = processedMessages.map(msg => ({
+        ...msg,
+        content: applyRegexScripts(msg.content, regexScripts, macroContext, 1, undefined)
+      }));
     }
 
     // Apply post-processing based on mode
@@ -535,22 +548,27 @@ export async function POST(request: NextRequest) {
         }
       });
 
-      // If startReplyWith is enabled, modify the response content
-      if (startReplyContent) {
-        try {
-          const responseJson = JSON.parse(rawResult.body);
-          // Prepend content to the first choice's message content
-          if (responseJson.choices?.[0]?.message?.content) {
-            responseJson.choices[0].message.content =
-              startReplyContent + responseJson.choices[0].message.content;
+      // Apply regex scripts (placement 2) and startReplyWith to AI output
+      try {
+        const responseJson = JSON.parse(rawResult.body);
+        if (responseJson.choices?.[0]?.message?.content) {
+          let content = responseJson.choices[0].message.content;
+          // Apply startReplyWith prefix if enabled
+          if (startReplyContent) {
+            content = startReplyContent + content;
           }
-          return new Response(JSON.stringify(responseJson), {
-            status: rawResult.status,
-            headers: responseHeaders,
-          });
-        } catch {
-          // If parsing fails, return as-is
+          // Apply regex scripts (placement 2)
+          if (regexScripts.length > 0) {
+            content = applyRegexScripts(content, regexScripts, macroContext, 2, undefined);
+          }
+          responseJson.choices[0].message.content = content;
         }
+        return new Response(JSON.stringify(responseJson), {
+          status: rawResult.status,
+          headers: responseHeaders,
+        });
+      } catch {
+        // If parsing fails, return as-is (no regex processing)
       }
 
       // Pure passthrough - return provider's response as-is
@@ -576,6 +594,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Process AI output content with startReplyWith and regex scripts
+    let aiContent = result.message?.content || '';
+    if (startReplyContent) {
+      aiContent = startReplyContent + aiContent;
+    }
+    if (regexScripts.length > 0) {
+      aiContent = applyRegexScripts(aiContent, regexScripts, macroContext, 2, undefined);
+    }
+
     const successResponse = {
       id: `chatcmpl-${requestId}`,
       object: 'chat.completion',
@@ -586,7 +613,7 @@ export async function POST(request: NextRequest) {
           index: 0,
           message: {
             role: 'assistant' as const,
-            content: result.message?.content || '',
+            content: aiContent,
           },
           finish_reason: 'stop',
         },

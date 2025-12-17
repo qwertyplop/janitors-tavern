@@ -5,7 +5,7 @@
 // Includes in-memory caching to minimize blob operations
 
 import { head } from '@vercel/blob';
-import { ConnectionPreset, ChatCompletionPreset, AppSettings } from '@/types';
+import { ConnectionPreset, ChatCompletionPreset, AppSettings, RegexScript } from '@/types';
 
 const STORAGE_PREFIX = 'janitors-tavern/';
 
@@ -109,6 +109,10 @@ export async function getServerConnectionPreset(id: string): Promise<ConnectionP
 export async function getServerChatCompletionPreset(id: string): Promise<ChatCompletionPreset | null> {
   const presets = await getServerChatCompletionPresets();
   return presets.find(p => p.id === id) || null;
+}
+
+export async function getServerRegexScripts(): Promise<RegexScript[]> {
+  return fetchBlobJson<RegexScript[]>('regexScripts', []);
 }
 
 // ============================================

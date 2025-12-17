@@ -8,6 +8,7 @@ interface StorageData {
   connections: unknown[];
   presets: unknown[];
   settings: unknown;
+  regexScripts: unknown[];
 }
 
 const DEFAULTS: StorageData = {
@@ -23,6 +24,7 @@ const DEFAULTS: StorageData = {
       logFilePath: 'logs/proxy.log',
     },
   },
+  regexScripts: [],
 };
 
 async function fetchBlobData(key: string): Promise<unknown> {
@@ -62,16 +64,18 @@ export async function GET() {
   }
 
   try {
-    const [connections, presets, settings] = await Promise.all([
+    const [connections, presets, settings, regexScripts] = await Promise.all([
       fetchBlobData('connections'),
       fetchBlobData('presets'),
       fetchBlobData('settings'),
+      fetchBlobData('regexScripts'),
     ]);
 
     return NextResponse.json({
       connections,
       presets,
       settings,
+      regexScripts,
     });
   } catch (error) {
     console.error('Error fetching all data:', error);
@@ -103,6 +107,9 @@ export async function PUT(request: NextRequest) {
     }
     if (data.settings !== undefined) {
       savePromises.push(saveBlobData('settings', data.settings));
+    }
+    if (data.regexScripts !== undefined) {
+      savePromises.push(saveBlobData('regexScripts', data.regexScripts));
     }
 
     await Promise.all(savePromises);

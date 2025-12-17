@@ -9,6 +9,7 @@ import {
   Profile,
   Extension,
   ExtensionsPipeline,
+  RegexScript,
   AppSettings,
   STORAGE_KEYS,
 } from '@/types';
@@ -286,6 +287,59 @@ export function getExtensionsPipelines(): ExtensionsPipeline[] {
 
 export function saveExtensionsPipelines(pipelines: ExtensionsPipeline[]): void {
   setToStorage(STORAGE_KEYS.EXTENSIONS_PIPELINES, pipelines);
+}
+
+// ============================================
+// Regex Scripts
+// ============================================
+
+export function getRegexScripts(): RegexScript[] {
+  return getFromStorage<RegexScript[]>(STORAGE_KEYS.REGEX_SCRIPTS, []);
+}
+
+export function saveRegexScripts(scripts: RegexScript[]): void {
+  setToStorage(STORAGE_KEYS.REGEX_SCRIPTS, scripts);
+}
+
+export function getRegexScript(id: string): RegexScript | undefined {
+  return getRegexScripts().find((s) => s.id === id);
+}
+
+export function addRegexScript(script: Omit<RegexScript, 'id' | 'createdAt' | 'updatedAt'>): RegexScript {
+  const now = new Date().toISOString();
+  const newScript: RegexScript = {
+    ...script,
+    id: generateId(),
+    createdAt: now,
+    updatedAt: now,
+  };
+  const scripts = getRegexScripts();
+  scripts.push(newScript);
+  saveRegexScripts(scripts);
+  return newScript;
+}
+
+export function updateRegexScript(id: string, updates: Partial<RegexScript>): RegexScript | null {
+  const scripts = getRegexScripts();
+  const index = scripts.findIndex((s) => s.id === id);
+  if (index === -1) return null;
+
+  scripts[index] = {
+    ...scripts[index],
+    ...updates,
+    id,
+    updatedAt: new Date().toISOString(),
+  };
+  saveRegexScripts(scripts);
+  return scripts[index];
+}
+
+export function deleteRegexScript(id: string): boolean {
+  const scripts = getRegexScripts();
+  const filtered = scripts.filter((s) => s.id !== id);
+  if (filtered.length === scripts.length) return false;
+  saveRegexScripts(filtered);
+  return true;
 }
 
 // ============================================

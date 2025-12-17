@@ -344,7 +344,7 @@ export interface SamplerPreset {
 // Extension Types
 // ============================================
 
-export type ExtensionType = 'pre' | 'prompt' | 'post';
+export type ExtensionType = 'pre' | 'prompt' | 'post' | 'regex';
 
 export interface Extension {
   id: string;
@@ -370,6 +370,31 @@ export interface ExtensionsPipeline {
   createdAt: string;
   updatedAt: string;
 }
+
+// ============================================
+// Regex Script Types
+// ============================================
+
+export interface RegexScript {
+  id: string; // UUID v4
+  scriptName: string;
+  findRegex: string; // e.g., "/pattern/flags"
+  replaceString: string;
+  trimStrings: string[]; // strings to trim from matches before replacement
+  placement: number[]; // 1 = user input, 2 = AI output (SillyTavern mapping)
+  disabled: boolean;
+  markdownOnly: boolean; // only apply if content contains markdown
+  promptOnly: boolean; // only apply to prompt (outgoing) vs response? (interpret as placement-specific)
+  runOnEdit: boolean; // irrelevant for proxy, kept for compatibility
+  substituteRegex: 0 | 1 | 2; // 0 = don't substitute macros, 1 = raw, 2 = escaped
+  minDepth: number | null; // minimum depth (0 = last message)
+  maxDepth: number | null; // maximum depth (must be > minDepth)
+  createdAt: string; // ISO timestamp
+  updatedAt: string; // ISO timestamp
+}
+
+// A pipeline of regex scripts (ordered collection)
+export type RegexPipeline = RegexScript[];
 
 // ============================================
 // Profile Types
@@ -477,4 +502,5 @@ export const STORAGE_KEYS = {
   EXTENSIONS: 'jt.extensions',
   EXTENSIONS_PIPELINES: 'jt.extensionsPipelines',
   SETTINGS: 'jt.settings',
+  REGEX_SCRIPTS: 'jt.regexScripts',
 } as const;

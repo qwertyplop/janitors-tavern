@@ -7,6 +7,9 @@ import {
   ChatCompletionPreset,
   ChatMessage,
   PromptPostProcessingMode,
+  Extension,
+  ExtensionsPipeline,
+  RegexExtension
 } from '@/types';
 import {
   logRequest,
@@ -22,8 +25,12 @@ import {
   getDefaultConnectionPreset,
   getDefaultChatCompletionPreset,
   getServerSettings,
+  getExtensionsPipeline,
+  getExtensionById
 } from '@/lib/server-storage';
 import { recordUsage, calculateMessageTokens } from '@/lib/stats';
+import { RegexScript } from '@/lib/regex-processor';
+import { RegexExtensionProcessor } from '@/lib/extensions/regex-extension';
 
 // ============================================
 // Request Types
@@ -40,6 +47,12 @@ interface ProxyRequest {
   // Presets (loaded from client localStorage and sent with request)
   connectionPreset?: ConnectionPreset;
   chatCompletionPreset?: ChatCompletionPreset;
+
+  // Extensions pipeline for processing
+  extensionsPipelineId?: string;
+
+  // Legacy: direct regex scripts (kept for backward compatibility)
+  regexScripts?: RegexScript[];
 }
 
 // ============================================
@@ -220,6 +233,46 @@ function applyPostProcessing(
 }
 
 // ============================================
+// Extensions Pipeline Processing
+// ============================================
+
+async function applyExtensionsPipeline(
+  messages: ChatMessage[],
+  pipelineId: string
+): Promise<ChatMessage[]> {
+  try {
+    // Get the extensions pipeline
+    const pipeline = await getExtensionsPipeline(pipelineId);
+    if (!pipeline) {
+      console.warn(`Extensions pipeline ${pipelineId} not found`);
+      return messages;
+    }
+
+    let processedMessages = messages;
+
+    // Process extensions in order
+    for (const step of pipeline.steps) {
+      if (!step.enabled) continue;
+
+      const extension = await getExtensionById(step.extensionId);
+      if (!extension || !extension.enabled) continue;
+
+      if (extension.type === 'regex') {
+        const regexExtension = extension as RegexExtension;
+        const processor = new RegexExtensionProcessor(regexExtension);
+        processedMessages = processor.processMessages(processedMessages);
+      }
+      // Add other extension types here as needed
+    }
+
+    return processedMessages;
+  } catch (error) {
+    console.error('Error applying extensions pipeline:', error);
+    return messages; // Return original messages on error
+  }
+}
+
+// ============================================
 // Main Route Handler
 // ============================================
 
@@ -316,7 +369,26 @@ export async function POST(request: NextRequest) {
     };
 
     // Parse Janitor data for context
-    const janitorData = parseJanitorRequest(janitorRequest);
+    let extensionProcessedMessages = body.messages;
+
+    // Apply extensions pipeline if specified
+    if (body.extensionsPipelineId) {
+      extensionProcessedMessages = await applyExtensionsPipeline(
+        body.messages,
+        body.extensionsPipelineId
+      );
+    } else if (body.regexScripts) {
+      // Legacy: direct regex scripts processing (backward compatibility)
+      const janitorData = parseJanitorRequest(janitorRequest, {
+        regexScripts: body.regexScripts
+      });
+      extensionProcessedMessages = janitorData.chatHistory;
+    }
+
+    const janitorData = parseJanitorRequest({
+      ...janitorRequest,
+      messages: extensionProcessedMessages
+    });
     const macroContext = janitorDataToMacroContext(janitorData);
 
     // Get settings for post-processing mode

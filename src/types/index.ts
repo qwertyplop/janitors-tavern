@@ -344,7 +344,7 @@ export interface SamplerPreset {
 // Extension Types
 // ============================================
 
-export type ExtensionType = 'pre' | 'prompt' | 'post';
+export type ExtensionType = 'pre' | 'prompt' | 'post' | 'regex';
 
 export interface Extension {
   id: string;
@@ -354,6 +354,28 @@ export interface Extension {
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+// Regex Extension Specific Type
+export interface RegexExtensionConfig {
+  scripts: RegexScript[];
+  enabledScripts?: string[]; // IDs of enabled scripts
+}
+
+export interface RegexExtension extends Extension {
+  type: 'regex';
+  config: RegexExtensionConfig;
+}
+
+export interface RegexScript {
+  id: string;
+  name: string;
+  description?: string;
+  pattern: string;
+  replacement: string;
+  flags?: string;
+  enabled?: boolean;
+  order?: number;
 }
 
 export interface ExtensionStep {

@@ -4,6 +4,7 @@
  */
 
 import type { MacroContext } from './macros';
+import { processChatHistoryWithRegex, RegexScript } from './regex-processor';
 
 export interface JanitorMessage {
   role: 'system' | 'user' | 'assistant';
@@ -83,7 +84,10 @@ function parseSystemMessage(content: string): {
 /**
  * Parse a JanitorAI request and extract all macro-relevant data
  */
-export function parseJanitorRequest(request: JanitorRequest): ParsedJanitorData {
+export function parseJanitorRequest(
+  request: JanitorRequest,
+  options?: { regexScripts?: RegexScript[] }
+): ParsedJanitorData {
   const messages = request.messages || [];
 
   // First message is typically the system message with all the character info
@@ -94,7 +98,15 @@ export function parseJanitorRequest(request: JanitorRequest): ParsedJanitorData 
   const parsed = parseSystemMessage(systemContent);
 
   // Chat history is all non-system messages
-  const chatHistory = messages.filter(m => m.role !== 'system');
+  let chatHistory = messages.filter(m => m.role !== 'system');
+
+  // Apply regex processing to chat history if scripts are provided
+  if (options?.regexScripts && options.regexScripts.length > 0) {
+    chatHistory = processChatHistoryWithRegex(chatHistory, {
+      scripts: options.regexScripts,
+      skipPresetProcessing: true // Only process chat history, not preset parts
+    });
+  }
 
   // Log parsed data for debugging
   console.log('[JanitorParser] Parsed data:', {

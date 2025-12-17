@@ -362,6 +362,10 @@ export default function RegexScriptManager() {
           <DialogHeader>
             <DialogTitle>{editingId ? 'Edit Regex Script' : 'New Regex Script'}</DialogTitle>
           </DialogHeader>
+          <p className="text-sm text-zinc-500 px-6 pt-2">
+            Regex scripts allow you to find and replace text in messages using regular expressions.
+            They can be applied to user input, AI output, or both, with optional depth and markdown filtering.
+          </p>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="name">Script Name</Label>
@@ -371,6 +375,9 @@ export default function RegexScriptManager() {
                 onChange={(e) => setFormName(e.target.value)}
                 placeholder="My Regex Script"
               />
+              <p className="text-xs text-zinc-500">
+                A descriptive name for this script, used in the script list.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="findRegex">Find Regex</Label>
@@ -381,7 +388,8 @@ export default function RegexScriptManager() {
                 placeholder="/pattern/flags"
               />
               <p className="text-xs text-zinc-500">
-                Use /pattern/flags format (e.g., /hello/gi) or plain text.
+                Regular expression pattern to search for. Use /pattern/flags format (e.g., /hello/gi) or plain text.
+                If using flags, ensure they are valid JavaScript regex flags (g, i, m, s, u, y).
               </p>
             </div>
             <div className="space-y-2">
@@ -392,6 +400,10 @@ export default function RegexScriptManager() {
                 onChange={(e) => setFormReplaceString(e.target.value)}
                 placeholder="Replacement text"
               />
+              <p className="text-xs text-zinc-500">
+                Text to replace matches with. Can include capture groups like $1, $2, etc.
+                Use {{match}} to insert the trimmed matched text. Leave empty to delete matches.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="trimStrings">Trim Strings (one per line)</Label>
@@ -402,6 +414,10 @@ export default function RegexScriptManager() {
                 onChange={(e) => setFormTrimStrings(e.target.value.split('\n').filter(s => s.trim() !== ''))}
                 placeholder="le\napp"
               />
+              <p className="text-xs text-zinc-500">
+                List of strings to trim from matches before replacement. One per line.
+                For example, 'le' and 'app' will trim 'le' and 'app' from the matched text.
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -412,6 +428,11 @@ export default function RegexScriptManager() {
                   onChange={(e) => setFormPlacement(e.target.value.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n)))}
                   placeholder="2"
                 />
+                <p className="text-xs text-zinc-500">
+                  Where the script should be applied: 1 = user input, 2 = AI output.
+                  You can specify multiple placements, e.g., "1,2" for both.
+                  Default is 2 (AI output).
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="substituteRegex">Substitute Macros</Label>
@@ -425,6 +446,10 @@ export default function RegexScriptManager() {
                   <option value={1}>Raw</option>
                   <option value={2}>Escaped</option>
                 </select>
+                <p className="text-xs text-zinc-500">
+                  Whether to substitute macros (e.g., {{char}}, {{user}}) in the find regex.
+                  Raw = replace with macro values; Escaped = also escape regex special characters.
+                </p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -437,6 +462,10 @@ export default function RegexScriptManager() {
                   onChange={(e) => setFormMinDepth(e.target.value === '' ? null : parseInt(e.target.value))}
                   placeholder="0"
                 />
+                <p className="text-xs text-zinc-500">
+                  Minimum message depth (0 = last message) where the script will apply.
+                  Leave empty for no minimum.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="maxDepth">Max Depth (optional)</Label>
@@ -447,44 +476,68 @@ export default function RegexScriptManager() {
                   onChange={(e) => setFormMaxDepth(e.target.value === '' ? null : parseInt(e.target.value))}
                   placeholder="5"
                 />
+                <p className="text-xs text-zinc-500">
+                  Maximum message depth (0 = last message) where the script will apply.
+                  Leave empty for no maximum.
+                </p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="disabled"
-                  checked={formDisabled}
-                  onChange={(e) => setFormDisabled(e.target.checked)}
-                />
-                <Label htmlFor="disabled">Disabled</Label>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="disabled"
+                    checked={formDisabled}
+                    onChange={(e) => setFormDisabled(e.target.checked)}
+                  />
+                  <Label htmlFor="disabled">Disabled</Label>
+                </div>
+                <p className="text-xs text-zinc-500">
+                  If checked, the script will be ignored and not applied.
+                </p>
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="markdownOnly"
-                  checked={formMarkdownOnly}
-                  onChange={(e) => setFormMarkdownOnly(e.target.checked)}
-                />
-                <Label htmlFor="markdownOnly">Markdown Only</Label>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="markdownOnly"
+                    checked={formMarkdownOnly}
+                    onChange={(e) => setFormMarkdownOnly(e.target.checked)}
+                  />
+                  <Label htmlFor="markdownOnly">Markdown Only</Label>
+                </div>
+                <p className="text-xs text-zinc-500">
+                  Only apply if the message contains markdown formatting.
+                </p>
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="promptOnly"
-                  checked={formPromptOnly}
-                  onChange={(e) => setFormPromptOnly(e.target.checked)}
-                />
-                <Label htmlFor="promptOnly">Prompt Only</Label>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="promptOnly"
+                    checked={formPromptOnly}
+                    onChange={(e) => setFormPromptOnly(e.target.checked)}
+                  />
+                  <Label htmlFor="promptOnly">Prompt Only</Label>
+                </div>
+                <p className="text-xs text-zinc-500">
+                  Only apply to prompt (outgoing) messages, not responses.
+                </p>
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="runOnEdit"
-                  checked={formRunOnEdit}
-                  onChange={(e) => setFormRunOnEdit(e.target.checked)}
-                />
-                <Label htmlFor="runOnEdit">Run on Edit</Label>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="runOnEdit"
+                    checked={formRunOnEdit}
+                    onChange={(e) => setFormRunOnEdit(e.target.checked)}
+                  />
+                  <Label htmlFor="runOnEdit">Run on Edit</Label>
+                </div>
+                <p className="text-xs text-zinc-500">
+                  (Legacy) Run the script when editing messages. May be ignored by the proxy.
+                </p>
               </div>
             </div>
           </div>

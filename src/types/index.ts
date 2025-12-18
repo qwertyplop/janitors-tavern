@@ -382,6 +382,7 @@ export interface RegexScript {
   replaceString: string;
   trimStrings: string[]; // strings to trim from matches before replacement
   placement: number[]; // 1 = user input, 2 = AI output (SillyTavern mapping)
+  roles?: ('assistant' | 'user' | 'system')[]; // roles to apply the regex to (defaults to ['assistant', 'user'])
   disabled: boolean;
   markdownOnly: boolean; // only apply if content contains markdown
   runOnEdit: boolean; // irrelevant for proxy, kept for compatibility

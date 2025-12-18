@@ -48,6 +48,7 @@ export default function RegexScriptManager() {
   const [formReplaceString, setFormReplaceString] = useState('');
   const [formTrimStrings, setFormTrimStrings] = useState<string[]>([]);
   const [formPlacement, setFormPlacement] = useState<number[]>([2]);
+  const [formRoles, setFormRoles] = useState<('assistant' | 'user' | 'system')[]>(['assistant', 'user']); // Default to assistant and user
   const [showTestMode, setShowTestMode] = useState(false);
   const [testInput, setTestInput] = useState('');
   const [testOutput, setTestOutput] = useState('');
@@ -77,6 +78,7 @@ export default function RegexScriptManager() {
         replaceString: formReplaceString,
         trimStrings: formTrimStrings,
         placement: formPlacement,
+        roles: formRoles,
         substituteRegex: formSubstituteRegex,
         minDepth: formMinDepth,
         maxDepth: formMaxDepth,
@@ -111,6 +113,7 @@ export default function RegexScriptManager() {
     formReplaceString,
     formTrimStrings,
     formPlacement,
+    formRoles,
     formMarkdownOnly,
     formSubstituteRegex,
     formMinDepth,
@@ -132,6 +135,7 @@ export default function RegexScriptManager() {
     setFormReplaceString(script.replaceString);
     setFormTrimStrings([...script.trimStrings]);
     setFormPlacement([...script.placement]);
+    setFormRoles(script.roles || ['assistant', 'user']); // Default to assistant and user if not set
     setFormMarkdownOnly(script.markdownOnly);
     setFormSubstituteRegex(script.substituteRegex);
     setFormMinDepth(script.minDepth);
@@ -145,6 +149,7 @@ export default function RegexScriptManager() {
     setFormReplaceString('');
     setFormTrimStrings([]);
     setFormPlacement([2]);
+    setFormRoles(['assistant', 'user']); // Default to assistant and user
     setFormMarkdownOnly(false);
     setFormSubstituteRegex(0);
     setFormMinDepth(null);
@@ -160,6 +165,7 @@ export default function RegexScriptManager() {
         replaceString: formReplaceString,
         trimStrings: formTrimStrings,
         placement: formPlacement,
+        roles: formRoles, // Add the roles field
         // New scripts start enabled; when editing we keep the existing disabled flag
         disabled: editingId
           ? (scripts.find(s => s.id === editingId)?.disabled ?? false)
@@ -211,6 +217,7 @@ export default function RegexScriptManager() {
       const newScripts = scriptsToImport.map((s) => ({
         ...s,
         findRegex: normalizeRegexPattern(s.findRegex),
+        roles: s.roles || ['assistant', 'user'], // Set default roles if not present (for backward compatibility)
         id: generateId(),
         createdAt: now,
         updatedAt: now,
@@ -549,22 +556,90 @@ export default function RegexScriptManager() {
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="substituteRegex">Substitute Macros</Label>
-                <select
-                  id="substituteRegex"
-                  className="w-full border rounded-md p-2 text-sm"
-                  value={formSubstituteRegex}
-                  onChange={(e) => setFormSubstituteRegex(parseInt(e.target.value) as 0 | 1 | 2)}
-                >
-                  <option value={0}>Don't substitute</option>
-                  <option value={1}>Raw</option>
-                  <option value={2}>Escaped</option>
-                </select>
+                <Label htmlFor="roles">Roles</Label>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="roleAssistant"
+                      checked={formRoles.includes('assistant')}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setFormRoles(prev => {
+                          const newRoles = new Set(prev);
+                          if (checked) {
+                            newRoles.add('assistant');
+                          } else {
+                            newRoles.delete('assistant');
+                          }
+                          return Array.from(newRoles) as ('assistant' | 'user' | 'system')[];
+                        });
+                      }}
+                    />
+                    <Label htmlFor="roleAssistant">Assistant</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="roleUser"
+                      checked={formRoles.includes('user')}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setFormRoles(prev => {
+                          const newRoles = new Set(prev);
+                          if (checked) {
+                            newRoles.add('user');
+                          } else {
+                            newRoles.delete('user');
+                          }
+                          return Array.from(newRoles) as ('assistant' | 'user' | 'system')[];
+                        });
+                      }}
+                    />
+                    <Label htmlFor="roleUser">User</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="roleSystem"
+                      checked={formRoles.includes('system')}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setFormRoles(prev => {
+                          const newRoles = new Set(prev);
+                          if (checked) {
+                            newRoles.add('system');
+                          } else {
+                            newRoles.delete('system');
+                          }
+                          return Array.from(newRoles) as ('assistant' | 'user' | 'system')[];
+                        });
+                      }}
+                    />
+                    <Label htmlFor="roleSystem">System</Label>
+                  </div>
+                </div>
                 <p className="text-xs text-zinc-500">
-                  Whether to substitute macros (e.g., {'{{char}}'}, {'{{user}}'}) in the find regex.
-                  Raw = replace with macro values; Escaped = also escape regex special characters.
+                  Which message roles to apply the regex to. Default: Assistant and User (System disabled).
                 </p>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="substituteRegex">Substitute Macros</Label>
+              <select
+                id="substituteRegex"
+                className="w-full border rounded-md p-2 text-sm"
+                value={formSubstituteRegex}
+                onChange={(e) => setFormSubstituteRegex(parseInt(e.target.value) as 0 | 1 | 2)}
+              >
+                <option value={0}>Don't substitute</option>
+                <option value={1}>Raw</option>
+                <option value={2}>Escaped</option>
+              </select>
+              <p className="text-xs text-zinc-500">
+                Whether to substitute macros (e.g., {'{{char}}'}, {'{{user}}'}) in the find regex.
+                Raw = replace with macro values; Escaped = also escape regex special characters.
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

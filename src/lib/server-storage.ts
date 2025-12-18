@@ -67,7 +67,19 @@ async function fetchBlobJson<T>(key: string, defaultValue: T): Promise<T> {
     if (blobInfo) {
       console.log(`[ServerStorage] Found blob for ${key}, fetching...`);
       const response = await fetch(blobInfo.url);
-      const data = await response.json();
+      let data = await response.json();
+      
+      // Handle regex scripts specifically to add default roles for backward compatibility
+      if (key === 'regexScripts' && Array.isArray(data)) {
+        data = data.map((script: any) => {
+          // If the script doesn't have roles, add the default ['assistant', 'user']
+          if (!script.hasOwnProperty('roles')) {
+            return { ...script, roles: ['assistant', 'user'] };
+          }
+          return script;
+        });
+      }
+      
       setCache(key, data);
       console.log(`[ServerStorage] Successfully fetched ${key} from blob, count: ${Array.isArray(data) ? data.length : 'N/A'}`);
       return data;

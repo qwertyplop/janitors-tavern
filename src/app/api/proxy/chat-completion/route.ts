@@ -361,7 +361,7 @@ export async function POST(request: NextRequest) {
         console.log(`[JT] [${requestId}] Applying ${inputScripts.length} regex script(s) to input messages (placement 1)`);
         processedMessages = processedMessages.map(msg => ({
           ...msg,
-          content: applyRegexScripts(msg.content, inputScripts, macroContext, 1, undefined)
+          content: applyRegexScripts(msg.content, inputScripts, macroContext, 1, undefined, msg.role)
         }));
       }
     }
@@ -512,6 +512,7 @@ export async function POST(request: NextRequest) {
                 // Apply startReplyWith prefix
                 const withPrefix = startReplyContent + original;
                 // Apply regex scripts (placement 2) to the content
+                // For streaming, we assume it's assistant output (role: 'assistant')
                 const outputScripts = regexScripts.filter(s => s.placement.includes(2));
                 if (outputScripts.length > 0) {
                   console.log(`[JT] [${requestId}] Applying ${outputScripts.length} regex script(s) to streaming AI output (placement 2)`);
@@ -520,7 +521,8 @@ export async function POST(request: NextRequest) {
                     outputScripts,
                     macroContext,
                     2,
-                    undefined
+                    undefined,
+                    'assistant'
                   );
                 } else {
                   newContent = withPrefix;
@@ -600,7 +602,7 @@ export async function POST(request: NextRequest) {
             const outputScripts = regexScripts.filter(s => s.placement.includes(2));
             if (outputScripts.length > 0) {
               console.log(`[JT] [${requestId}] Applying ${outputScripts.length} regex script(s) to AI output (placement 2)`);
-              content = applyRegexScripts(content, outputScripts, macroContext, 2, undefined);
+              content = applyRegexScripts(content, outputScripts, macroContext, 2, undefined, 'assistant');
             }
           }
           responseJson.choices[0].message.content = content;
@@ -645,7 +647,7 @@ export async function POST(request: NextRequest) {
       const outputScripts = regexScripts.filter(s => s.placement.includes(2));
       if (outputScripts.length > 0) {
         console.log(`[JT] [${requestId}] Applying ${outputScripts.length} regex script(s) to AI output (placement 2)`);
-        aiContent = applyRegexScripts(aiContent, outputScripts, macroContext, 2, undefined);
+        aiContent = applyRegexScripts(aiContent, outputScripts, macroContext, 2, undefined, 'assistant');
       }
     }
 

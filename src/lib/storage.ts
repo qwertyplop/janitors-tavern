@@ -333,6 +333,7 @@ export function addRegexScript(script: Omit<RegexScript, 'id' | 'createdAt' | 'u
   const newScript: RegexScript = {
     ...script,
     findRegex: normalizeRegexPattern(script.findRegex),
+    roles: script.roles || ['assistant', 'user'], // Default to assistant and user roles
     id: generateId(),
     createdAt: now,
     updatedAt: now,
@@ -352,6 +353,7 @@ export function updateRegexScript(id: string, updates: Partial<RegexScript>): Re
     ...scripts[index],
     ...updates,
     findRegex: updates.findRegex ? normalizeRegexPattern(updates.findRegex) : scripts[index].findRegex,
+    roles: updates.roles !== undefined ? updates.roles : scripts[index].roles || ['assistant', 'user'], // Preserve existing roles or set default
     id,
     updatedAt: new Date().toISOString(),
   };

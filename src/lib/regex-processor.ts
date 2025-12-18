@@ -104,11 +104,24 @@ export function applyRegexScript(
   content: string,
   script: RegexScript,
   context: MacroContext,
-  depth?: number
+  depth?: number,
+  role?: 'system' | 'user' | 'assistant'
 ): string {
   // Skip if disabled
   if (script.disabled) {
     return content;
+  }
+
+  // Role filtering - if roles are specified, only apply to matching roles
+  if (script.roles && role) {
+    if (!script.roles.includes(role)) {
+      return content;
+    }
+  } else if (!script.roles && role) {
+    // Default behavior: apply to assistant and user roles, but not system
+    if (role === 'system') {
+      return content;
+    }
   }
 
   // Depth filtering
@@ -164,13 +177,14 @@ export function applyRegexScripts(
   scripts: RegexScript[],
   context: MacroContext,
   placement: number,
-  depth?: number
+  depth?: number,
+  role?: 'system' | 'user' | 'assistant'
 ): string {
   let result = content;
   // Filter scripts by placement
   const filtered = scripts.filter(s => s.placement.includes(placement));
   for (const script of filtered) {
-    result = applyRegexScript(result, script, context, depth);
+    result = applyRegexScript(result, script, context, depth, role);
   }
   return result;
 }

@@ -76,8 +76,18 @@ async function pullFromBlob(): Promise<StorageData | null> {
       const data = await response.json();
       // Check if we got valid data (not just defaults)
       if (data && (data.connections?.length > 0 || data.presets?.length > 0 || data.regexScripts?.length > 0)) {
+        // Add default roles to regex scripts for backward compatibility
+        if (data.regexScripts && Array.isArray(data.regexScripts)) {
+          data.regexScripts = data.regexScripts.map((script: any) => {
+            if (!script.hasOwnProperty('roles')) {
+              return { ...script, roles: ['assistant', 'user'] };
+            }
+            return script;
+          });
+        }
         return data;
       }
+      return null;
     }
   } catch (error) {
     console.error('Failed to pull from blob:', error);

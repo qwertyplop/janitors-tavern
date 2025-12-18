@@ -384,7 +384,6 @@ export interface RegexScript {
   placement: number[]; // 1 = user input, 2 = AI output (SillyTavern mapping)
   disabled: boolean;
   markdownOnly: boolean; // only apply if content contains markdown
-  promptOnly: boolean; // only apply to prompt (outgoing) vs response? (interpret as placement-specific)
   runOnEdit: boolean; // irrelevant for proxy, kept for compatibility
   substituteRegex: 0 | 1 | 2; // 0 = don't substitute macros, 1 = raw, 2 = escaped
   minDepth: number | null; // minimum depth (0 = last message)

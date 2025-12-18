@@ -51,7 +51,6 @@ export default function RegexScriptManager() {
   const [testInput, setTestInput] = useState('');
   const [testOutput, setTestOutput] = useState('');
   const [formMarkdownOnly, setFormMarkdownOnly] = useState(false);
-  const [formPromptOnly, setFormPromptOnly] = useState(false);
   const [formSubstituteRegex, setFormSubstituteRegex] = useState<0 | 1 | 2>(0);
   const [formMinDepth, setFormMinDepth] = useState<number | null>(null);
   const [formMaxDepth, setFormMaxDepth] = useState<number | null>(null);
@@ -73,10 +72,6 @@ export default function RegexScriptManager() {
         replaceString: formReplaceString,
         trimStrings: formTrimStrings,
         placement: formPlacement,
-        // disabled flag is not editable in the UI; default to false for test preview
-        disabled: false,
-        markdownOnly: formMarkdownOnly,
-        promptOnly: formPromptOnly,
         substituteRegex: formSubstituteRegex,
         minDepth: formMinDepth,
         maxDepth: formMaxDepth,
@@ -96,7 +91,6 @@ export default function RegexScriptManager() {
     formTrimStrings,
     formPlacement,
     formMarkdownOnly,
-    formPromptOnly,
     formSubstituteRegex,
     formMinDepth,
     formMaxDepth,
@@ -118,7 +112,6 @@ export default function RegexScriptManager() {
     setFormTrimStrings([...script.trimStrings]);
     setFormPlacement([...script.placement]);
     setFormMarkdownOnly(script.markdownOnly);
-    setFormPromptOnly(script.promptOnly);
     setFormSubstituteRegex(script.substituteRegex);
     setFormMinDepth(script.minDepth);
     setFormMaxDepth(script.maxDepth);
@@ -132,7 +125,6 @@ export default function RegexScriptManager() {
     setFormTrimStrings([]);
     setFormPlacement([2]);
     setFormMarkdownOnly(false);
-    setFormPromptOnly(false);
     setFormSubstituteRegex(0);
     setFormMinDepth(null);
     setFormMaxDepth(null);
@@ -142,21 +134,20 @@ export default function RegexScriptManager() {
     if (!formName || !formFindRegex) return;
 
     const scriptData: Omit<RegexScript, 'id' | 'createdAt' | 'updatedAt'> = {
-      scriptName: formName,
-      findRegex: formFindRegex,
-      replaceString: formReplaceString,
-      trimStrings: formTrimStrings,
-      placement: formPlacement,
-      // New scripts start enabled; when editing we keep the existing disabled flag
-      disabled: editingId
-        ? (scripts.find(s => s.id === editingId)?.disabled ?? false)
-        : false,
-      markdownOnly: formMarkdownOnly,
-      promptOnly: formPromptOnly,
-      substituteRegex: formSubstituteRegex,
-      minDepth: formMinDepth,
-      maxDepth: formMaxDepth,
-      runOnEdit: false,
+        scriptName: formName,
+        findRegex: formFindRegex,
+        replaceString: formReplaceString,
+        trimStrings: formTrimStrings,
+        placement: formPlacement,
+        // New scripts start enabled; when editing we keep the existing disabled flag
+        disabled: editingId
+          ? (scripts.find(s => s.id === editingId)?.disabled ?? false)
+          : false,
+        markdownOnly: formMarkdownOnly,
+        substituteRegex: formSubstituteRegex,
+        minDepth: formMinDepth,
+        maxDepth: formMaxDepth,
+        runOnEdit: false,
     };
 
     if (editingId) {
@@ -348,9 +339,6 @@ export default function RegexScriptManager() {
                   )}
                   {selectedScript.markdownOnly && (
                     <Badge variant="outline">Markdown Only</Badge>
-                  )}
-                  {selectedScript.promptOnly && (
-                    <Badge variant="outline">Prompt Only</Badge>
                   )}
                 </div>
               </CardHeader>
@@ -615,20 +603,6 @@ export default function RegexScriptManager() {
                 </div>
                 <p className="text-xs text-zinc-500">
                   Only apply if the message contains markdown formatting.
-                </p>
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="promptOnly"
-                    checked={formPromptOnly}
-                    onChange={(e) => setFormPromptOnly(e.target.checked)}
-                  />
-                  <Label htmlFor="promptOnly">Prompt Only</Label>
-                </div>
-                <p className="text-xs text-zinc-500">
-                  Only apply to prompt (outgoing) messages, not responses.
                 </p>
               </div>
             </div>

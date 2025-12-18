@@ -37,7 +37,7 @@ export default function RegexScriptManager() {
   const [formReplaceString, setFormReplaceString] = useState('');
   const [formTrimStrings, setFormTrimStrings] = useState<string[]>([]);
   const [formPlacement, setFormPlacement] = useState<number[]>([2]);
-  const [testModeEnabled, setTestModeEnabled] = useState(false);
+  const [showTestMode, setShowTestMode] = useState(false);
   const [testInput, setTestInput] = useState('');
   const [testOutput, setTestOutput] = useState('');
   const [formDisabled, setFormDisabled] = useState(false);
@@ -57,7 +57,7 @@ export default function RegexScriptManager() {
 
   // Real‑time test mode processing
   useEffect(() => {
-    if (testModeEnabled) {
+    if (showTestMode) {
       const tempScript = {
         scriptName: formName,
         findRegex: formFindRegex,
@@ -78,7 +78,7 @@ export default function RegexScriptManager() {
       setTestOutput('');
     }
   }, [
-    testModeEnabled,
+    showTestMode,
     testInput,
     formName,
     formFindRegex,
@@ -169,7 +169,7 @@ export default function RegexScriptManager() {
     setDeleteConfirmId(null);
     // Reset test mode when dialog closes
     if (!isDialogOpen) {
-      setTestModeEnabled(false);
+      setShowTestMode(false);
       setTestInput('');
       setTestOutput('');
     }
@@ -359,7 +359,7 @@ export default function RegexScriptManager() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Placement</h4>
+                    <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Affects</h4>
                     <p className="text-sm">{selectedScript.placement.join(', ')}</p>
                   </div>
                   <div>
@@ -411,6 +411,9 @@ export default function RegexScriptManager() {
           <p className="text-sm text-zinc-500 px-6 pt-2">
             Regex scripts allow you to find and replace text in messages using regular expressions.
             They can be applied to user input, AI output, or both, with optional depth and markdown filtering.
+          </p>
+          <p className="text-xs text-zinc-500 px-6">
+            Note: the “Run on Edit” option has been removed; scripts no longer execute automatically when editing messages.
           </p>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -602,18 +605,18 @@ export default function RegexScriptManager() {
               </div>
             </div>
           </div>
-          {/* Test Mode */}
+          {/* Test Mode Button */}
           <div className="space-y-2 px-6">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="testMode"
-                checked={testModeEnabled}
-                onChange={(e) => setTestModeEnabled(e.target.checked)}
-              />
-              <Label htmlFor="testMode">Test Mode</Label>
-            </div>
-            {testModeEnabled && (
+            <Button
+              variant="outline"
+              onClick={() => setShowTestMode(prev => !prev)}
+            >
+              Test Mode
+            </Button>
+            <p className="text-xs text-zinc-500">
+              Click “Test Mode” to preview the script’s effect on sample input. The Input field and real‑time Output preview appear below.
+            </p>
+            {showTestMode && (
               <div className="space-y-2">
                 <Label htmlFor="testInput">Input</Label>
                 <textarea

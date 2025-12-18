@@ -467,7 +467,39 @@ export default function RegexScriptManager() {
                 List of strings to trim from matches before replacement. One per line.
                 For example, 'le' and 'app' will trim 'le' and 'app' from the matched text.
               </p>
-            </div>
+              </div>
+              
+              {/* Test Mode Button */}
+              <div className="space-y-2 px-6">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowTestMode(prev => !prev)}
+                >
+                  Test Mode
+                </Button>
+                <p className="text-xs text-zinc-500">
+                  The Test Mode button appears between the Trim Strings field and the Affects checkboxes. Click “Test Mode” to preview the script’s effect on sample input; the Input textarea and read‑only Output area appear directly below the button when active.
+                </p>
+                {showTestMode && (
+                  <div className="space-y-2">
+                    <Label htmlFor="testInput">Input</Label>
+                    <textarea
+                      id="testInput"
+                      className="w-full min-h-[80px] border rounded-md p-2 text-sm"
+                      value={testInput}
+                      onChange={(e) => setTestInput(e.target.value)}
+                      placeholder="Enter test string..."
+                    />
+                    <Label htmlFor="testOutput">Output</Label>
+                    <pre
+                      id="testOutput"
+                      className="w-full min-h-[80px] border rounded-md p-2 text-sm bg-zinc-100 dark:bg-zinc-800 overflow-auto"
+                    >
+                      {testOutput}
+                    </pre>
+                  </div>
+                )}
+              </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="affects">Affects</Label>
@@ -604,37 +636,6 @@ export default function RegexScriptManager() {
                 </p>
               </div>
             </div>
-          </div>
-          {/* Test Mode Button */}
-          <div className="space-y-2 px-6">
-            <Button
-              variant="outline"
-              onClick={() => setShowTestMode(prev => !prev)}
-            >
-              Test Mode
-            </Button>
-            <p className="text-xs text-zinc-500">
-              Click “Test Mode” to preview the script’s effect on sample input. The Input field and real‑time Output preview appear below.
-            </p>
-            {showTestMode && (
-              <div className="space-y-2">
-                <Label htmlFor="testInput">Input</Label>
-                <textarea
-                  id="testInput"
-                  className="w-full min-h-[80px] border rounded-md p-2 text-sm"
-                  value={testInput}
-                  onChange={(e) => setTestInput(e.target.value)}
-                  placeholder="Enter test string..."
-                />
-                <Label htmlFor="testOutput">Output</Label>
-                <pre
-                  id="testOutput"
-                  className="w-full min-h-[80px] border rounded-md p-2 text-sm bg-zinc-100 dark:bg-zinc-800 overflow-auto"
-                >
-                  {testOutput}
-                </pre>
-              </div>
-            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>

@@ -40,7 +40,6 @@ export default function RegexScriptManager() {
   const [showTestMode, setShowTestMode] = useState(false);
   const [testInput, setTestInput] = useState('');
   const [testOutput, setTestOutput] = useState('');
-  const [formDisabled, setFormDisabled] = useState(false);
   const [formMarkdownOnly, setFormMarkdownOnly] = useState(false);
   const [formPromptOnly, setFormPromptOnly] = useState(false);
   const [formSubstituteRegex, setFormSubstituteRegex] = useState<0 | 1 | 2>(0);
@@ -64,7 +63,8 @@ export default function RegexScriptManager() {
         replaceString: formReplaceString,
         trimStrings: formTrimStrings,
         placement: formPlacement,
-        disabled: formDisabled,
+        // disabled flag is not editable in the UI; default to false for test preview
+        disabled: false,
         markdownOnly: formMarkdownOnly,
         promptOnly: formPromptOnly,
         substituteRegex: formSubstituteRegex,
@@ -85,7 +85,6 @@ export default function RegexScriptManager() {
     formReplaceString,
     formTrimStrings,
     formPlacement,
-    formDisabled,
     formMarkdownOnly,
     formPromptOnly,
     formSubstituteRegex,
@@ -108,7 +107,6 @@ export default function RegexScriptManager() {
     setFormReplaceString(script.replaceString);
     setFormTrimStrings([...script.trimStrings]);
     setFormPlacement([...script.placement]);
-    setFormDisabled(script.disabled);
     setFormMarkdownOnly(script.markdownOnly);
     setFormPromptOnly(script.promptOnly);
     setFormSubstituteRegex(script.substituteRegex);
@@ -123,7 +121,6 @@ export default function RegexScriptManager() {
     setFormReplaceString('');
     setFormTrimStrings([]);
     setFormPlacement([2]);
-    setFormDisabled(false);
     setFormMarkdownOnly(false);
     setFormPromptOnly(false);
     setFormSubstituteRegex(0);
@@ -140,7 +137,10 @@ export default function RegexScriptManager() {
       replaceString: formReplaceString,
       trimStrings: formTrimStrings,
       placement: formPlacement,
-      disabled: formDisabled,
+      // New scripts start enabled; when editing we keep the existing disabled flag
+      disabled: editingId
+        ? (scripts.find(s => s.id === editingId)?.disabled ?? false)
+        : false,
       markdownOnly: formMarkdownOnly,
       promptOnly: formPromptOnly,
       substituteRegex: formSubstituteRegex,
@@ -593,20 +593,6 @@ export default function RegexScriptManager() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="disabled"
-                    checked={formDisabled}
-                    onChange={(e) => setFormDisabled(e.target.checked)}
-                  />
-                  <Label htmlFor="disabled">Disabled</Label>
-                </div>
-                <p className="text-xs text-zinc-500">
-                  If checked, the script will be ignored and not applied.
-                </p>
-              </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <input

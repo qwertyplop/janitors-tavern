@@ -18,7 +18,7 @@ import {
   generateId,
 } from '@/lib/storage';
 import { RegexScript } from '@/types';
-import { applyRegexScript } from '@/lib/regex-processor';
+import { applyRegexScript, applyRegexScripts } from '@/lib/regex-processor';
 import { createDefaultMacroContext } from '@/lib/macros';
 import { useI18n } from '@/components/providers/I18nProvider';
 
@@ -75,9 +75,23 @@ export default function RegexScriptManager() {
         substituteRegex: formSubstituteRegex,
         minDepth: formMinDepth,
         maxDepth: formMaxDepth,
-      } as any; // cast to satisfy applyRegexScript
+        disabled: false,
+        markdownOnly: formMarkdownOnly,
+        runOnEdit: false,
+        id: '',
+        createdAt: '',
+        updatedAt: '',
+      } as any; // cast to satisfy applyRegexScripts
 
-      const output = applyRegexScript(testInput, tempScript, createDefaultMacroContext());
+      // Determine which placement to test against; default to "After receiving from Model" (2)
+      const placementToTest = formPlacement.length > 0 ? formPlacement[0] : 2;
+
+      const output = applyRegexScripts(
+        testInput,
+        [tempScript],
+        createDefaultMacroContext(),
+        placementToTest
+      );
       setTestOutput(output);
     } else {
       setTestOutput('');

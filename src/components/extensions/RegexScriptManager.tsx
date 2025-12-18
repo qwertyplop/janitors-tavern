@@ -18,6 +18,8 @@ import {
   generateId,
 } from '@/lib/storage';
 import { RegexScript } from '@/types';
+import { applyRegexScript } from '@/lib/regex-processor';
+import { createDefaultMacroContext } from '@/lib/macros';
 import { useI18n } from '@/components/providers/I18nProvider';
 
 export default function RegexScriptManager() {
@@ -35,10 +37,12 @@ export default function RegexScriptManager() {
   const [formReplaceString, setFormReplaceString] = useState('');
   const [formTrimStrings, setFormTrimStrings] = useState<string[]>([]);
   const [formPlacement, setFormPlacement] = useState<number[]>([2]);
+  const [testModeEnabled, setTestModeEnabled] = useState(false);
+  const [testInput, setTestInput] = useState('');
+  const [testOutput, setTestOutput] = useState('');
   const [formDisabled, setFormDisabled] = useState(false);
   const [formMarkdownOnly, setFormMarkdownOnly] = useState(false);
   const [formPromptOnly, setFormPromptOnly] = useState(false);
-  const [formRunOnEdit, setFormRunOnEdit] = useState(false);
   const [formSubstituteRegex, setFormSubstituteRegex] = useState<0 | 1 | 2>(0);
   const [formMinDepth, setFormMinDepth] = useState<number | null>(null);
   const [formMaxDepth, setFormMaxDepth] = useState<number | null>(null);
@@ -50,6 +54,44 @@ export default function RegexScriptManager() {
       setSelectedId(stored[0].id);
     }
   }, []);
+
+  // Real‑time test mode processing
+  useEffect(() => {
+    if (testModeEnabled) {
+      const tempScript = {
+        scriptName: formName,
+        findRegex: formFindRegex,
+        replaceString: formReplaceString,
+        trimStrings: formTrimStrings,
+        placement: formPlacement,
+        disabled: formDisabled,
+        markdownOnly: formMarkdownOnly,
+        promptOnly: formPromptOnly,
+        substituteRegex: formSubstituteRegex,
+        minDepth: formMinDepth,
+        maxDepth: formMaxDepth,
+      } as any; // cast to satisfy applyRegexScript
+
+      const output = applyRegexScript(testInput, tempScript, createDefaultMacroContext());
+      setTestOutput(output);
+    } else {
+      setTestOutput('');
+    }
+  }, [
+    testModeEnabled,
+    testInput,
+    formName,
+    formFindRegex,
+    formReplaceString,
+    formTrimStrings,
+    formPlacement,
+    formDisabled,
+    formMarkdownOnly,
+    formPromptOnly,
+    formSubstituteRegex,
+    formMinDepth,
+    formMaxDepth,
+  ]);
 
   const selectedScript = scripts.find(s => s.id === selectedId);
 
@@ -69,7 +111,6 @@ export default function RegexScriptManager() {
     setFormDisabled(script.disabled);
     setFormMarkdownOnly(script.markdownOnly);
     setFormPromptOnly(script.promptOnly);
-    setFormRunOnEdit(script.runOnEdit);
     setFormSubstituteRegex(script.substituteRegex);
     setFormMinDepth(script.minDepth);
     setFormMaxDepth(script.maxDepth);
@@ -85,7 +126,6 @@ export default function RegexScriptManager() {
     setFormDisabled(false);
     setFormMarkdownOnly(false);
     setFormPromptOnly(false);
-    setFormRunOnEdit(false);
     setFormSubstituteRegex(0);
     setFormMinDepth(null);
     setFormMaxDepth(null);
@@ -103,10 +143,10 @@ export default function RegexScriptManager() {
       disabled: formDisabled,
       markdownOnly: formMarkdownOnly,
       promptOnly: formPromptOnly,
-      runOnEdit: formRunOnEdit,
       substituteRegex: formSubstituteRegex,
       minDepth: formMinDepth,
       maxDepth: formMaxDepth,
+      runOnEdit: false,
     };
 
     if (editingId) {
@@ -127,6 +167,12 @@ export default function RegexScriptManager() {
       setSelectedId(updated.length > 0 ? updated[0].id : null);
     }
     setDeleteConfirmId(null);
+    // Reset test mode when dialog closes
+    if (!isDialogOpen) {
+      setTestModeEnabled(false);
+      setTestInput('');
+      setTestOutput('');
+    }
   };
 
   const handleExport = (script: RegexScript) => {
@@ -421,17 +467,46 @@ export default function RegexScriptManager() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="placement">Placement (comma-separated numbers)</Label>
-                <Input
-                  id="placement"
-                  value={formPlacement.join(',')}
-                  onChange={(e) => setFormPlacement(e.target.value.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n)))}
-                  placeholder="2"
-                />
+                <Label htmlFor="affects">Affects</Label>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="affectsBefore"
+                      checked={formPlacement.includes(1)}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setFormPlacement((prev) => {
+                          const set = new Set(prev);
+                          if (checked) set.add(1);
+                          else set.delete(1);
+                          return Array.from(set).sort();
+                        });
+                      }}
+                    />
+                    <Label htmlFor="affectsBefore">Before sending to Model</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="affectsAfter"
+                      checked={formPlacement.includes(2)}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setFormPlacement((prev) => {
+                          const set = new Set(prev);
+                          if (checked) set.add(2);
+                          else set.delete(2);
+                          return Array.from(set).sort();
+                        });
+                      }}
+                    />
+                    <Label htmlFor="affectsAfter">After receiving from Model</Label>
+                  </div>
+                </div>
                 <p className="text-xs text-zinc-500">
                   Where the script should be applied: 1 = user input, 2 = AI output.
-                  You can specify multiple placements, e.g., "1,2" for both.
-                  Default is 2 (AI output).
+                  Select one or both options. Default is 2 (AI output).
                 </p>
               </div>
               <div className="space-y-2">
@@ -525,21 +600,38 @@ export default function RegexScriptManager() {
                   Only apply to prompt (outgoing) messages, not responses.
                 </p>
               </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="runOnEdit"
-                    checked={formRunOnEdit}
-                    onChange={(e) => setFormRunOnEdit(e.target.checked)}
-                  />
-                  <Label htmlFor="runOnEdit">Run on Edit</Label>
-                </div>
-                <p className="text-xs text-zinc-500">
-                  (Legacy) Run the script when editing messages. May be ignored by the proxy.
-                </p>
-              </div>
             </div>
+          </div>
+          {/* Test Mode */}
+          <div className="space-y-2 px-6">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="testMode"
+                checked={testModeEnabled}
+                onChange={(e) => setTestModeEnabled(e.target.checked)}
+              />
+              <Label htmlFor="testMode">Test Mode</Label>
+            </div>
+            {testModeEnabled && (
+              <div className="space-y-2">
+                <Label htmlFor="testInput">Input</Label>
+                <textarea
+                  id="testInput"
+                  className="w-full min-h-[80px] border rounded-md p-2 text-sm"
+                  value={testInput}
+                  onChange={(e) => setTestInput(e.target.value)}
+                  placeholder="Enter test string..."
+                />
+                <Label htmlFor="testOutput">Output</Label>
+                <pre
+                  id="testOutput"
+                  className="w-full min-h-[80px] border rounded-md p-2 text-sm bg-zinc-100 dark:bg-zinc-800 overflow-auto"
+                >
+                  {testOutput}
+                </pre>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>

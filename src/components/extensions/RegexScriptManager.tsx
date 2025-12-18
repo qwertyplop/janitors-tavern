@@ -64,6 +64,10 @@ export default function RegexScriptManager() {
   }, []);
 
   // Real‑time test mode processing
+  // The test mode now mirrors the actual processing pipeline:
+  // - For each selected placement (1 = before sending, 2 = after receiving),
+  //   the script is applied sequentially to the current content.
+  // This allows users to see the final result when both checkboxes are checked.
   useEffect(() => {
     if (showTestMode) {
       const tempScript = {
@@ -83,16 +87,18 @@ export default function RegexScriptManager() {
         updatedAt: '',
       } as any; // cast to satisfy applyRegexScripts
 
-      // Determine which placement to test against; default to "After receiving from Model" (2)
-      const placementToTest = formPlacement.length > 0 ? formPlacement[0] : 2;
-
-      const output = applyRegexScripts(
-        testInput,
-        [tempScript],
-        createDefaultMacroContext(),
-        placementToTest
-      );
-      setTestOutput(output);
+      // Apply the script for each selected placement in order.
+      const placements = formPlacement.length > 0 ? formPlacement : [2];
+      let intermediate = testInput;
+      placements.forEach((placement) => {
+        intermediate = applyRegexScripts(
+          intermediate,
+          [tempScript],
+          createDefaultMacroContext(),
+          placement
+        );
+      });
+      setTestOutput(intermediate);
     } else {
       setTestOutput('');
     }

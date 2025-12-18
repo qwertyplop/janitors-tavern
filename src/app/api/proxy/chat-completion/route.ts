@@ -492,13 +492,33 @@ export async function POST(request: NextRequest) {
 
             // Check if this chunk contains content delta
             if (text.includes('"delta"') && text.includes('"content"')) {
-              // Inject our prefix into the first content chunk
-              // SSE format: data: {"choices":[{"delta":{"content":"..."}}]}
-              const modifiedText = text.replace(
-                /"delta":\s*\{\s*"content":\s*"/,
-                `"delta":{"content":"${startReplyContent.replace(/"/g, '\\"').replace(/\n/g, '\\n')}`
-              );
-              controller.enqueue(encoder.encode(modifiedText));
+              // Extract the content string, apply startReplyWith and regex scripts
+              const contentMatch = text.match(/("content":\s*")([^"]*)(")/);
+              let newContent = '';
+              if (contentMatch) {
+                const original = contentMatch[2];
+                // Apply startReplyWith prefix
+                const withPrefix = startReplyContent + original;
+                // Apply regex scripts (placement 2) to the content
+                newContent = applyRegexScripts(
+                  withPrefix,
+                  regexScripts,
+                  macroContext,
+                  2,
+                  undefined
+                );
+                // Escape any double quotes in the new content for JSON safety
+                const escaped = newContent.replace(/"/g, '\\"').replace(/\n/g, '\\n');
+                // Reconstruct the chunk with modified content
+                const modifiedText = text.replace(
+                  /("content":\s*")([^"]*)(")/,
+                  `$1${escaped}$3`
+                );
+                controller.enqueue(encoder.encode(modifiedText));
+              } else {
+                // Fallback: no content field found, just pass through
+                controller.enqueue(chunk);
+              }
               prefixSent = true;
             } else {
               controller.enqueue(chunk);

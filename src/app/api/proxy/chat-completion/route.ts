@@ -330,6 +330,14 @@ export async function POST(request: NextRequest) {
 
     // Load regex scripts for processing
     const regexScripts = await getServerRegexScripts();
+    console.log(`[JT] [${requestId}] Regex scripts loaded: Found ${regexScripts.length} scripts`);
+    if (regexScripts.length > 0) {
+      regexScripts.forEach((script, index) => {
+        console.log(`[JT] [${requestId}] Script ${index + 1}: "${script.scriptName}" - Affects: ${script.placement.map(p => p === 1 ? 'Input' : 'Output').join(', ')}`);
+      });
+    } else {
+      console.log(`[JT] [${requestId}] No regex scripts found or loaded`);
+    }
 
     // Build messages
     let processedMessages: OutputMessage[];
@@ -348,10 +356,14 @@ export async function POST(request: NextRequest) {
 
     // Apply regex scripts (placement 1) to each message
     if (regexScripts.length > 0) {
-      processedMessages = processedMessages.map(msg => ({
-        ...msg,
-        content: applyRegexScripts(msg.content, regexScripts, macroContext, 1, undefined)
-      }));
+      const inputScripts = regexScripts.filter(s => s.placement.includes(1));
+      if (inputScripts.length > 0) {
+        console.log(`[JT] [${requestId}] Applying ${inputScripts.length} regex script(s) to input messages (placement 1)`);
+        processedMessages = processedMessages.map(msg => ({
+          ...msg,
+          content: applyRegexScripts(msg.content, inputScripts, macroContext, 1, undefined)
+        }));
+      }
     }
 
     // Apply post-processing based on mode
@@ -500,13 +512,19 @@ export async function POST(request: NextRequest) {
                 // Apply startReplyWith prefix
                 const withPrefix = startReplyContent + original;
                 // Apply regex scripts (placement 2) to the content
-                newContent = applyRegexScripts(
-                  withPrefix,
-                  regexScripts,
-                  macroContext,
-                  2,
-                  undefined
-                );
+                const outputScripts = regexScripts.filter(s => s.placement.includes(2));
+                if (outputScripts.length > 0) {
+                  console.log(`[JT] [${requestId}] Applying ${outputScripts.length} regex script(s) to streaming AI output (placement 2)`);
+                  newContent = applyRegexScripts(
+                    withPrefix,
+                    outputScripts,
+                    macroContext,
+                    2,
+                    undefined
+                  );
+                } else {
+                  newContent = withPrefix;
+                }
                 // Escape any double quotes in the new content for JSON safety
                 const escaped = newContent.replace(/"/g, '\\"').replace(/\n/g, '\\n');
                 // Reconstruct the chunk with modified content
@@ -579,7 +597,11 @@ export async function POST(request: NextRequest) {
           }
           // Apply regex scripts (placement 2)
           if (regexScripts.length > 0) {
-            content = applyRegexScripts(content, regexScripts, macroContext, 2, undefined);
+            const outputScripts = regexScripts.filter(s => s.placement.includes(2));
+            if (outputScripts.length > 0) {
+              console.log(`[JT] [${requestId}] Applying ${outputScripts.length} regex script(s) to AI output (placement 2)`);
+              content = applyRegexScripts(content, outputScripts, macroContext, 2, undefined);
+            }
           }
           responseJson.choices[0].message.content = content;
         }
@@ -620,7 +642,11 @@ export async function POST(request: NextRequest) {
       aiContent = startReplyContent + aiContent;
     }
     if (regexScripts.length > 0) {
-      aiContent = applyRegexScripts(aiContent, regexScripts, macroContext, 2, undefined);
+      const outputScripts = regexScripts.filter(s => s.placement.includes(2));
+      if (outputScripts.length > 0) {
+        console.log(`[JT] [${requestId}] Applying ${outputScripts.length} regex script(s) to AI output (placement 2)`);
+        aiContent = applyRegexScripts(aiContent, outputScripts, macroContext, 2, undefined);
+      }
     }
 
     const successResponse = {

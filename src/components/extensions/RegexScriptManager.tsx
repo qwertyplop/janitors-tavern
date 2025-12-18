@@ -30,6 +30,16 @@ export default function RegexScriptManager() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { t } = useI18n();
+  
+  const placementLabels: Record<number, string> = {
+    1: 'Before sending to Model',
+    2: 'After receiving from Model',
+  };
+  
+  function formatPlacement(arr: number[]): string {
+    if (!arr || arr.length === 0) return 'None';
+    return arr.map(v => placementLabels[v] ?? 'Unknown').join(', ');
+  }
 
   // Form state for create/edit dialog
   const [formName, setFormName] = useState('');
@@ -360,7 +370,7 @@ export default function RegexScriptManager() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Affects</h4>
-                    <p className="text-sm">{selectedScript.placement.join(', ')}</p>
+                    <p className="text-sm">{formatPlacement(selectedScript.placement)}</p>
                   </div>
                   <div>
                     <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Trim Strings</h4>

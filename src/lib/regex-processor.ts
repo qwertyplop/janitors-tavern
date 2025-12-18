@@ -15,12 +15,19 @@ import { MacroContext, processMacros } from '@/lib/macros';
  * Extracts pattern and flags from a findRegex string like "/pattern/flags".
  * If the string does not start and end with '/', treats the whole string as pattern with no flags.
  * Returns an object with pattern and flags.
+ *
+ * Handles double-escaped patterns from imported SillyTavern regex scripts.
  */
 export function parseFindRegex(findRegex: string): { pattern: string; flags: string } {
   if (findRegex.startsWith('/') && findRegex.lastIndexOf('/') > 0) {
     const lastSlash = findRegex.lastIndexOf('/');
-    const pattern = findRegex.slice(1, lastSlash);
+    let pattern = findRegex.slice(1, lastSlash);
     const flags = findRegex.slice(lastSlash + 1);
+
+    // Handle double-escaped patterns from SillyTavern exports
+    // Convert \\/ to \/ in the pattern to fix escaped forward slashes
+    pattern = pattern.replace(/\\\//g, '/');
+
     return { pattern, flags };
   }
   // No slashes, treat as plain pattern with no flags

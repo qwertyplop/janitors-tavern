@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { downloadJson, readJsonFile } from '@/lib/utils';
+import { readJsonFile } from '@/lib/utils';
 import {
   getRegexScripts,
   addRegexScript,
@@ -16,6 +16,7 @@ import {
   deleteRegexScript,
   saveRegexScripts,
   generateId,
+  normalizeRegexPattern,
 } from '@/lib/storage';
 import { RegexScript } from '@/types';
 import { applyRegexScript, applyRegexScripts } from '@/lib/regex-processor';
@@ -196,13 +197,7 @@ export default function RegexScriptManager() {
     }
   };
 
-  const handleExport = (script: RegexScript) => {
-    downloadJson(script, `regex-script-${script.scriptName.replace(/\s+/g, '-').toLowerCase()}.json`);
-  };
-
-  const handleExportAll = () => {
-    downloadJson(scripts, 'regex-scripts-export.json');
-  };
+  // Export functionality removed as requested
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -215,6 +210,7 @@ export default function RegexScriptManager() {
 
       const newScripts = scriptsToImport.map((s) => ({
         ...s,
+        findRegex: normalizeRegexPattern(s.findRegex),
         id: generateId(),
         createdAt: now,
         updatedAt: now,
@@ -260,9 +256,6 @@ export default function RegexScriptManager() {
           />
           <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
             Import
-          </Button>
-          <Button variant="outline" onClick={handleExportAll} disabled={scripts.length === 0}>
-            Export All
           </Button>
           <Button onClick={handleCreate}>New Script</Button>
         </div>
@@ -392,13 +385,6 @@ export default function RegexScriptManager() {
                     onClick={() => handleEdit(selectedScript)}
                   >
                     Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleExport(selectedScript)}
-                  >
-                    Export
                   </Button>
                 </div>
               </CardContent>

@@ -290,6 +290,29 @@ export function saveExtensionsPipelines(pipelines: ExtensionsPipeline[]): void {
 }
 
 // ============================================
+// Regex Script Utilities
+// ============================================
+
+/**
+ * Normalizes a regex pattern to fix double-escaping issues from SillyTavern exports.
+ * Converts patterns like "/<(?:font|div|h[1-6]|p|span|i|b|\\/font|\\/div)[^>]*>/g"
+ * to "/<(?:font|div|h[1-6]|p|span|i|b|\/font|\/div)[^>]*>/g"
+ */
+export function normalizeRegexPattern(findRegex: string): string {
+  if (findRegex.startsWith('/') && findRegex.lastIndexOf('/') > 0) {
+    const lastSlash = findRegex.lastIndexOf('/');
+    let pattern = findRegex.slice(1, lastSlash);
+    const flags = findRegex.slice(lastSlash + 1);
+
+    // Fix double-escaped forward slashes (from SillyTavern exports)
+    pattern = pattern.replace(/\\\//g, '/');
+
+    return `/${pattern}/${flags}`;
+  }
+  return findRegex;
+}
+
+// ============================================
 // Regex Scripts
 // ============================================
 
@@ -309,6 +332,7 @@ export function addRegexScript(script: Omit<RegexScript, 'id' | 'createdAt' | 'u
   const now = new Date().toISOString();
   const newScript: RegexScript = {
     ...script,
+    findRegex: normalizeRegexPattern(script.findRegex),
     id: generateId(),
     createdAt: now,
     updatedAt: now,
@@ -327,6 +351,7 @@ export function updateRegexScript(id: string, updates: Partial<RegexScript>): Re
   scripts[index] = {
     ...scripts[index],
     ...updates,
+    findRegex: updates.findRegex ? normalizeRegexPattern(updates.findRegex) : scripts[index].findRegex,
     id,
     updatedAt: new Date().toISOString(),
   };

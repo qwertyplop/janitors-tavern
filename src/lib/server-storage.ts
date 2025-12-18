@@ -50,10 +50,14 @@ async function fetchBlobJson<T>(key: string, defaultValue: T): Promise<T> {
   // Check cache first - avoids blob operations entirely
   const cached = getCached<T>(key);
   if (cached !== null) {
+    console.log(`[ServerStorage] Cache hit for ${key}`);
     return cached;
   }
 
+  console.log(`[ServerStorage] Cache miss for ${key}, attempting to fetch from blob`);
+  
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    console.log(`[ServerStorage] BLOB_READ_WRITE_TOKEN not configured, returning default for ${key}`);
     return defaultValue;
   }
 
@@ -61,16 +65,22 @@ async function fetchBlobJson<T>(key: string, defaultValue: T): Promise<T> {
     const blobPath = `${STORAGE_PREFIX}${key}.json`;
     const blobInfo = await head(blobPath);
     if (blobInfo) {
+      console.log(`[ServerStorage] Found blob for ${key}, fetching...`);
       const response = await fetch(blobInfo.url);
       const data = await response.json();
       setCache(key, data);
+      console.log(`[ServerStorage] Successfully fetched ${key} from blob, count: ${Array.isArray(data) ? data.length : 'N/A'}`);
       return data;
+    } else {
+      console.log(`[ServerStorage] Blob not found for ${key}, returning default`);
     }
-  } catch {
+  } catch (error) {
+    console.error(`[ServerStorage] Error fetching ${key} from blob:`, error);
     // Blob doesn't exist or error
   }
 
   setCache(key, defaultValue);
+  console.log(`[ServerStorage] Returning default value for ${key}`);
   return defaultValue;
 }
 

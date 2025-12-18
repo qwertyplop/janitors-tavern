@@ -3,7 +3,7 @@
 // ============================================
 // Handles auto-sync between localStorage and Vercel Blob
 
-import { ConnectionPreset, ChatCompletionPreset, AppSettings } from '@/types';
+import { ConnectionPreset, ChatCompletionPreset, AppSettings, RegexScript } from '@/types';
 
 // ============================================
 // Types
@@ -13,6 +13,7 @@ export interface StorageData {
   connections: ConnectionPreset[];
   presets: ChatCompletionPreset[];
   settings: AppSettings;
+  regexScripts: RegexScript[];
 }
 
 interface SyncStatus {
@@ -74,7 +75,7 @@ async function pullFromBlob(): Promise<StorageData | null> {
     if (response.ok) {
       const data = await response.json();
       // Check if we got valid data (not just defaults)
-      if (data && (data.connections?.length > 0 || data.presets?.length > 0)) {
+      if (data && (data.connections?.length > 0 || data.presets?.length > 0 || data.regexScripts?.length > 0)) {
         return data;
       }
     }
@@ -110,18 +111,20 @@ const STORAGE_KEYS = {
   connections: 'jt.connectionPresets',
   presets: 'jt.chatCompletionPresets',
   settings: 'jt.settings',
+  regexScripts: 'jt.regexScripts',
   lastSync: 'jt.lastBlobSync',
 };
 
 function getLocalData(): StorageData {
   if (typeof window === 'undefined') {
-    return { connections: [], presets: [], settings: getDefaultSettings() };
+    return { connections: [], presets: [], settings: getDefaultSettings(), regexScripts: [] };
   }
 
   return {
     connections: JSON.parse(localStorage.getItem(STORAGE_KEYS.connections) || '[]'),
     presets: JSON.parse(localStorage.getItem(STORAGE_KEYS.presets) || '[]'),
     settings: JSON.parse(localStorage.getItem(STORAGE_KEYS.settings) || 'null') || getDefaultSettings(),
+    regexScripts: JSON.parse(localStorage.getItem(STORAGE_KEYS.regexScripts) || '[]'),
   };
 }
 
@@ -136,6 +139,9 @@ function setLocalData(data: Partial<StorageData>): void {
   }
   if (data.settings !== undefined) {
     localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(data.settings));
+  }
+  if (data.regexScripts !== undefined) {
+    localStorage.setItem(STORAGE_KEYS.regexScripts, JSON.stringify(data.regexScripts));
   }
 }
 
@@ -183,6 +189,7 @@ export async function initializeSync(): Promise<void> {
           connections: blobData.connections?.length > 0 ? blobData.connections : localData.connections,
           presets: blobData.presets?.length > 0 ? blobData.presets : localData.presets,
           settings: blobData.settings || localData.settings,
+          regexScripts: blobData.regexScripts?.length > 0 ? blobData.regexScripts : localData.regexScripts,
         };
 
         setLocalData(mergedData);
@@ -191,7 +198,8 @@ export async function initializeSync(): Promise<void> {
         // If local had data that blob didn't, push it back
         if (
           (localData.connections.length > 0 && blobData.connections?.length === 0) ||
-          (localData.presets.length > 0 && blobData.presets?.length === 0)
+          (localData.presets.length > 0 && blobData.presets?.length === 0) ||
+          (localData.regexScripts.length > 0 && blobData.regexScripts?.length === 0)
         ) {
           console.log('[Storage Sync] Pushing local data to cloud...');
           await pushToBlob(mergedData);
@@ -199,7 +207,7 @@ export async function initializeSync(): Promise<void> {
       } else {
         // Blob is empty, push local data if we have any
         const localData = getLocalData();
-        if (localData.connections.length > 0 || localData.presets.length > 0) {
+        if (localData.connections.length > 0 || localData.presets.length > 0 || localData.regexScripts.length > 0) {
           console.log('[Storage Sync] Cloud is empty, pushing local data...');
           await pushToBlob(localData);
         }

@@ -18,18 +18,33 @@ function getAuthSettingsPath(): string {
   return path.join(process.cwd(), 'data', 'auth-settings.json');
 }
 
-// Get auth settings from server storage (file or environment)
+// Get auth settings from Firestore
 export async function getAuthSettings(): Promise<AuthSettings> {
-  // Check if we're in a serverless environment by trying to access the file system
+  // Try to get auth settings from Firestore first
   try {
-    // For traditional deployments, use file-based storage
-    const filePath = path.join(process.cwd(), 'data', 'auth-settings.json');
-    const content = await fs.readFile(filePath, 'utf-8');
-    return { isAuthenticated: false, ...JSON.parse(content) };
+    // Import Firebase functions dynamically to avoid server-side issues
+    const { doc, getDoc } = await import('firebase/firestore');
+    const { db } = await import('./firebase-config');
+    
+    const authDoc = await getDoc(doc(db, 'system', 'auth'));
+    
+    if (authDoc.exists()) {
+      const data = authDoc.data();
+      return {
+        isAuthenticated: data.isAuthenticated || false,
+        username: data.username,
+        passwordHash: data.passwordHash,
+        janitorApiKey: data.janitorApiKey
+      };
+    } else {
+      // If no auth document exists, return default
+      return { isAuthenticated: false };
+    }
   } catch (error) {
-    // If file access fails (e.g., in serverless), check environment variables
+    console.error('Error fetching auth settings from Firestore:', error);
+    
+    // Fallback to environment variables
     if (process.env.AUTH_IS_SETUP === 'true') {
-      // Use environment variables for serverless
       return {
         isAuthenticated: true,
         username: process.env.AUTH_USERNAME || undefined,
@@ -38,33 +53,43 @@ export async function getAuthSettings(): Promise<AuthSettings> {
       };
     }
     
-    // If neither file nor environment variables are available, return default
+    // If neither Firestore nor environment variables work, return default
     return { isAuthenticated: false };
   }
 }
 
-// Save auth settings to server storage (file or environment)
+// Save auth settings to Firestore
 export async function saveAuthSettings(settings: AuthSettings): Promise<void> {
   try {
-    // For traditional deployments, save to file
-    const filePath = path.join(process.cwd(), 'data', 'auth-settings.json');
-    const dir = path.dirname(filePath);
-    try {
-      await fs.access(dir);
-    } catch {
-      await fs.mkdir(dir, { recursive: true });
-    }
+    // Try to save to Firestore first
+    const { doc, setDoc } = await import('firebase/firestore');
+    const { db } = await import('./firebase-config');
     
-    await fs.writeFile(filePath, JSON.stringify(settings, null, 2), 'utf-8');
+    await setDoc(doc(db, 'system', 'auth'), settings);
   } catch (error) {
-    // If file writing fails (e.g., in serverless), we can't persist the settings
-    // In a serverless environment, the user needs to configure via environment variables
-    console.warn('Could not save auth settings to file. In serverless environments, configure authentication via environment variables.');
-    console.warn('Required environment variables:');
-    console.warn(`AUTH_IS_SETUP=${settings.isAuthenticated}`);
-    console.warn(`AUTH_USERNAME=${settings.username || ''}`);
-    console.warn(`AUTH_PASSWORD_HASH=${settings.passwordHash || ''}`);
-    console.warn(`JANITOR_API_KEY=${settings.janitorApiKey || ''}`);
+    console.error('Error saving auth settings to Firestore:', error);
+    
+    // Fallback to file system
+    try {
+      // For traditional deployments, save to file
+      const filePath = path.join(process.cwd(), 'data', 'auth-settings.json');
+      const dir = path.dirname(filePath);
+      try {
+        await fs.access(dir);
+      } catch {
+        await fs.mkdir(dir, { recursive: true });
+      }
+      
+      await fs.writeFile(filePath, JSON.stringify(settings, null, 2), 'utf-8');
+    } catch (fileError) {
+      // If both Firestore and file system fail, warn about environment variables
+      console.warn('Could not save auth settings to Firestore or file. In serverless environments, configure authentication via environment variables.');
+      console.warn('Required environment variables:');
+      console.warn(`AUTH_IS_SETUP=${settings.isAuthenticated}`);
+      console.warn(`AUTH_USERNAME=${settings.username || ''}`);
+      console.warn(`AUTH_PASSWORD_HASH=${settings.passwordHash || ''}`);
+      console.warn(`JANITOR_API_KEY=${settings.janitorApiKey || ''}`);
+    }
   }
 }
 

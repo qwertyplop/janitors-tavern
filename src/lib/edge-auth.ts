@@ -33,7 +33,29 @@ export async function isAuthenticated(request: NextRequest): Promise<boolean> {
 
 // Get auth settings (for Edge Runtime)
 export async function getAuthSettings(): Promise<AuthSettings> {
-  // Check environment variables for auth settings (serverless/edge compatible)
+  // Try to get auth settings from Firestore first (for modern deployments)
+  try {
+    // Import Firebase functions dynamically to avoid server-side issues
+    const { doc, getDoc } = await import('firebase/firestore');
+    const { db } = await import('./firebase-config');
+    
+    const authDoc = await getDoc(doc(db, 'system', 'auth'));
+    
+    if (authDoc.exists()) {
+      const data = authDoc.data();
+      return {
+        isAuthenticated: data.isAuthenticated || false,
+        username: data.username,
+        passwordHash: data.passwordHash,
+        janitorApiKey: data.janitorApiKey
+      };
+    }
+  } catch (error) {
+    console.error('Error fetching auth settings from Firestore in edge runtime:', error);
+    // Continue to fallback
+  }
+  
+  // Fallback to environment variables for compatibility
   if (process.env.AUTH_IS_SETUP === 'true') {
     return {
       isAuthenticated: true,

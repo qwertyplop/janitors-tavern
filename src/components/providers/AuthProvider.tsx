@@ -82,15 +82,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Verify the username matches
       if (username === authSettings.username) {
-        // In a real implementation, you would verify the password hash
-        // For now, we'll just check if the username matches and auth is set up
-        // Store authentication state
-        localStorage.setItem('jt.authenticated', 'true');
-        localStorage.setItem('jt.username', username);
+        // Hash the provided password and compare with stored hash
+        const encoder = new TextEncoder();
+        const data = encoder.encode(password);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const passwordHash = Array.from(new Uint8Array(hashBuffer))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
         
-        setIsAuthenticated(true);
-        setUsername(username);
-        return true;
+        // Compare the hashed password with the stored hash
+        if (passwordHash === authSettings.passwordHash) {
+          // Store authentication state
+          localStorage.setItem('jt.authenticated', 'true');
+          localStorage.setItem('jt.username', username);
+          
+          setIsAuthenticated(true);
+          setUsername(username);
+          return true;
+        }
       }
       
       return false;

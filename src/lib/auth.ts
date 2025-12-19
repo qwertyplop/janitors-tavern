@@ -12,38 +12,60 @@ export interface AuthSettings {
   janitorApiKey?: string;
 }
 
-// Path for storing auth settings on the server
-const AUTH_SETTINGS_FILE = path.join(process.cwd(), 'data', 'auth-settings.json');
-
-async function ensureDataDirectory(): Promise<void> {
-  const dir = path.dirname(AUTH_SETTINGS_FILE);
-  try {
-    await fs.access(dir);
-  } catch {
-    await fs.mkdir(dir, { recursive: true });
-  }
+// For serverless environments like Vercel, we'll use environment variables
+// For traditional deployments, we'll use file-based storage
+function getAuthSettingsPath(): string {
+  return path.join(process.cwd(), 'data', 'auth-settings.json');
 }
 
-// Get auth settings from server storage
+// Get auth settings from server storage (file or environment)
 export async function getAuthSettings(): Promise<AuthSettings> {
+  // Check if we're in a serverless environment by trying to access the file system
   try {
-    await ensureDataDirectory();
-    const content = await fs.readFile(AUTH_SETTINGS_FILE, 'utf-8');
+    // For traditional deployments, use file-based storage
+    const filePath = path.join(process.cwd(), 'data', 'auth-settings.json');
+    const content = await fs.readFile(filePath, 'utf-8');
     return { isAuthenticated: false, ...JSON.parse(content) };
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      // File doesn't exist, return default settings
-      return { isAuthenticated: false };
+    // If file access fails (e.g., in serverless), check environment variables
+    if (process.env.AUTH_IS_SETUP === 'true') {
+      // Use environment variables for serverless
+      return {
+        isAuthenticated: true,
+        username: process.env.AUTH_USERNAME || undefined,
+        passwordHash: process.env.AUTH_PASSWORD_HASH || undefined,
+        janitorApiKey: process.env.JANITOR_API_KEY || undefined
+      };
     }
-    console.error('Error reading auth settings:', error);
+    
+    // If neither file nor environment variables are available, return default
     return { isAuthenticated: false };
   }
 }
 
-// Save auth settings to server storage
+// Save auth settings to server storage (file or environment)
 export async function saveAuthSettings(settings: AuthSettings): Promise<void> {
-  await ensureDataDirectory();
-  await fs.writeFile(AUTH_SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf-8');
+  try {
+    // For traditional deployments, save to file
+    const filePath = path.join(process.cwd(), 'data', 'auth-settings.json');
+    const dir = path.dirname(filePath);
+    try {
+      await fs.access(dir);
+    } catch {
+      await fs.mkdir(dir, { recursive: true });
+    }
+    
+    await fs.writeFile(filePath, JSON.stringify(settings, null, 2), 'utf-8');
+  } catch (error) {
+    // If file writing fails (e.g., in serverless), we can't persist the settings
+    // In a serverless environment, the user needs to configure via environment variables
+    console.warn('Could not save auth settings to file. In serverless environments, configure authentication via environment variables.');
+    console.warn('Required environment variables:');
+    console.warn(`AUTH_IS_SETUP=${settings.isAuthenticated}`);
+    console.warn(`AUTH_USERNAME=${settings.username || ''}`);
+    console.warn(`AUTH_PASSWORD_HASH=${settings.passwordHash || ''}`);
+    console.warn(`JANITOR_API_KEY=${settings.janitorApiKey || ''}`);
+  }
 }
 
 // Hash password using Web Crypto API

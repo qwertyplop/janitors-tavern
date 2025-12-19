@@ -93,21 +93,45 @@ export async function PUT(request: NextRequest) {
             );
           }
           
-          await setupAuth(authRequest.username, authRequest.password);
-          return NextResponse.json({ success: true, message: 'Authentication set up successfully' });
+          try {
+            await setupAuth(authRequest.username, authRequest.password);
+            return NextResponse.json({ success: true, message: 'Authentication set up successfully' });
+          } catch (error) {
+            console.error('Error setting up auth:', error);
+            return NextResponse.json(
+              { error: `Failed to set up authentication: ${error instanceof Error ? error.message : 'Unknown error'}` },
+              { status: 500 }
+            );
+          }
           
         case 'update-api-key':
           // Update the JanitorAI API key
-          const newApiKey = await updateJanitorApiKey();
-          return NextResponse.json({ success: true, apiKey: newApiKey });
+          try {
+            const newApiKey = await updateJanitorApiKey();
+            return NextResponse.json({ success: true, apiKey: newApiKey });
+          } catch (error) {
+            console.error('Error updating API key:', error);
+            return NextResponse.json(
+              { error: `Failed to update API key: ${error instanceof Error ? error.message : 'Unknown error'}` },
+              { status: 500 }
+            );
+          }
           
         case 'get-auth-status':
           // Return authentication status
-          const currentAuthSettings = await getAuthSettings();
-          return NextResponse.json({
-            isAuthenticated: currentAuthSettings.isAuthenticated,
-            hasApiKey: !!currentAuthSettings.janitorApiKey
-          });
+          try {
+            const currentAuthSettings = await getAuthSettings();
+            return NextResponse.json({
+              isAuthenticated: currentAuthSettings.isAuthenticated,
+              hasApiKey: !!currentAuthSettings.janitorApiKey
+            });
+          } catch (error) {
+            console.error('Error getting auth status:', error);
+            return NextResponse.json(
+              { error: `Failed to get auth status: ${error instanceof Error ? error.message : 'Unknown error'}` },
+              { status: 500 }
+            );
+          }
           
         default:
           return NextResponse.json(

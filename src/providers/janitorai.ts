@@ -44,8 +44,13 @@ export class JanitorAIProvider extends ChatProvider {
 
     try {
       // Get the JanitorAI API key from auth settings
-      const authSettings = await getAuthSettings();
-      const janitorApiKey = authSettings.janitorApiKey;
+      let janitorApiKey: string | undefined;
+      try {
+        const authSettings = await getAuthSettings();
+        janitorApiKey = authSettings.janitorApiKey;
+      } catch (error) {
+        console.warn('Could not retrieve auth settings, proceeding without JanitorAI API key:', error);
+      }
       
       // Build headers with or without the JanitorAI API key
       const headers = {
@@ -101,8 +106,13 @@ export class JanitorAIProvider extends ChatProvider {
   async testConnection(): Promise<{ success: boolean; message: string }> {
     try {
       // Get the JanitorAI API key from auth settings
-      const authSettings = await getAuthSettings();
-      const janitorApiKey = authSettings.janitorApiKey;
+      let janitorApiKey: string | undefined;
+      try {
+        const authSettings = await getAuthSettings();
+        janitorApiKey = authSettings.janitorApiKey;
+      } catch (error) {
+        console.warn('Could not retrieve auth settings, proceeding without JanitorAI API key:', error);
+      }
       
       // Build headers with or without the JanitorAI API key
       const headers = {

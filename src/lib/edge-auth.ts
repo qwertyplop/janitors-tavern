@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 // Check if request is authenticated (for Edge Runtime)
 export async function isAuthenticated(request: NextRequest): Promise<boolean> {
   // Check if authentication is enforced via environment variable
-  const authEnforced = process.env.AUTH_ENFORCED === 'true';
+  const authEnforced = process.env.AUTH_ENFORCED === 'true' || process.env.AUTH_IS_SETUP === 'true';
   
   // If authentication is not enforced, allow all requests
   if (!authEnforced) {

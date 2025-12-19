@@ -69,16 +69,14 @@ export default function LoginPage() {
         // Use setTimeout to ensure the success message is shown before redirect
         setTimeout(() => {
           const targetUrl = callbackUrl && callbackUrl !== '/login' ? callbackUrl : '/';
-          // Try both router.push and window.location for reliability
-          router.push(targetUrl).then(() => {
-            // If router.push doesn't work, fall back to window.location
+          // Use router.push for normal navigation
+          router.push(targetUrl);
+          // Set a fallback timeout in case router.push doesn't work
+          setTimeout(() => {
             if (window.location.pathname === '/login') {
               window.location.href = targetUrl;
             }
-          }).catch(() => {
-            // If router.push fails, use window.location
-            window.location.href = targetUrl;
-          });
+          }, 1000); // Wait 1 second before fallback
         }, 500);
       } else {
         setError(t.login.invalidCredentials || 'Invalid username or password');

@@ -31,34 +31,57 @@ const firebaseConfig: FirebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase only in client-side environments
+// Initialize Firebase in both client and server environments
 let app;
 let firestoreInstance: Firestore | null = null;
 let authInstance: Auth | null = null;
 
-if (typeof window !== 'undefined' && getApps().length === 0) {
-  console.log('[Firebase] Initializing Firebase with config:', {
-    apiKey: firebaseConfig.apiKey ? '***' : 'MISSING',
-    authDomain: firebaseConfig.authDomain,
-    projectId: firebaseConfig.projectId,
-  });
-  
-  if (!firebaseConfig.apiKey || firebaseConfig.apiKey === 'your_firebase_api_key_here' || firebaseConfig.apiKey === '') {
-    console.warn('[Firebase] API Key is not configured properly!');
+// Check if all required config values are present
+const hasValidConfig = firebaseConfig.apiKey &&
+                       firebaseConfig.apiKey !== 'your_firebase_api_key_here' &&
+                       firebaseConfig.apiKey !== '' &&
+                       firebaseConfig.projectId &&
+                       firebaseConfig.projectId !== 'your-project-id';
+
+if (hasValidConfig) {
+  try {
+    if (getApps().length === 0) {
+      console.log('[Firebase] Initializing Firebase with config:', {
+        apiKey: firebaseConfig.apiKey ? '***' : 'MISSING',
+        authDomain: firebaseConfig.authDomain,
+        projectId: firebaseConfig.projectId,
+        environment: typeof window !== 'undefined' ? 'browser' : 'server'
+      });
+      
+      app = initializeApp(firebaseConfig);
+      firestoreInstance = getFirestore(app);
+      
+      // Only initialize auth in browser environment
+      if (typeof window !== 'undefined') {
+        authInstance = getAuth(app);
+      }
+      
+      console.log('[Firebase] Firebase initialized successfully');
+    } else {
+      // If already initialized, get the existing instances
+      app = getApps()[0];
+      firestoreInstance = getFirestore(app);
+      
+      if (typeof window !== 'undefined') {
+        authInstance = getAuth(app);
+      }
+      
+      console.log('[Firebase] Using existing Firebase instance');
+    }
+  } catch (error) {
+    console.error('[Firebase] Failed to initialize Firebase:', error);
   }
-  
-  app = initializeApp(firebaseConfig);
-  firestoreInstance = getFirestore(app);
-  authInstance = getAuth(app);
-  console.log('[Firebase] Firebase initialized successfully');
-} else if (typeof window !== 'undefined') {
-  // If already initialized in client-side, get the existing instances
-  app = getApps()[0];
-  firestoreInstance = getFirestore(app);
-  authInstance = getAuth(app);
-  console.log('[Firebase] Using existing Firebase instance');
 } else {
-  console.log('[Firebase] Not initializing - not in browser environment');
+  console.warn('[Firebase] Firebase configuration is incomplete or uses placeholder values');
+  console.warn('[Firebase] Config values:', {
+    apiKey: firebaseConfig.apiKey ? '***' : 'MISSING',
+    projectId: firebaseConfig.projectId || 'MISSING'
+  });
 }
 
 // Export Firebase instances (will be null in server-side environments)

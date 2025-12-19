@@ -76,9 +76,11 @@ export class FirebaseStorageProvider implements StorageProvider {
   private cache: Partial<StorageData> = {};
   private cacheTimestamps: Map<string, number> = new Map();
   private CACHE_TTL = 30000; // 30 seconds cache TTL
+  private initialized: boolean = false;
 
   constructor(userId?: string) {
     this.userId = userId || this.getCurrentUserId();
+    console.log('[FirebaseStorage] Provider created with user ID:', this.userId);
   }
 
   private getCurrentUserId(): string {

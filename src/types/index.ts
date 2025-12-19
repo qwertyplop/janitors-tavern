@@ -505,3 +505,14 @@ export const STORAGE_KEYS = {
   SETTINGS: 'jt.settings',
   REGEX_SCRIPTS: 'jt.regexScripts',
 } as const;
+
+// ============================================
+// Auth Settings Types
+// ============================================
+
+export interface AuthSettings {
+  isAuthenticated: boolean;
+  username?: string;
+  passwordHash?: string;
+  janitorApiKey?: string;
+}

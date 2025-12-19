@@ -9,6 +9,7 @@ const publicRoutes = [
   '/api/storage/status',
   '/api/storage/stats',
   '/api/storage/logs',
+  '/api/settings/auth', // Allow access to auth settings for client-side auth
   '/login',  // Allow access to login page
 ];
 

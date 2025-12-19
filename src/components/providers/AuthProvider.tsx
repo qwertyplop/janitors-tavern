@@ -2,7 +2,9 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { getAuthSettings } from '@/lib/auth';
+import { AuthSettings } from '@/types';
+
+// Define auth-related types
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -23,6 +25,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     checkAuthStatus();
   }, []);
+
+  const getAuthSettings = async (): Promise<AuthSettings> => {
+    try {
+      const response = await fetch('/api/settings/auth');
+      if (!response.ok) {
+        throw new Error('Failed to fetch auth settings');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching auth settings:', error);
+      return { isAuthenticated: false };
+    }
+  };
 
   const checkAuthStatus = async () => {
     try {
@@ -65,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      // Verify the username matches and that auth is set up
+      // Verify the username matches
       if (username === authSettings.username) {
         // In a real implementation, you would verify the password hash
         // For now, we'll just check if the username matches and auth is set up

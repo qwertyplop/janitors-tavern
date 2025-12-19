@@ -15,19 +15,6 @@ interface MainLayoutProps {
 export function MainLayout({ children }: MainLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { isAuthenticated, loading } = useAuth();
-  const router = useRouter();
-
-  // Check authentication status and redirect if not authenticated
-  useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      // Redirect to login page with current path as callback
-      const currentPath = window.location.pathname + window.location.search;
-      if (currentPath !== '/login') {
-        const callbackUrl = encodeURIComponent(currentPath);
-        router.push(`/login?callbackUrl=${callbackUrl}`);
-      }
-    }
-  }, [isAuthenticated, loading, router]);
 
   // Show loading state while checking auth
   if (loading) {
@@ -38,11 +25,6 @@ export function MainLayout({ children }: MainLayoutProps) {
         </div>
       </I18nProvider>
     );
-  }
-
-  // If not authenticated, don't render the layout (redirect will happen in useEffect)
-  if (!isAuthenticated) {
-    return null;
   }
 
   return (

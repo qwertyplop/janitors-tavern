@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,6 +17,8 @@ import {
   saveRegexScripts,
   generateId,
   normalizeRegexPattern,
+  updateRegexScriptsOrder,
+  migrateRegexScriptsOrder,
 } from '@/lib/storage';
 import { RegexScript } from '@/types';
 import { applyRegexScript, applyRegexScripts } from '@/lib/regex-processor';
@@ -29,6 +31,7 @@ export default function RegexScriptManager() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { t } = useI18n();
   
@@ -57,12 +60,50 @@ export default function RegexScriptManager() {
   const [formMinDepth, setFormMinDepth] = useState<number | null>(null);
   const [formMaxDepth, setFormMaxDepth] = useState<number | null>(null);
 
+  // Sort scripts by order when loading
   useEffect(() => {
+    // Migrate scripts to include order field if needed
+    migrateRegexScriptsOrder();
+
     const stored = getRegexScripts();
-    setScripts(stored);
-    if (stored.length > 0) {
-      setSelectedId(stored[0].id);
+    const sorted = [...stored].sort((a, b) => a.order - b.order);
+    setScripts(sorted);
+    if (sorted.length > 0) {
+      setSelectedId(sorted[0].id);
     }
+  }, []);
+
+  const handleDragStart = useCallback((index: number) => {
+    setDraggedIndex(index);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    // Reorder scripts
+    const newScripts = [...scripts];
+    const draggedScript = newScripts[draggedIndex];
+    newScripts.splice(draggedIndex, 1);
+    newScripts.splice(index, 0, draggedScript);
+
+    // Update order values
+    const updatedScripts = newScripts.map((script, i) => ({
+      ...script,
+      order: i,
+      updatedAt: new Date().toISOString(),
+    }));
+
+    setScripts(updatedScripts);
+    setDraggedIndex(index);
+
+    // Save the new order
+    const scriptIdsInOrder = updatedScripts.map(s => s.id);
+    updateRegexScriptsOrder(scriptIdsInOrder);
+  }, [scripts, draggedIndex]);
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedIndex(null);
   }, []);
 
   // Real‑time test mode processing
@@ -159,7 +200,7 @@ export default function RegexScriptManager() {
   const handleSave = () => {
     if (!formName || !formFindRegex) return;
 
-    const scriptData: Omit<RegexScript, 'id' | 'createdAt' | 'updatedAt'> = {
+    const scriptData: Omit<RegexScript, 'id' | 'createdAt' | 'updatedAt' | 'order'> = {
         scriptName: formName,
         findRegex: formFindRegex,
         replaceString: formReplaceString,
@@ -221,6 +262,7 @@ export default function RegexScriptManager() {
         id: generateId(),
         createdAt: now,
         updatedAt: now,
+        order: existingScripts.length + scriptsToImport.indexOf(s), // Assign order based on import position
       })) as RegexScript[];
 
       const existingScripts = getRegexScripts();
@@ -268,6 +310,22 @@ export default function RegexScriptManager() {
         </div>
       </div>
 
+      {/* Order documentation */}
+      <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md p-3 text-sm">
+        <div className="flex items-start gap-2">
+          <svg className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div>
+            <p className="font-medium text-blue-800 dark:text-blue-200">Execution Order</p>
+            <p className="text-zinc-700 dark:text-zinc-300 mt-1">
+              Scripts are executed <strong>from top to bottom</strong>, with the top script executing first.
+              Drag and drop scripts to reorder them. This order applies to all placement contexts (before sending, after receiving).
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Panel - Script List */}
         <div className="lg:col-span-1 space-y-2">
@@ -282,20 +340,34 @@ export default function RegexScriptManager() {
             </Card>
           ) : (
             <div className="space-y-2">
-              {scripts.map((script) => (
+              {scripts.map((script, index) => (
                 <Card
                   key={script.id}
+                  draggable
+                  onDragStart={() => handleDragStart(index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragEnd={handleDragEnd}
                   className={cn(
                     'p-3 cursor-pointer transition-colors',
                     selectedId === script.id
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
-                      : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                      : 'hover:bg-zinc-50 dark:hover:bg-zinc-800',
+                    draggedIndex === index && 'ring-2 ring-blue-500'
                   )}
                   onClick={() => setSelectedId(script.id)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
+                        {/* Drag handle */}
+                        <svg
+                          className="w-4 h-4 text-zinc-400 dark:text-zinc-500 cursor-move"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                        </svg>
                         <h4 className="font-medium text-sm truncate">{script.scriptName}</h4>
                         {script.disabled && (
                           <Badge variant="secondary" className="text-xs">Disabled</Badge>

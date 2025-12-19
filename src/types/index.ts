@@ -389,6 +389,7 @@ export interface RegexScript {
   substituteRegex: 0 | 1 | 2; // 0 = don't substitute macros, 1 = raw, 2 = escaped
   minDepth: number | null; // minimum depth (0 = last message)
   maxDepth: number | null; // maximum depth (must be > minDepth)
+  order: number; // execution order (lower numbers execute first)
   createdAt: string; // ISO timestamp
   updatedAt: string; // ISO timestamp
 }

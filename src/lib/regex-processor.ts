@@ -181,8 +181,11 @@ export function applyRegexScripts(
   role?: 'system' | 'user' | 'assistant'
 ): string {
   let result = content;
-  // Filter scripts by placement
-  const filtered = scripts.filter(s => s.placement.includes(placement));
+  // Filter scripts by placement and sort by order
+  const filtered = scripts
+    .filter(s => s.placement.includes(placement))
+    .sort((a, b) => a.order - b.order);
+
   for (const script of filtered) {
     result = applyRegexScript(result, script, context, depth, role);
   }

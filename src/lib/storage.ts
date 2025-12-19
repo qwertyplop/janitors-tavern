@@ -328,8 +328,12 @@ export function getRegexScript(id: string): RegexScript | undefined {
   return getRegexScripts().find((s) => s.id === id);
 }
 
-export function addRegexScript(script: Omit<RegexScript, 'id' | 'createdAt' | 'updatedAt'>): RegexScript {
+export function addRegexScript(script: Omit<RegexScript, 'id' | 'createdAt' | 'updatedAt' | 'order'>): RegexScript {
   const now = new Date().toISOString();
+  const scripts = getRegexScripts();
+  // Determine the next order value (max + 1, or 0 if empty)
+  const nextOrder = scripts.length > 0 ? Math.max(...scripts.map(s => s.order)) + 1 : 0;
+
   const newScript: RegexScript = {
     ...script,
     findRegex: normalizeRegexPattern(script.findRegex),
@@ -337,8 +341,8 @@ export function addRegexScript(script: Omit<RegexScript, 'id' | 'createdAt' | 'u
     id: generateId(),
     createdAt: now,
     updatedAt: now,
+    order: nextOrder,
   };
-  const scripts = getRegexScripts();
   scripts.push(newScript);
   saveRegexScripts(scripts);
   return newScript;
@@ -367,6 +371,56 @@ export function deleteRegexScript(id: string): boolean {
   if (filtered.length === scripts.length) return false;
   saveRegexScripts(filtered);
   return true;
+}
+
+/**
+ * Migrates existing regex scripts to include order field
+ * This should be called once when the app starts to ensure all scripts have order fields
+ */
+export function migrateRegexScriptsOrder(): void {
+  const scripts = getRegexScripts();
+  // Check if any script is missing the order field
+  const needsMigration = scripts.some(script => script.order === undefined);
+
+  if (needsMigration) {
+    const updatedScripts = scripts.map((script, index) => ({
+      ...script,
+      order: script.order ?? index, // Preserve existing order if present, otherwise use index
+      updatedAt: new Date().toISOString(),
+    }));
+    saveRegexScripts(updatedScripts);
+  }
+}
+
+/**
+ * Updates the order of regex scripts
+ * @param newOrder Array of script IDs in the new order
+ */
+export function updateRegexScriptsOrder(newOrder: string[]): void {
+  const scripts = getRegexScripts();
+  const updatedScripts = newOrder.map((id, index) => {
+    const script = scripts.find(s => s.id === id);
+    if (!script) return null;
+    return {
+      ...script,
+      order: index,
+      updatedAt: new Date().toISOString(),
+    };
+  }).filter(script => script !== null) as RegexScript[];
+
+  // Add any scripts that weren't in the newOrder (shouldn't happen but just in case)
+  const orderedIds = new Set(newOrder);
+  scripts.forEach(script => {
+    if (!orderedIds.has(script.id)) {
+      updatedScripts.push({
+        ...script,
+        order: updatedScripts.length,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  });
+
+  saveRegexScripts(updatedScripts);
 }
 
 // ============================================

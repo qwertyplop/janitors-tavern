@@ -304,6 +304,8 @@ export const ru: TranslationKeys = {
     confirmPasswordPlaceholder: 'Подтвердите ваш пароль',
     settingUp: 'Настройка...',
     setupAuth: 'Настроить аутентификацию',
+    goToRegistration: 'Перейти к регистрации',
+    goToLogin: 'Войти',
   },
 
   // Extensions

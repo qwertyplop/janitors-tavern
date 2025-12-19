@@ -302,6 +302,8 @@ export const en = {
     confirmPasswordPlaceholder: 'Confirm your password',
     settingUp: 'Setting up...',
     setupAuth: 'Set Up Authentication',
+    goToRegistration: 'Go to Registration',
+    goToLogin: 'Go to Login',
   },
 
   // Extensions

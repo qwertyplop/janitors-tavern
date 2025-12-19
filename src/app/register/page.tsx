@@ -22,6 +22,14 @@ export default function RegisterPage() {
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const forceRegister = urlParams.get('force');
+        
+        // If force parameter is present, skip auth check
+        if (forceRegister === 'true') {
+          return;
+        }
+        
         const response = await fetch('/api/settings', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -158,13 +166,22 @@ export default function RegisterPage() {
               </div>
             )}
             
-            <Button 
-              type="submit" 
-              className="w-full" 
+            <Button
+              type="submit"
+              className="w-full"
               disabled={loading}
             >
               {loading ? (t.login.settingUp || 'Setting up...') : (t.login.setupAuth || 'Set Up Authentication')}
             </Button>
+            
+            <div className="text-center text-sm text-zinc-600 dark:text-zinc-400 mt-4">
+              <a
+                href="/login"
+                className="text-blue-600 hover:underline"
+              >
+                {t.login.goToLogin || 'Go to Login'}
+              </a>
+            </div>
           </form>
         </CardContent>
       </Card>

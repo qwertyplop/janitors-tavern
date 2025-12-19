@@ -48,6 +48,14 @@ export async function middleware(request: NextRequest) {
   if (isWebPage && !isPublicRoute) {
     // Allow access to register page for first-time setup
     if (pathname === '/register') {
+      const url = request.nextUrl;
+      const forceRegister = url.searchParams.get('force');
+      
+      // If force parameter is present, allow access to register page regardless of auth status
+      if (forceRegister === 'true') {
+        return NextResponse.next();
+      }
+      
       // If user is already authenticated, redirect to dashboard
       const authenticated = await isAuthenticated(request);
       if (authenticated) {
@@ -61,10 +69,9 @@ export async function middleware(request: NextRequest) {
     const authenticated = await isAuthenticated(request);
     
     if (!authenticated) {
-      // Redirect to register page for first-time setup, or login if already set up
-      // The register page will handle checking if auth is already set up
+      // Redirect to login page first, which will redirect to register if auth is not set up
       const callbackUrl = encodeURIComponent(request.nextUrl.pathname + request.nextUrl.search);
-      return NextResponse.redirect(new URL(`/register?callbackUrl=${callbackUrl}`, request.url));
+      return NextResponse.redirect(new URL(`/login?callbackUrl=${callbackUrl}`, request.url));
     }
   }
   

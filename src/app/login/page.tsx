@@ -23,12 +23,13 @@ export default function LoginPage() {
   
   const callbackUrl = searchParams.get('callbackUrl') || '/';
 
-  // Check if already authenticated
+  // Check if already authenticated (only on initial load, not during login flow)
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
+    // Only redirect if authentication was verified on initial load (not after login submission)
+    if (!authLoading && isAuthenticated && !success) {
       router.push(callbackUrl);
     }
-  }, [isAuthenticated, authLoading, callbackUrl, router]);
+  }, [isAuthenticated, authLoading, callbackUrl, router, success]);
   
   // Check if auth is set up in Firestore, if not redirect to register
   useEffect(() => {
@@ -78,17 +79,12 @@ export default function LoginPage() {
     }
   };
   
-  // Handle redirect after success message is shown
+  // Handle redirect immediately after login success
   useEffect(() => {
     if (success && redirectTriggered) {
-      const timer = setTimeout(() => {
-        // Redirect to dashboard (or original callback URL if it's not the login page)
-        const targetUrl = callbackUrl && callbackUrl !== '/login' ? callbackUrl : '/';
-        router.push(targetUrl);
-      }, 1000); // 1 second delay to show success message
-      
-      // Cleanup timer if component unmounts
-      return () => clearTimeout(timer);
+      // Redirect immediately without delay to prevent race conditions
+      const targetUrl = callbackUrl && callbackUrl !== '/login' ? callbackUrl : '/';
+      router.push(targetUrl);
     }
   }, [success, redirectTriggered, callbackUrl, router]);
 

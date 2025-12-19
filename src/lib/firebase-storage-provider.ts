@@ -137,6 +137,12 @@ export class FirebaseStorageProvider implements StorageProvider {
       return cached;
     }
 
+    // Check if Firebase is available
+    if (!db) {
+      console.warn(`[FirebaseStorage] Firebase not available, returning default for ${key}`);
+      return DEFAULT_STORAGE_DATA[key];
+    }
+
     try {
       // For large arrays (connections, presets, regexScripts), use subcollections
       if (key === 'connections' || key === 'presets' || key === 'regexScripts') {
@@ -182,6 +188,12 @@ export class FirebaseStorageProvider implements StorageProvider {
   }
 
   async set<K extends StorageKey>(key: K, value: StorageData[K]): Promise<void> {
+    // Check if Firebase is available
+    if (!db) {
+      console.warn(`[FirebaseStorage] Firebase not available, cannot save ${key}`);
+      throw new Error('Firebase not available');
+    }
+
     try {
       // For large arrays (connections, presets, regexScripts), use subcollections
       if (key === 'connections' || key === 'presets' || key === 'regexScripts') {
@@ -197,7 +209,7 @@ export class FirebaseStorageProvider implements StorageProvider {
           const addPromises = value.map(async (item: any) => {
             // Use the item's id if it exists, otherwise generate a new one
             const id = item.id || this.generateId();
-            const docRef = doc(db, collectionPath, id);
+            const docRef = doc(db!, collectionPath, id);
             return setDoc(docRef, { ...item, id });
           });
           await Promise.all(addPromises);
@@ -258,7 +270,7 @@ export class FirebaseStorageProvider implements StorageProvider {
       }
       
       // Process smaller data with batch
-      if (smallDataUpdates.length > 0) {
+      if (smallDataUpdates.length > 0 && db) {
         const batch = writeBatch(db);
         for (const update of smallDataUpdates) {
           const docPath = this.getFirestoreDocPath(update.key);
@@ -292,6 +304,11 @@ export class FirebaseStorageProvider implements StorageProvider {
 
   async isAvailable(): Promise<boolean> {
     try {
+      // Check if Firebase is available
+      if (!db) {
+        return false;
+      }
+      
       // Test Firestore availability by attempting to read from a known path
       const testDocPath = `users/${this.userId}/storage/test`;
       const docRef = doc(db, testDocPath);

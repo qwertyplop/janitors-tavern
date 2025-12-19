@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthSettings } from './lib/edge-auth';
 
 // Create a server-side compatible isAuthenticated function for middleware
 async function isAuthenticated(request: NextRequest): Promise<boolean> {

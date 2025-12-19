@@ -162,3 +162,7 @@ export async function PUT(request: NextRequest) {
     );
   }
 }
+
+// Ensure this route runs in Node.js runtime, not edge runtime
+// because it uses file system operations
+export const runtime = 'nodejs';

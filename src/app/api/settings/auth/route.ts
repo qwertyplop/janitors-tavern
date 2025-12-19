@@ -14,3 +14,6 @@ export async function GET() {
     );
   }
 }
+
+// This route can run in edge runtime since it only uses environment variables
+export const runtime = 'edge';

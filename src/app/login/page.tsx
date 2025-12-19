@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { getAuthSettings } from '@/lib/auth';
+import { AuthSettings } from '@/types';
 import { useI18n } from '@/components/providers/I18nProvider';
 import { useAuth } from '@/components/providers/AuthProvider';
 
@@ -30,6 +30,19 @@ export default function LoginPage() {
       router.push(callbackUrl);
     }
   }, [isAuthenticated, callbackUrl, router]);
+
+  const getAuthSettings = async (): Promise<AuthSettings> => {
+    try {
+      const response = await fetch('/api/settings/auth');
+      if (!response.ok) {
+        throw new Error('Failed to fetch auth settings');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching auth settings:', error);
+      return { isAuthenticated: false };
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -23,7 +23,8 @@ import { downloadJson, readJsonFile } from '@/lib/utils';
 import { useSync } from '@/components/providers/SyncProvider';
 import { useI18n } from '@/components/providers/I18nProvider';
 import { AppSettings, Profile, ConnectionPreset, PromptPreset, SamplerPreset, ThemeMode, LoggingSettings, ChatCompletionPreset } from '@/types';
-import { setupAuth, updateJanitorApiKey } from '@/lib/auth';
+// Remove direct import of server-side auth functions
+// These functions are now called via API endpoints
 
 interface ServerSettings {
   logging: LoggingSettings;
@@ -146,8 +147,19 @@ export default function SettingsPage() {
       const data = await response.json();
       
       if (response.ok) {
-        // Generate the .env content
-        const apiKey = await updateJanitorApiKey(); // Generate a new API key
+        // Generate a new API key via API call
+        const apiKeyResponse = await fetch('/api/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'update-api-key' }),
+        });
+        
+        let apiKey = '';
+        if (apiKeyResponse.ok) {
+          const apiKeyData = await apiKeyResponse.json();
+          apiKey = apiKeyData.apiKey;
+        }
+        
         const envContent = `# Authentication Settings
 AUTH_IS_SETUP=true
 AUTH_ENFORCED=true

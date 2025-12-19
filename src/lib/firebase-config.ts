@@ -37,14 +37,28 @@ let firestoreInstance: Firestore | null = null;
 let authInstance: Auth | null = null;
 
 if (typeof window !== 'undefined' && getApps().length === 0) {
+  console.log('[Firebase] Initializing Firebase with config:', {
+    apiKey: firebaseConfig.apiKey ? '***' : 'MISSING',
+    authDomain: firebaseConfig.authDomain,
+    projectId: firebaseConfig.projectId,
+  });
+  
+  if (!firebaseConfig.apiKey || firebaseConfig.apiKey === 'your_firebase_api_key_here' || firebaseConfig.apiKey === '') {
+    console.warn('[Firebase] API Key is not configured properly!');
+  }
+  
   app = initializeApp(firebaseConfig);
   firestoreInstance = getFirestore(app);
   authInstance = getAuth(app);
+  console.log('[Firebase] Firebase initialized successfully');
 } else if (typeof window !== 'undefined') {
   // If already initialized in client-side, get the existing instances
   app = getApps()[0];
   firestoreInstance = getFirestore(app);
   authInstance = getAuth(app);
+  console.log('[Firebase] Using existing Firebase instance');
+} else {
+  console.log('[Firebase] Not initializing - not in browser environment');
 }
 
 // Export Firebase instances (will be null in server-side environments)

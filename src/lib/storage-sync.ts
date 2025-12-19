@@ -54,13 +54,17 @@ function notifySyncListeners(syncing: boolean): void {
 
 async function checkFirebaseStatus(): Promise<boolean> {
   try {
+    console.log('[Storage Sync] Checking Firebase status...');
     const response = await fetch('/api/storage/status');
     if (response.ok) {
       const data = await response.json();
+      console.log('[Storage Sync] Firebase status response:', data);
       return data.configured === true;
+    } else {
+      console.log('[Storage Sync] Firebase status check failed with status:', response.status);
     }
   } catch (error) {
-    console.error('Failed to check Firebase status:', error);
+    console.error('[Storage Sync] Failed to check Firebase status:', error);
   }
   return false;
 }

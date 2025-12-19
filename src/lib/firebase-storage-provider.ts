@@ -89,9 +89,13 @@ export class FirebaseStorageProvider implements StorageProvider {
       if (!userId) {
         userId = 'anonymous_user'; // In a real app, this would be handled by auth
         localStorage.setItem('firebase_user_id', userId);
+        console.log('[FirebaseStorage] Generated new user ID:', userId);
+      } else {
+        console.log('[FirebaseStorage] Using existing user ID:', userId);
       }
       return userId;
     }
+    console.log('[FirebaseStorage] Using server user ID');
     return 'anonymous_server'; // For server-side rendering
   }
 
@@ -304,17 +308,27 @@ export class FirebaseStorageProvider implements StorageProvider {
 
   async isAvailable(): Promise<boolean> {
     try {
+      console.log('[FirebaseStorage] Checking Firebase availability...');
+      
       // Check if Firebase is available
       if (!db) {
+        console.log('[FirebaseStorage] Firebase db instance is null');
         return false;
       }
       
+      console.log('[FirebaseStorage] Firebase db instance is available');
+      console.log('[FirebaseStorage] Using user ID:', this.userId);
+      
       // Test Firestore availability by attempting to read from a known path
       const testDocPath = `users/${this.userId}/storage/test`;
+      console.log('[FirebaseStorage] Testing Firestore with path:', testDocPath);
+      
       const docRef = doc(db, testDocPath);
       await getDoc(docRef);
+      console.log('[FirebaseStorage] Firestore test successful');
       return true;
-    } catch {
+    } catch (error) {
+      console.log('[FirebaseStorage] Firestore test failed:', error);
       return false;
     }
   }

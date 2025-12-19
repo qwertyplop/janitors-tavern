@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   getConnectionPresets,
   getChatCompletionPresets,
@@ -154,14 +155,40 @@ export default function DashboardPage() {
           <CardTitle>{t.dashboard.proxyEndpoint}</CardTitle>
           <CardDescription>{t.dashboard.configureJanitor}</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="rounded-md bg-zinc-100 p-3 font-mono text-sm dark:bg-zinc-800">
-            <code>/api/proxy/chat-completion</code>
+        <CardContent className="space-y-4">
+          <div>
+            <Label className="mb-2 block">Proxy Endpoint</Label>
+            <div className="rounded-md bg-zinc-100 p-3 font-mono text-sm dark:bg-zinc-800">
+              <code>/api/proxy/chat-completion</code>
+            </div>
+            <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+              {t.dashboard.sendRequestsWith} <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">presetId</code> {t.dashboard.or}
+              <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800 ml-1">connectionId</code> {t.dashboard.inRequestBody}
+            </p>
           </div>
-          <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-            {t.dashboard.sendRequestsWith} <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">presetId</code> {t.dashboard.or}
-            <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800 ml-1">connectionId</code> {t.dashboard.inRequestBody}
-          </p>
+          
+          <div>
+            <Label className="mb-2 block">API Key</Label>
+            <div className="flex gap-2">
+              <Input
+                value="Include this in X-API-Key header"
+                readOnly
+                className="font-mono text-xs"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText('Include this in X-API-Key header');
+                }}
+              >
+                Copy
+              </Button>
+            </div>
+            <p className="mt-2 text-xs text-zinc-500">
+              Configure JanitorAI to use this endpoint with your API key
+            </p>
+          </div>
         </CardContent>
       </Card>
 

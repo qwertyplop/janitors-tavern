@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useI18n } from '@/components/providers/I18nProvider';
+import { getAuthSettings } from '@/lib/auth';
 
 export default function RegisterPage() {
   const [username, setUsername] = useState('');
@@ -30,20 +31,13 @@ export default function RegisterPage() {
           return;
         }
         
-        const response = await fetch('/api/settings', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'get-auth-status' }),
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('Register - Auth status check:', data);
-          if (data.isAuthenticated) {
-            // If auth is already set up, redirect to login
-            console.log('Register - Auth already set up, redirecting to login');
-            router.push('/login');
-          }
+        // Use the same auth settings function as other pages
+        const authSettings = await getAuthSettings();
+        console.log('Register - Auth status check:', authSettings);
+        if (authSettings.isAuthenticated) {
+          // If auth is already set up, redirect to login
+          console.log('Register - Auth already set up, redirecting to login');
+          router.push('/login');
         }
       } catch (err) {
         console.error('Error checking auth status:', err);

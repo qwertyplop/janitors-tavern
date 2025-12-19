@@ -43,51 +43,31 @@ export async function isAuthenticated(request: NextRequest): Promise<boolean> {
 
 // Get auth settings (for Edge Runtime)
 export async function getAuthSettings(): Promise<AuthSettings> {
-  let authSettings: AuthSettings | null = null;
-  
-  // Check if we're in a browser environment (client-side)
-  if (typeof window !== 'undefined') {
-    try {
-      // Try to get auth settings from Firestore first (for modern deployments)
-      // Import Firebase functions dynamically to avoid server-side issues
-      const { doc, getDoc } = await import('firebase/firestore');
-      const { db } = await import('./firebase-config');
-      
-      const authDoc = await getDoc(doc(db, 'system', 'auth'));
-      
-      if (authDoc.exists()) {
-        const data = authDoc.data();
-        authSettings = {
-          isAuthenticated: data.isAuthenticated || false,
-          username: data.username,
-          passwordHash: data.passwordHash,
-          janitorApiKey: data.janitorApiKey
-        };
-        console.log('Auth settings retrieved from Firestore (edge runtime)');
-      }
-    } catch (error) {
-      console.error('Error fetching auth settings from Firestore in edge runtime:', error);
-      // Continue to fallback
+  try {
+    // Import Firebase functions dynamically to avoid server-side issues
+    const { doc, getDoc } = await import('firebase/firestore');
+    const { db } = await import('./firebase-config');
+    
+    const authDoc = await getDoc(doc(db, 'system', 'auth'));
+    
+    if (authDoc.exists()) {
+      const data = authDoc.data();
+      const authSettings: AuthSettings = {
+        isAuthenticated: data.isAuthenticated || false,
+        username: data.username,
+        passwordHash: data.passwordHash,
+        janitorApiKey: data.janitorApiKey
+      };
+      console.log('Auth settings retrieved from Firestore (edge runtime)');
+      return authSettings;
+    } else {
+      // If no auth document exists, return default
+      console.log('No auth settings found in Firestore (edge runtime), returning default');
+      return { isAuthenticated: false };
     }
+  } catch (error) {
+    console.error('Error fetching auth settings from Firestore in edge runtime:', error);
+    // Return default settings if there's an error
+    return { isAuthenticated: false };
   }
-  
-  // If we found settings in Firestore, return them
-  if (authSettings) {
-    return authSettings;
-  }
-  
-  // Fallback to environment variables for compatibility and server-side rendering
-  if (process.env.AUTH_IS_SETUP === 'true') {
-    console.log('Auth settings retrieved from environment variables (edge runtime)');
-    return {
-      isAuthenticated: true,
-      username: process.env.AUTH_USERNAME || undefined,
-      passwordHash: process.env.AUTH_PASSWORD_HASH || undefined,
-      janitorApiKey: process.env.JANITOR_API_KEY || undefined
-    };
-  }
-  
-  // If no environment variables are set, return default
-  console.log('No auth settings found in edge runtime, returning default');
-  return { isAuthenticated: false };
 }

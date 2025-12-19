@@ -31,6 +31,21 @@ export default function LoginPage() {
       router.push(callbackUrl);
     }
   }, [isAuthenticated, authLoading, callbackUrl, router]);
+  
+  // Check if auth is set up in Firestore, if not redirect to register
+  useEffect(() => {
+    const checkAuthSetup = async () => {
+      if (authLoading) return; // Wait for auth loading to complete
+      
+      const authSettings = await getAuthSettings();
+      if (!authSettings.isAuthenticated && !isAuthenticated) {
+        // Auth is not set up in Firestore, redirect to register
+        router.push('/register');
+      }
+    };
+    
+    checkAuthSetup();
+  }, [authLoading, isAuthenticated, router]);
 
   const getAuthSettings = async (): Promise<AuthSettings> => {
     try {

@@ -2,7 +2,54 @@ import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 import type { LoggingSettings } from '@/types';
-import { getAuthSettings, saveAuthSettings, setupAuth, updateJanitorApiKey, hashPassword, verifyPassword } from '@/lib/auth';
+import { AuthSettings } from '@/types';
+import { setupAuth, updateJanitorApiKey, hashPassword, verifyPassword } from '@/lib/auth';
+
+// Server-side auth settings functions that work in API routes
+async function getAuthSettings(): Promise<AuthSettings> {
+  // For server-side execution, we'll use a file-based approach
+  // since Firebase can't be used server-side in this context
+  const authSettingsPath = path.join(process.cwd(), 'data', 'auth-settings.json');
+  
+  try {
+    const fileContent = await fs.readFile(authSettingsPath, 'utf-8');
+    return JSON.parse(fileContent);
+  } catch (error) {
+    // If file doesn't exist or there's an error, return default
+    return { isAuthenticated: false };
+  }
+}
+
+async function saveAuthSettings(settings: AuthSettings): Promise<void> {
+  // For server-side execution, save to file
+  const authSettingsPath = path.join(process.cwd(), 'data', 'auth-settings.json');
+  const dir = path.dirname(authSettingsPath);
+  
+  try {
+    await fs.access(dir);
+  } catch {
+    await fs.mkdir(dir, { recursive: true });
+  }
+  
+  await fs.writeFile(authSettingsPath, JSON.stringify(settings, null, 2), 'utf-8');
+}
+
+// Function to sync auth settings to Firestore (client-side only)
+async function syncAuthSettingsToFirestore(settings: AuthSettings): Promise<void> {
+  // Only attempt to sync to Firestore if we're in a browser environment
+  if (typeof window !== 'undefined') {
+    try {
+      const { doc, setDoc } = await import('firebase/firestore');
+      const { db } = await import('@/lib/firebase-config');
+      
+      await setDoc(doc(db, 'system', 'auth'), settings);
+      console.log('Auth settings synced to Firestore successfully');
+    } catch (error) {
+      console.error('Error syncing auth settings to Firestore:', error);
+      // Don't throw error as this is just a sync operation
+    }
+  }
+}
 
 const SETTINGS_FILE = path.join(process.cwd(), 'data', 'server-settings.json');
 
@@ -97,6 +144,11 @@ export async function PUT(request: NextRequest) {
             console.log('API - Setting up authentication for user:', authRequest.username);
             await setupAuth(authRequest.username, authRequest.password);
             console.log('API - Authentication set up successfully for user:', authRequest.username);
+            
+            // Sync to Firestore if possible (client-side)
+            const newAuthSettings = await getAuthSettings();
+            await syncAuthSettingsToFirestore(newAuthSettings);
+            
             return NextResponse.json({ success: true, message: 'Authentication set up successfully' });
           } catch (error) {
             console.error('Error setting up auth:', error);
@@ -112,6 +164,11 @@ export async function PUT(request: NextRequest) {
             console.log('API - Updating Janitor API key');
             const newApiKey = await updateJanitorApiKey();
             console.log('API - New API key generated successfully');
+            
+            // Sync to Firestore if possible (client-side)
+            const newAuthSettings = await getAuthSettings();
+            await syncAuthSettingsToFirestore(newAuthSettings);
+            
             return NextResponse.json({ success: true, apiKey: newApiKey });
           } catch (error) {
             console.error('Error updating API key:', error);
@@ -126,11 +183,15 @@ export async function PUT(request: NextRequest) {
           try {
             const currentAuthSettings = await getAuthSettings();
             console.log('API - Auth settings retrieved for status check:', currentAuthSettings);
-            return NextResponse.json({
+            
+            // Return the auth status
+            const authStatus = {
               isAuthenticated: currentAuthSettings.isAuthenticated,
               hasApiKey: !!currentAuthSettings.janitorApiKey,
               janitorApiKey: currentAuthSettings.janitorApiKey
-            });
+            };
+            
+            return NextResponse.json(authStatus);
           } catch (error) {
             console.error('Error getting auth status:', error);
             return NextResponse.json(

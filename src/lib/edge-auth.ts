@@ -40,34 +40,3 @@ export async function isAuthenticated(request: NextRequest): Promise<boolean> {
   console.log('Edge auth - Authentication result:', isAuth);
   return isAuth;
 }
-
-// Get auth settings (for Edge Runtime)
-export async function getAuthSettings(): Promise<AuthSettings> {
-  try {
-    // Import Firebase functions dynamically to avoid server-side issues
-    const { doc, getDoc } = await import('firebase/firestore');
-    const { db } = await import('./firebase-config');
-    
-    const authDoc = await getDoc(doc(db, 'system', 'auth'));
-    
-    if (authDoc.exists()) {
-      const data = authDoc.data();
-      const authSettings: AuthSettings = {
-        isAuthenticated: data.isAuthenticated || false,
-        username: data.username,
-        passwordHash: data.passwordHash,
-        janitorApiKey: data.janitorApiKey
-      };
-      console.log('Auth settings retrieved from Firestore (edge runtime)');
-      return authSettings;
-    } else {
-      // If no auth document exists, return default
-      console.log('No auth settings found in Firestore (edge runtime), returning default');
-      return { isAuthenticated: false };
-    }
-  } catch (error) {
-    console.error('Error fetching auth settings from Firestore in edge runtime:', error);
-    // Return default settings if there's an error
-    return { isAuthenticated: false };
-  }
-}

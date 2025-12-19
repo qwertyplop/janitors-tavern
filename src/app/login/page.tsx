@@ -49,7 +49,11 @@ export default function LoginPage() {
 
   const getAuthSettings = async (): Promise<AuthSettings> => {
     try {
-      const response = await fetch('/api/settings/auth');
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get-auth-status' }),
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch auth settings');
       }

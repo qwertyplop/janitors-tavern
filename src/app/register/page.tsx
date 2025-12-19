@@ -7,7 +7,25 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useI18n } from '@/components/providers/I18nProvider';
-import { getAuthSettings } from '@/lib/auth';
+import { AuthSettings } from '@/types';
+
+// Create a function to get auth settings from the API
+const getAuthSettings = async (): Promise<AuthSettings> => {
+  try {
+    const response = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'get-auth-status' }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch auth settings');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching auth settings:', error);
+    return { isAuthenticated: false };
+  }
+};
 
 export default function RegisterPage() {
   const [username, setUsername] = useState('');

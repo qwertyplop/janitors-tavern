@@ -296,6 +296,14 @@ export const ru: TranslationKeys = {
     invalidCredentials: 'Неверное имя пользователя или пароль',
     noAuthSetup: 'Аутентификация не настроена. Сначала настройте аутентификацию.',
     authError: 'Произошла ошибка при аутентификации',
+    passwordsDontMatch: 'Пароли не совпадают',
+    passwordTooShort: 'Пароль должен содержать не менее 6 символов',
+    setupAuthTitle: 'Настройка аутентификации',
+    setupAuthDescription: 'Создайте имя пользователя и пароль',
+    confirmPassword: 'Подтвердите пароль',
+    confirmPasswordPlaceholder: 'Подтвердите ваш пароль',
+    settingUp: 'Настройка...',
+    setupAuth: 'Настроить аутентификацию',
   },
 
   // Extensions

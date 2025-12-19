@@ -23,6 +23,7 @@ import { downloadJson, readJsonFile } from '@/lib/utils';
 import { useSync } from '@/components/providers/SyncProvider';
 import { useI18n } from '@/components/providers/I18nProvider';
 import { AppSettings, Profile, ConnectionPreset, PromptPreset, SamplerPreset, ThemeMode, LoggingSettings, ChatCompletionPreset } from '@/types';
+import { setupAuth, updateJanitorApiKey } from '@/lib/auth';
 
 interface ServerSettings {
   logging: LoggingSettings;
@@ -46,6 +47,11 @@ export default function SettingsPage() {
   const [samplers, setSamplers] = useState<SamplerPreset[]>([]);
   const [saved, setSaved] = useState(false);
   const [serverSaved, setServerSaved] = useState(false);
+  const [authStatus, setAuthStatus] = useState<{ isAuthenticated: boolean; hasApiKey: boolean } | null>(null);
+  const [authForm, setAuthForm] = useState({ username: '', password: '' });
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [authMessage, setAuthMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isGeneratingApiKey, setIsGeneratingApiKey] = useState(false);
 
 
   // Storage sync from context
@@ -66,7 +72,92 @@ export default function SettingsPage() {
 
     // Fetch server settings
     fetchServerSettings();
+    
+    // Fetch auth status
+    fetchAuthStatus();
   }, []);
+
+  const fetchAuthStatus = async () => {
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get-auth-status' }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAuthStatus(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch auth status:', error);
+    }
+  };
+  
+  const handleSetupAuth = async () => {
+    if (!authForm.username || !authForm.password) {
+      setAuthMessage({ type: 'error', message: 'Username and password are required' });
+      return;
+    }
+    
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'setup',
+          username: authForm.username,
+          password: authForm.password
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setAuthMessage({ type: 'success', message: 'Authentication set up successfully' });
+        setAuthForm({ username: '', password: '' });
+        fetchAuthStatus(); // Refresh auth status
+      } else {
+        setAuthMessage({ type: 'error', message: data.error || 'Failed to set up authentication' });
+      }
+    } catch (error) {
+      setAuthMessage({ type: 'error', message: 'Failed to set up authentication' });
+    }
+  };
+  
+  const handleGenerateApiKey = async () => {
+    setIsGeneratingApiKey(true);
+    setAuthMessage(null);
+    
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update-api-key' }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setApiKey(data.apiKey);
+        setAuthMessage({ type: 'success', message: 'New API key generated successfully' });
+        fetchAuthStatus(); // Refresh auth status
+      } else {
+        setAuthMessage({ type: 'error', message: data.error || 'Failed to generate API key' });
+      }
+    } catch (error) {
+      setAuthMessage({ type: 'error', message: 'Failed to generate API key' });
+    } finally {
+      setIsGeneratingApiKey(false);
+    }
+  };
+  
+  const handleCopyApiKey = () => {
+    if (apiKey) {
+      navigator.clipboard.writeText(apiKey);
+      setAuthMessage({ type: 'success', message: 'API key copied to clipboard!' });
+    }
+  };
 
   // Re-fetch data when sync initializes (data may have been pulled from Firebase)
   useEffect(() => {
@@ -461,6 +552,129 @@ export default function SettingsPage() {
             />
             <Label htmlFor="showAdvanced">{t.settings.showAdvancedOptions}</Label>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Authentication Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t.settings.authentication}</CardTitle>
+          <CardDescription>
+            {t.settings.authenticationDescription}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {authStatus ? (
+            <>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className={`h-2 w-2 rounded-full ${authStatus.isAuthenticated ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                  <span className="text-sm">
+                    {authStatus.isAuthenticated
+                      ? t.settings.authEnabled
+                      : t.settings.authNotEnabled}
+                  </span>
+                </div>
+                
+                {authStatus.hasApiKey && (
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2 w-2 rounded-full ${authStatus.hasApiKey ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                    <span className="text-sm">
+                      {t.settings.apiKeyGenerated}
+                    </span>
+                  </div>
+                )}
+              </div>
+              
+              {!authStatus.isAuthenticated ? (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="auth-username">{t.settings.username}</Label>
+                    <Input
+                      id="auth-username"
+                      value={authForm.username}
+                      onChange={(e) => setAuthForm({...authForm, username: e.target.value})}
+                      placeholder={t.settings.usernamePlaceholder}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="auth-password">{t.settings.password}</Label>
+                    <Input
+                      id="auth-password"
+                      type="password"
+                      value={authForm.password}
+                      onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
+                      placeholder={t.settings.passwordPlaceholder}
+                    />
+                    <p className="text-xs text-zinc-500">{t.settings.authPasswordHint}</p>
+                  </div>
+                  
+                  <Button onClick={handleSetupAuth} disabled={!authForm.username || !authForm.password}>
+                    {t.settings.setupAuth}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                    {t.settings.authSetupComplete}
+                  </p>
+                  
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                      {t.settings.apiKeyManagement}
+                    </h4>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={handleGenerateApiKey}
+                          disabled={isGeneratingApiKey}
+                        >
+                          {isGeneratingApiKey ? t.settings.generating : t.settings.generateNewApiKey}
+                        </Button>
+                      </div>
+                      
+                      {apiKey && (
+                        <div className="space-y-2">
+                          <Label>{t.settings.generatedApiKey}</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              value={apiKey}
+                              readOnly
+                              className="font-mono text-xs"
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleCopyApiKey}
+                            >
+                              {t.settings.copy}
+                            </Button>
+                          </div>
+                          <p className="text-xs text-zinc-500">
+                            {t.settings.apiKeyUsageHint}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {authMessage && (
+                <div className={`p-3 rounded-md text-sm ${
+                  authMessage.type === 'success'
+                    ? 'bg-green-50 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                    : 'bg-red-50 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                }`}>
+                  {authMessage.message}
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-zinc-500">{t.settings.loadingAuthStatus}</p>
+          )}
         </CardContent>
       </Card>
 

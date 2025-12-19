@@ -1,5 +1,6 @@
 import { ChatProvider, ProviderRequest, ProviderConfig } from './base';
 import { InternalChatResponse, ChatMessage } from '@/types';
+import { getAuthSettings } from '@/lib/auth';
 
 // JanitorAI provider - uses OpenAI-compatible format by default
 // but can be customized for JanitorAI-specific endpoints if needed
@@ -10,9 +11,10 @@ export class JanitorAIProvider extends ChatProvider {
   }
 
   protected getHeaders(): Record<string, string> {
+    // For now, use the synchronous version and handle API key differently
     return {
       ...super.getHeaders(),
-      Authorization: `Bearer ${this.config.apiKey}`,
+      'Authorization': `Bearer ${this.config.apiKey}`,
     };
   }
 
@@ -41,9 +43,19 @@ export class JanitorAIProvider extends ChatProvider {
     });
 
     try {
+      // Get the JanitorAI API key from auth settings
+      const authSettings = await getAuthSettings();
+      const janitorApiKey = authSettings.janitorApiKey;
+      
+      // Build headers with or without the JanitorAI API key
+      const headers = {
+        ...this.getHeaders(),
+        ...(janitorApiKey && { 'X-JanitorAI-API-Key': janitorApiKey })
+      };
+      
       const response = await fetch(this.buildUrl('/chat/completions'), {
         method: 'POST',
-        headers: this.getHeaders(),
+        headers,
         body: JSON.stringify(requestBody),
       });
 
@@ -88,10 +100,20 @@ export class JanitorAIProvider extends ChatProvider {
 
   async testConnection(): Promise<{ success: boolean; message: string }> {
     try {
+      // Get the JanitorAI API key from auth settings
+      const authSettings = await getAuthSettings();
+      const janitorApiKey = authSettings.janitorApiKey;
+      
+      // Build headers with or without the JanitorAI API key
+      const headers = {
+        ...this.getHeaders(),
+        ...(janitorApiKey && { 'X-JanitorAI-API-Key': janitorApiKey })
+      };
+      
       // Test by attempting to list models or a simple health check
       const response = await fetch(this.buildUrl('/models'), {
         method: 'GET',
-        headers: this.getHeaders(),
+        headers,
       });
 
       if (response.ok) {

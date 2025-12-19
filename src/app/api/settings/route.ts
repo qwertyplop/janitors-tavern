@@ -2,11 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 import type { LoggingSettings } from '@/types';
+import { getAuthSettings, saveAuthSettings, setupAuth, updateJanitorApiKey, hashPassword, verifyPassword } from '@/lib/auth';
 
 const SETTINGS_FILE = path.join(process.cwd(), 'data', 'server-settings.json');
 
 interface ServerSettings {
   logging: LoggingSettings;
+}
+
+interface AuthRequest {
+  action: 'setup' | 'update-api-key' | 'get-auth-status';
+  username?: string;
+  password?: string;
+  currentPassword?: string;
 }
 
 const DEFAULT_SERVER_SETTINGS: ServerSettings = {
@@ -62,6 +70,54 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
+    
+    // Check if this is an auth-related request
+    if (body.action) {
+      const authRequest = body as AuthRequest;
+      
+      switch (authRequest.action) {
+        case 'setup':
+          // Setup authentication (one-time only)
+          const authSettings = await getAuthSettings();
+          if (authSettings.isAuthenticated) {
+            return NextResponse.json(
+              { error: 'Authentication is already set up and cannot be changed' },
+              { status: 400 }
+            );
+          }
+          
+          if (!authRequest.username || !authRequest.password) {
+            return NextResponse.json(
+              { error: 'Username and password are required' },
+              { status: 400 }
+            );
+          }
+          
+          await setupAuth(authRequest.username, authRequest.password);
+          return NextResponse.json({ success: true, message: 'Authentication set up successfully' });
+          
+        case 'update-api-key':
+          // Update the JanitorAI API key
+          const newApiKey = await updateJanitorApiKey();
+          return NextResponse.json({ success: true, apiKey: newApiKey });
+          
+        case 'get-auth-status':
+          // Return authentication status
+          const currentAuthSettings = await getAuthSettings();
+          return NextResponse.json({
+            isAuthenticated: currentAuthSettings.isAuthenticated,
+            hasApiKey: !!currentAuthSettings.janitorApiKey
+          });
+          
+        default:
+          return NextResponse.json(
+            { error: 'Invalid action' },
+            { status: 400 }
+          );
+      }
+    }
+    
+    // Handle regular server settings update
     const currentSettings = await readServerSettings();
 
     // Merge with current settings

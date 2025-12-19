@@ -45,9 +45,12 @@ export default function LoginPage() {
     }
   };
 
+  const [redirectTriggered, setRedirectTriggered] = useState(false);
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
     setLoading(true);
 
     try {
@@ -65,19 +68,11 @@ export default function LoginPage() {
       const loginSuccess = await login(username, password);
       
       if (loginSuccess) {
-        // Show success message and redirect to dashboard after a brief delay
-        setError(''); // Clear any previous error
+        // Show success message and set redirect trigger
         setSuccess('Login successful! Redirecting...');
-        
-        // Redirect after a brief delay to show the success message
-        setTimeout(() => {
-          // Redirect to dashboard (or original callback URL if it's not the login page)
-          const targetUrl = callbackUrl && callbackUrl !== '/login' ? callbackUrl : '/';
-          router.push(targetUrl);
-        }, 1000); // 1 second delay to show success message
+        setRedirectTriggered(true);
       } else {
         setError(t.login.invalidCredentials);
-        setSuccess(''); // Clear any previous success message
       }
     } catch (err) {
       setError(t.login.authError);
@@ -86,6 +81,20 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+  
+  // Handle redirect after success message is shown
+  useEffect(() => {
+    if (success && redirectTriggered) {
+      const timer = setTimeout(() => {
+        // Redirect to dashboard (or original callback URL if it's not the login page)
+        const targetUrl = callbackUrl && callbackUrl !== '/login' ? callbackUrl : '/';
+        router.push(targetUrl);
+      }, 1000); // 1 second delay to show success message
+      
+      // Cleanup timer if component unmounts
+      return () => clearTimeout(timer);
+    }
+  }, [success, redirectTriggered, callbackUrl, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-900 p-4">

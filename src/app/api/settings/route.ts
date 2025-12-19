@@ -1,38 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
 import type { LoggingSettings } from '@/types';
 import { AuthSettings } from '@/types';
-import { setupAuth, updateJanitorApiKey, hashPassword, verifyPassword } from '@/lib/auth';
-
-// Server-side auth settings functions that work in API routes
-async function getAuthSettings(): Promise<AuthSettings> {
-  // For server-side execution, we'll use a file-based approach
-  // since Firebase can't be used server-side in this context
-  const authSettingsPath = path.join(process.cwd(), 'data', 'auth-settings.json');
-  
-  try {
-    const fileContent = await fs.readFile(authSettingsPath, 'utf-8');
-    return JSON.parse(fileContent);
-  } catch (error) {
-    // If file doesn't exist or there's an error, return default
-    return { isAuthenticated: false };
-  }
-}
-
-async function saveAuthSettings(settings: AuthSettings): Promise<void> {
-  // For server-side execution, save to file
-  const authSettingsPath = path.join(process.cwd(), 'data', 'auth-settings.json');
-  const dir = path.dirname(authSettingsPath);
-  
-  try {
-    await fs.access(dir);
-  } catch {
-    await fs.mkdir(dir, { recursive: true });
-  }
-  
-  await fs.writeFile(authSettingsPath, JSON.stringify(settings, null, 2), 'utf-8');
-}
+import { setupAuth, updateJanitorApiKey, getAuthSettings } from '@/lib/auth';
 
 // Function to sync auth settings to Firestore (client-side only)
 async function syncAuthSettingsToFirestore(settings: AuthSettings): Promise<void> {
@@ -41,7 +10,7 @@ async function syncAuthSettingsToFirestore(settings: AuthSettings): Promise<void
     try {
       const { doc, setDoc } = await import('firebase/firestore');
       const { db } = await import('@/lib/firebase-config');
-      
+
       await setDoc(doc(db, 'system', 'auth'), settings);
       console.log('Auth settings synced to Firestore successfully');
     } catch (error) {
@@ -51,7 +20,7 @@ async function syncAuthSettingsToFirestore(settings: AuthSettings): Promise<void
   }
 }
 
-const SETTINGS_FILE = path.join(process.cwd(), 'data', 'server-settings.json');
+const SETTINGS_FILE = 'data/server-settings.json';
 
 interface ServerSettings {
   logging: LoggingSettings;
@@ -73,31 +42,28 @@ const DEFAULT_SERVER_SETTINGS: ServerSettings = {
   },
 };
 
-async function ensureDataDirectory(): Promise<void> {
-  const dir = path.dirname(SETTINGS_FILE);
-  try {
-    await fs.access(dir);
-  } catch {
-    await fs.mkdir(dir, { recursive: true });
-  }
-}
+// For server settings storage, we'll use a simple in-memory approach with
+// periodic sync to Firestore when in client environment
+// This is a simplified approach for Edge Runtime compatibility
+let serverSettingsCache: ServerSettings | null = null;
 
 async function readServerSettings(): Promise<ServerSettings> {
-  try {
-    await ensureDataDirectory();
-    const content = await fs.readFile(SETTINGS_FILE, 'utf-8');
-    return { ...DEFAULT_SERVER_SETTINGS, ...JSON.parse(content) };
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return DEFAULT_SERVER_SETTINGS;
-    }
-    throw error;
+  // In Edge Runtime, we'll use a simple in-memory cache
+  // In a production environment, you might want to use a proper database
+  if (serverSettingsCache) {
+    return serverSettingsCache;
   }
+
+  // Return default settings if no cache exists
+  return DEFAULT_SERVER_SETTINGS;
 }
 
 async function writeServerSettings(settings: ServerSettings): Promise<void> {
-  await ensureDataDirectory();
-  await fs.writeFile(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf-8');
+  // Update the in-memory cache
+  serverSettingsCache = settings;
+
+  // In a production environment, you might want to persist this to a database
+  // For now, we'll just keep it in memory
 }
 
 // GET /api/settings - Get server settings
@@ -224,6 +190,5 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// Ensure this route runs in Node.js runtime, not edge runtime
-// because it uses file system operations
-export const runtime = 'nodejs';
+// This route can run in edge runtime since it no longer uses file system operations
+export const runtime = 'edge';

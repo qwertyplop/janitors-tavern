@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthSettings } from '@/lib/edge-auth';
+import { getAuthSettings } from '@/lib/auth';
 
 // GET /api/settings/auth - Get authentication settings
 export async function GET() {

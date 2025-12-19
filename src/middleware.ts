@@ -21,59 +21,55 @@ const protectedRoutes = [
   '/api/logs',
 ];
 
-// Define routes that should be protected (all web pages except public ones)
-const protectedPages = [
-  '/',           // Dashboard
-  '/connections', // Connections page
-  '/presets',    // Presets page
-  '/extensions', // Extensions page
-  '/settings',   // Settings page
-];
+// For web pages, we'll protect everything that's not explicitly public
+// This means any route that doesn't start with public routes and doesn't start with /api/ or other static files
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
   // Check if this is a protected route
-  const isProtectedRoute = protectedRoutes.some(route => 
+  const isProtectedRoute = protectedRoutes.some(route =>
     pathname.startsWith(route)
   );
   
   // Check if this is a public route
-  const isPublicRoute = publicRoutes.some(route => 
+  const isPublicRoute = publicRoutes.some(route =>
     pathname.startsWith(route)
   );
   
+  // Check if this is a web page (not an API route) that should be protected
+  const isWebPage = !pathname.startsWith('/api/') &&
+                   !pathname.startsWith('/_next/') &&
+                   !pathname.startsWith('/favicon.ico') &&
+                   !pathname.startsWith('/public/') &&
+                   !pathname.startsWith('/static/');
+  
+  // If it's a web page but not a public route, check authentication
+  if (isWebPage && !isPublicRoute) {
+    // Check authentication
+    const authenticated = await isAuthenticated(request);
+    
+    if (!authenticated) {
+      // Redirect to login page with callback URL
+      const callbackUrl = encodeURIComponent(request.nextUrl.pathname + request.nextUrl.search);
+      return NextResponse.redirect(new URL(`/login?callbackUrl=${callbackUrl}`, request.url));
+    }
+  }
+  
   // If it's a public route, allow access
   if (isPublicRoute) {
-    // Check if this is a protected page (web interface)
-    const isProtectedPage = protectedPages.some(page =>
-      pathname === page || pathname.startsWith(page + '/')
-    );
-    
-    // If it's a protected page but not authenticated, redirect to login
-    if (isProtectedPage) {
-      // Check authentication using the same logic as API routes
-      const authenticated = await isAuthenticated(request);
-      
-      if (!authenticated) {
-        // Redirect to login page with callback URL
-        const callbackUrl = encodeURIComponent(request.nextUrl.pathname + request.nextUrl.search);
-        return NextResponse.redirect(new URL(`/login?callbackUrl=${callbackUrl}`, request.url));
-      }
-    }
-    
     return NextResponse.next();
   }
   
-  // If it's a protected route, check authentication
+  // If it's a protected API route, check authentication
   if (isProtectedRoute) {
     const authenticated = await isAuthenticated(request);
     
     if (!authenticated) {
       return new NextResponse(
         JSON.stringify({ error: 'Unauthorized: API key required' }),
-        { 
-          status: 401, 
+        {
+          status: 401,
           headers: { 'Content-Type': 'application/json' }
         }
       );

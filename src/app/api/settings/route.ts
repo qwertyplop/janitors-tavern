@@ -1,48 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { LoggingSettings } from '@/types';
-import { AuthSettings } from '@/types';
-import { setupAuth, updateJanitorApiKey, getAuthSettings } from '@/lib/auth';
-
-// Function to sync auth settings to Firestore (client-side only)
-async function syncAuthSettingsToFirestore(settings: AuthSettings): Promise<void> {
-  // Only attempt to sync to Firestore if we're in a browser environment
-  if (typeof window !== 'undefined') {
-    try {
-      const { doc, setDoc } = await import('firebase/firestore');
-      const { db, isFirebaseAvailable } = await import('@/lib/firebase-config');
-
-      // Check if Firebase is available
-      if (!isFirebaseAvailable()) {
-        console.log('Firebase Firestore is not available, skipping sync');
-        return;
-      }
-
-      // Type assertion to ensure db is not null when Firebase is available
-      if (!db) {
-        throw new Error('Firebase Firestore is not initialized');
-      }
-
-      // Use type assertion to tell TypeScript that db is not null
-      await setDoc(doc(db as any, 'system', 'auth'), settings);
-      console.log('Auth settings synced to Firestore successfully');
-    } catch (error) {
-      console.error('Error syncing auth settings to Firestore:', error);
-      // Don't throw error as this is just a sync operation
-    }
-  }
-}
 
 const SETTINGS_FILE = 'data/server-settings.json';
 
 interface ServerSettings {
   logging: LoggingSettings;
-}
-
-interface AuthRequest {
-  action: 'setup' | 'update-api-key' | 'get-auth-status';
-  username?: string;
-  password?: string;
-  currentPassword?: string;
 }
 
 const DEFAULT_SERVER_SETTINGS: ServerSettings = {
@@ -90,103 +52,6 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-
-    // Check if this is an auth-related request
-    if (body.action) {
-      const authRequest = body as AuthRequest;
-
-      switch (authRequest.action) {
-        case 'setup':
-          // Setup authentication (one-time only)
-          if (!authRequest.username || !authRequest.password) {
-            return NextResponse.json(
-              { error: 'Username and password are required' },
-              { status: 400 }
-            );
-          }
-
-          try {
-            // In Edge Runtime, we'll use environment variables for auth
-            // The setupAuth function will throw an error in server-side environments
-            // So we'll handle this case specifically
-            if (typeof window === 'undefined') {
-              // In server-side environments, auth should be set up via environment variables
-              return NextResponse.json({
-                success: true,
-                message: 'Authentication should be configured via environment variables in server-side environments'
-              });
-            } else {
-              await setupAuth(authRequest.username, authRequest.password);
-
-              // Sync to Firestore if possible (client-side)
-              const newAuthSettings = await getAuthSettings();
-              await syncAuthSettingsToFirestore(newAuthSettings);
-
-              return NextResponse.json({ success: true, message: 'Authentication set up successfully' });
-            }
-          } catch (error) {
-            console.error('Error setting up auth:', error);
-            return NextResponse.json(
-              { error: `Failed to set up authentication: ${error instanceof Error ? error.message : 'Unknown error'}` },
-              { status: 500 }
-            );
-          }
-
-        case 'update-api-key':
-          // Update the JanitorAI API key
-          try {
-            // In Edge Runtime, we'll use environment variables for auth
-            if (typeof window === 'undefined') {
-              // In server-side environments, API key should be managed via environment variables
-              return NextResponse.json({
-                success: true,
-                message: 'API key should be configured via environment variables in server-side environments'
-              });
-            } else {
-              const newApiKey = await updateJanitorApiKey();
-
-              // Sync to Firestore if possible (client-side)
-              const newAuthSettings = await getAuthSettings();
-              await syncAuthSettingsToFirestore(newAuthSettings);
-
-              return NextResponse.json({ success: true, apiKey: newApiKey });
-            }
-          } catch (error) {
-            console.error('Error updating API key:', error);
-            return NextResponse.json(
-              { error: `Failed to update API key: ${error instanceof Error ? error.message : 'Unknown error'}` },
-              { status: 500 }
-            );
-          }
-
-        case 'get-auth-status':
-          // Return authentication status
-          try {
-            const currentAuthSettings = await getAuthSettings();
-
-            // Return the auth status
-            const authStatus = {
-              isAuthenticated: currentAuthSettings.isAuthenticated,
-              hasApiKey: !!currentAuthSettings.janitorApiKey,
-              janitorApiKey: currentAuthSettings.janitorApiKey
-            };
-
-            return NextResponse.json(authStatus);
-          } catch (error) {
-            console.error('Error getting auth status:', error);
-            return NextResponse.json(
-              { error: `Failed to get auth status: ${error instanceof Error ? error.message : 'Unknown error'}` },
-              { status: 500 }
-            );
-          }
-
-        default:
-          return NextResponse.json(
-            { error: 'Invalid action' },
-            { status: 400 }
-          );
-      }
-    }
 
     // Handle regular server settings update
     const currentSettings = await readServerSettings();

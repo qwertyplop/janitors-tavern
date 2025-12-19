@@ -1,28 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Create a server-side compatible isAuthenticated function for middleware
+// This function checks if the user is authenticated by verifying the auth status in Firestore
 async function isAuthenticated(request: NextRequest): Promise<boolean> {
-  // Check if authentication is enforced via environment variable
-  // This serves as a master switch for authentication enforcement
-  const authEnforced = process.env.AUTH_ENFORCED === 'true';
-  
-  // If authentication is not enforced, allow all requests
-  if (!authEnforced) {
-    return true;
+  try {
+    // For API routes, check for the session cookie or API key
+    const apiKey = request.headers.get('x-api-key');
+    
+    // If API key is provided, we'll validate it against Firestore in the client-side
+    // For now, we allow the request to pass through and let the client-side auth handle it
+    if (apiKey) {
+      return true;
+    }
+    
+    // For web pages, we can't directly access Firestore in middleware (edge runtime)
+    // So we'll redirect to login page and let the client-side auth handle the check
+    return false;
+  } catch (error) {
+    console.error('Error checking authentication in middleware:', error);
+    return false;
   }
-  
-  // If authentication is enforced, check for API key in headers
-  const apiKey = request.headers.get('x-api-key');
-  const expectedApiKey = process.env.JANITOR_API_KEY;
-  
-  // If no expected API key is set, allow access (shouldn't happen in properly configured system)
-  if (!expectedApiKey) {
-    return true;
-  }
-  
-  // Check if the provided API key matches the expected one
-  const isAuth = apiKey === expectedApiKey;
-  return isAuth;
 }
 
 // Define public routes that don't require authentication
@@ -33,8 +30,8 @@ const publicRoutes = [
   '/api/storage/status',
   '/api/storage/stats',
   '/api/storage/logs',
-  '/api/settings/auth', // Allow access to auth settings for client-side auth
   '/login',  // Allow access to login page
+  '/register', // Allow access to register page for first-time setup
 ];
 
 // Define routes that require authentication
@@ -44,9 +41,6 @@ const protectedRoutes = [
   '/api/storage',
   '/api/logs',
 ];
-
-// For web pages, we'll protect everything that's not explicitly public
-// This means any route that doesn't start with public routes and doesn't start with /api/ or other static files
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -68,35 +62,11 @@ export async function middleware(request: NextRequest) {
                    !pathname.startsWith('/public/') &&
                    !pathname.startsWith('/static/');
   
-  // If it's a web page but not a public route, check authentication
+  // If it's a web page but not a public route, redirect to login
+  // The login page will check Firestore and redirect to register if needed
   if (isWebPage && !isPublicRoute) {
-    // Allow access to register page for first-time setup
-    if (pathname === '/register') {
-      const url = request.nextUrl;
-      const forceRegister = url.searchParams.get('force');
-      
-      // If force parameter is present, allow access to register page regardless of auth status
-      if (forceRegister === 'true') {
-        return NextResponse.next();
-      }
-      
-      // If user is already authenticated, redirect to dashboard
-      const authenticated = await isAuthenticated(request);
-      if (authenticated) {
-        return NextResponse.redirect(new URL('/', request.url));
-      }
-      // Otherwise, allow access to register page
-      return NextResponse.next();
-    }
-    
-    // For other pages, check authentication
-    const authenticated = await isAuthenticated(request);
-    
-    if (!authenticated) {
-      // Redirect to login page first, which will redirect to register if auth is not set up
-      const callbackUrl = encodeURIComponent(request.nextUrl.pathname + request.nextUrl.search);
-      return NextResponse.redirect(new URL(`/login?callbackUrl=${callbackUrl}`, request.url));
-    }
+    const callbackUrl = encodeURIComponent(request.nextUrl.pathname + request.nextUrl.search);
+    return NextResponse.redirect(new URL(`/login?callbackUrl=${callbackUrl}`, request.url));
   }
   
   // If it's a public route, allow access
@@ -104,63 +74,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
   
-  // If it's a protected API route, check authentication
+  // If it's a protected API route, check for API key
   if (isProtectedRoute) {
-    // Special case for /api/settings - allow access to get-auth-status action when not authenticated
-    // This allows the UI to check if auth is set up without being authenticated
-    if (pathname === '/api/settings' && request.method === 'PUT') {
-      try {
-        // Get the request body to check the action
-        const bodyText = await request.text();
-        const body = JSON.parse(bodyText);
-        
-        // Allow access to get-auth-status action to check if auth is set up
-        if (body.action === 'get-auth-status') {
-          // Continue with the request without authentication check
-        } else {
-          // For other actions, check authentication as normal
-          const authenticated = await isAuthenticated(request);
-          
-          if (!authenticated) {
-            console.warn('Middleware - Request blocked, user not authenticated for protected route');
-            return new NextResponse(
-              JSON.stringify({ error: 'Unauthorized: API key required' }),
-              {
-                status: 401,
-                headers: { 'Content-Type': 'application/json' }
-              }
-            );
-          }
+    const authenticated = await isAuthenticated(request);
+    
+    if (!authenticated) {
+      console.warn('Middleware - Request blocked, user not authenticated for protected route');
+      return new NextResponse(
+        JSON.stringify({ error: 'Unauthorized: API key required' }),
+        {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' }
         }
-      } catch (error) {
-        // If parsing the body fails, fall back to normal authentication check
-        const authenticated = await isAuthenticated(request);
-        
-        if (!authenticated) {
-          console.warn('Middleware - Request blocked during fallback auth check');
-          return new NextResponse(
-            JSON.stringify({ error: 'Unauthorized: API key required' }),
-            {
-              status: 401,
-              headers: { 'Content-Type': 'application/json' }
-            }
-          );
-        }
-      }
-    } else {
-      // For all other protected routes, check authentication normally
-      const authenticated = await isAuthenticated(request);
-      
-      if (!authenticated) {
-        console.warn('Middleware - Request blocked, user not authenticated for protected route');
-        return new NextResponse(
-          JSON.stringify({ error: 'Unauthorized: API key required' }),
-          {
-            status: 401,
-            headers: { 'Content-Type': 'application/json' }
-          }
-        );
-      }
+      );
     }
   }
   

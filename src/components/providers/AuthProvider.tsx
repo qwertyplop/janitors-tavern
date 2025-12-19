@@ -2,9 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { AuthSettings } from '@/types';
-
-// Define auth-related types
+import { getAuthSettings, verifyPassword, hashPassword } from '@/lib/auth';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -26,56 +24,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuthStatus();
   }, []);
 
-  const getAuthSettings = async (): Promise<AuthSettings> => {
-    try {
-      const response = await fetch('/api/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get-auth-status' }),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch auth settings');
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching auth settings:', error);
-      return { isAuthenticated: false };
-    }
-  };
-
   const checkAuthStatus = async () => {
     try {
-      // Check if user is authenticated via localStorage
-      const authed = localStorage.getItem('jt.authenticated') === 'true';
-      const storedUsername = localStorage.getItem('jt.username');
+      // Get auth settings directly from Firestore
+      const authSettings = await getAuthSettings();
       
-      if (authed && storedUsername) {
-        // Verify that auth is actually set up in the system
-        const authSettings = await getAuthSettings();
-        if (authSettings.isAuthenticated && authSettings.username === storedUsername) {
-          setIsAuthenticated(true);
-          setUsername(storedUsername);
-        } else {
-          // Auth state is invalid, clear it
-          localStorage.removeItem('jt.authenticated');
-          localStorage.removeItem('jt.username');
-          setIsAuthenticated(false);
-          setUsername(null);
-        }
+      if (authSettings.isAuthenticated && authSettings.username) {
+        setIsAuthenticated(true);
+        setUsername(authSettings.username);
       } else {
-        // Check if auth is set up in the system but not in localStorage (edge case)
-        const authSettings = await getAuthSettings();
-        if (authSettings.isAuthenticated) {
-          // Auth is set up in the system but not in localStorage, this is an inconsistent state
-          // We should not set the user as authenticated without localStorage state
-          setIsAuthenticated(false);
-          setUsername(null);
-          console.log('Auth status: auth set up in system but not in localStorage');
-        } else {
-          setIsAuthenticated(false);
-          setUsername(null);
-          console.log('Auth status: not authenticated');
-        }
+        setIsAuthenticated(false);
+        setUsername(null);
       }
     } catch (error) {
       console.error('Error checking auth status:', error);
@@ -91,32 +50,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Get auth settings to verify credentials
       const authSettings = await getAuthSettings();
       
-      if (!authSettings.isAuthenticated) {
+      if (!authSettings.isAuthenticated || !authSettings.username || !authSettings.passwordHash) {
         return false;
       }
 
       // Verify the username matches
       if (username === authSettings.username) {
-        // Hash the provided password and compare with stored hash
-        const encoder = new TextEncoder();
-        const data = encoder.encode(password);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        const passwordHash = Array.from(new Uint8Array(hashBuffer))
-          .map(b => b.toString(16).padStart(2, '0'))
-          .join('');
+        // Verify the password against the stored hash
+        const isPasswordValid = await verifyPassword(password, authSettings.passwordHash);
         
-        // Compare the hashed password with the stored hash
-        if (passwordHash === authSettings.passwordHash) {
-          // Store authentication state
-          localStorage.setItem('jt.authenticated', 'true');
-          localStorage.setItem('jt.username', username);
-          
+        if (isPasswordValid) {
           setIsAuthenticated(true);
           setUsername(username);
-          
-          // Refresh auth status to ensure consistency
-          await checkAuthStatus();
-          
           return true;
         }
       }
@@ -129,15 +74,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    // Clear authentication state
-    localStorage.removeItem('jt.authenticated');
-    localStorage.removeItem('jt.username');
-    
     setIsAuthenticated(false);
     setUsername(null);
-    
-    // Refresh auth status to ensure consistency
-    await checkAuthStatus();
     
     // Redirect to login page
     router.push('/login');
@@ -152,11 +90,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     const currentPath = window.location.pathname;
     
-    // Don't redirect if we're already on the login page or accessing public resources
-    const isLoginPage = currentPath === '/login';
+    // Don't redirect if we're already on the login/register page or accessing public resources
+    const isAuthPage = currentPath === '/login' || currentPath === '/register';
     const isPublicPath = currentPath.startsWith('/api/') || currentPath.startsWith('/_next/');
     
-    if (!isLoginPage && !isPublicPath && !isAuthenticated) {
+    if (!isAuthPage && !isPublicPath && !isAuthenticated) {
       // Preserve the current URL as callback URL
       const callbackUrl = encodeURIComponent(currentPath + window.location.search);
       router.push(`/login?callbackUrl=${callbackUrl}`);

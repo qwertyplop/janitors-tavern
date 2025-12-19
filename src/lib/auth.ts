@@ -1,8 +1,5 @@
-// This file provides authentication functions that work in both client and server contexts
-// For client-side: Uses Firebase Firestore for storage
-// For server-side: Uses environment variables as fallback when Firebase is not available
-
-import { isFirebaseAvailable } from './firebase-config';
+// This file provides authentication functions that work exclusively with Firestore
+// All authentication data is stored in Firestore and accessed client-side only
 
 // Define auth-related types
 export interface AuthSettings {
@@ -13,28 +10,15 @@ export interface AuthSettings {
 }
 
 /**
- * Get auth settings
- * Client-side: Reads from Firestore
- * Server-side: Falls back to environment variables
+ * Get auth settings from Firestore
+ * This function only works in client-side environments
  */
 export async function getAuthSettings(): Promise<AuthSettings> {
-  // Check if we're in a server environment
+  // Ensure we're in a browser environment
   if (typeof window === 'undefined') {
-    // Server-side fallback using environment variables
-    const isAuthenticated = process.env.AUTH_IS_SETUP === 'true';
-    const username = process.env.AUTH_USERNAME;
-    const janitorApiKey = process.env.JANITOR_API_KEY;
-
-    return {
-      isAuthenticated,
-      username,
-      janitorApiKey,
-      // Note: In server-side fallback, we don't store password hashes
-      // Authentication is handled via API keys in this case
-    };
+    throw new Error('getAuthSettings can only be called in client-side environments');
   }
 
-  // Client-side: use Firestore
   try {
     // Import Firebase functions dynamically
     const { doc, getDoc } = await import('firebase/firestore');
@@ -42,10 +26,10 @@ export async function getAuthSettings(): Promise<AuthSettings> {
 
     // Check if Firebase is available
     if (!db) {
-      return { isAuthenticated: false };
+      throw new Error('Firebase Firestore is not initialized');
     }
 
-    const authDoc = await getDoc(doc(db as any, 'system', 'auth'));
+    const authDoc = await getDoc(doc(db, 'system', 'auth'));
 
     if (authDoc.exists()) {
       const data = authDoc.data();
@@ -68,14 +52,13 @@ export async function getAuthSettings(): Promise<AuthSettings> {
 }
 
 /**
- * Save auth settings
- * Client-side: Saves to Firestore
- * Server-side: Throws error (auth should be managed via environment variables)
+ * Save auth settings to Firestore
+ * This function only works in client-side environments
  */
 export async function saveAuthSettings(settings: AuthSettings): Promise<void> {
-  // In server-side environments, auth should be managed via environment variables
+  // Ensure we're in a browser environment
   if (typeof window === 'undefined') {
-    throw new Error('Cannot save auth settings in server-side environment. Use environment variables instead.');
+    throw new Error('saveAuthSettings can only be called in client-side environments');
   }
 
   try {
@@ -85,10 +68,10 @@ export async function saveAuthSettings(settings: AuthSettings): Promise<void> {
 
     // Check if Firebase is available
     if (!db) {
-      throw new Error('Firebase Firestore is not available');
+      throw new Error('Firebase Firestore is not initialized');
     }
 
-    await setDoc(doc(db as any, 'system', 'auth'), settings);
+    await setDoc(doc(db, 'system', 'auth'), settings);
   } catch (error) {
     console.error('Error saving auth settings to Firestore:', error);
     throw error; // Re-throw the error to be handled by the caller
@@ -119,13 +102,12 @@ export function generateApiKey(): string {
 
 /**
  * Initialize auth settings if they don't exist
- * Client-side: Creates initial Firestore document
- * Server-side: No-op (auth should be managed via environment variables)
+ * Creates initial Firestore document with default values
  */
 export async function initializeAuthSettings(): Promise<void> {
-  // In server-side environments, auth should be managed via environment variables
+  // Ensure we're in a browser environment
   if (typeof window === 'undefined') {
-    return; // No-op for server-side
+    throw new Error('initializeAuthSettings can only be called in client-side environments');
   }
 
   const authSettings = await getAuthSettings();
@@ -143,10 +125,10 @@ export async function initializeAuthSettings(): Promise<void> {
 
       // Check if Firebase is available
       if (!db) {
-        throw new Error('Firebase Firestore is not available');
+        throw new Error('Firebase Firestore is not initialized');
       }
 
-      await setDoc(doc(db as any, 'system', 'auth'), settingsToSave);
+      await setDoc(doc(db, 'system', 'auth'), settingsToSave);
     } catch (error) {
       console.error('Error initializing auth settings in Firestore:', error);
       throw error; // Re-throw the error to be handled by the caller
@@ -156,13 +138,12 @@ export async function initializeAuthSettings(): Promise<void> {
 
 /**
  * Set up authentication with username and password
- * Client-side: Creates auth document in Firestore
- * Server-side: Throws error (auth should be managed via environment variables)
+ * Creates auth document in Firestore
  */
 export async function setupAuth(username: string, password: string): Promise<void> {
-  // In server-side environments, auth should be managed via environment variables
+  // Ensure we're in a browser environment
   if (typeof window === 'undefined') {
-    throw new Error('Cannot set up authentication in server-side environment. Use environment variables instead.');
+    throw new Error('setupAuth can only be called in client-side environments');
   }
 
   const passwordHash = await hashPassword(password);
@@ -181,10 +162,10 @@ export async function setupAuth(username: string, password: string): Promise<voi
 
     // Check if Firebase is available
     if (!db) {
-      throw new Error('Firebase Firestore is not available');
+      throw new Error('Firebase Firestore is not initialized');
     }
 
-    await setDoc(doc(db as any, 'system', 'auth'), authSettings);
+    await setDoc(doc(db, 'system', 'auth'), authSettings);
   } catch (error) {
     console.error('Error saving auth settings to Firestore:', error);
     throw error; // Re-throw the error to be handled by the caller
@@ -193,13 +174,12 @@ export async function setupAuth(username: string, password: string): Promise<voi
 
 /**
  * Update the JanitorAI API key
- * Client-side: Updates Firestore document
- * Server-side: Throws error (auth should be managed via environment variables)
+ * Updates Firestore document with new API key
  */
 export async function updateJanitorApiKey(): Promise<string> {
-  // In server-side environments, auth should be managed via environment variables
+  // Ensure we're in a browser environment
   if (typeof window === 'undefined') {
-    throw new Error('Cannot update API key in server-side environment. Use environment variables instead.');
+    throw new Error('updateJanitorApiKey can only be called in client-side environments');
   }
 
   const authSettings = await getAuthSettings();
@@ -217,10 +197,10 @@ export async function updateJanitorApiKey(): Promise<string> {
 
     // Check if Firebase is available
     if (!db) {
-      throw new Error('Firebase Firestore is not available');
+      throw new Error('Firebase Firestore is not initialized');
     }
 
-    await setDoc(doc(db as any, 'system', 'auth'), updatedSettings);
+    await setDoc(doc(db, 'system', 'auth'), updatedSettings);
   } catch (error) {
     console.error('Error saving auth settings to Firestore:', error);
     throw error; // Re-throw the error to be handled by the caller
@@ -231,13 +211,12 @@ export async function updateJanitorApiKey(): Promise<string> {
 
 /**
  * Clear authentication
- * Client-side: Clears Firestore document
- * Server-side: Throws error (auth should be managed via environment variables)
+ * Clears Firestore document
  */
 export async function clearAuth(): Promise<void> {
-  // In server-side environments, auth should be managed via environment variables
+  // Ensure we're in a browser environment
   if (typeof window === 'undefined') {
-    throw new Error('Cannot clear authentication in server-side environment. Use environment variables instead.');
+    throw new Error('clearAuth can only be called in client-side environments');
   }
 
   // Clearing authentication settings
@@ -250,10 +229,10 @@ export async function clearAuth(): Promise<void> {
 
     // Check if Firebase is available
     if (!db) {
-      throw new Error('Firebase Firestore is not available');
+      throw new Error('Firebase Firestore is not initialized');
     }
 
-    await setDoc(doc(db as any, 'system', 'auth'), settingsToSave);
+    await setDoc(doc(db, 'system', 'auth'), settingsToSave);
   } catch (error) {
     console.error('Error clearing auth settings in Firestore:', error);
     throw error; // Re-throw the error to be handled by the caller

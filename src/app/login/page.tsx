@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AuthSettings } from '@/types';
+import { getAuthSettings } from '@/lib/auth';
 import { useI18n } from '@/components/providers/I18nProvider';
 import { useAuth } from '@/components/providers/AuthProvider';
 
@@ -19,12 +19,10 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useI18n();
-  const { login } = useAuth();
+  const { login, isAuthenticated, loading: authLoading } = useAuth();
   
   const callbackUrl = searchParams.get('callbackUrl') || '/';
 
-  const { isAuthenticated, loading: authLoading } = useAuth();
-  
   // Check if already authenticated
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -37,32 +35,20 @@ export default function LoginPage() {
     const checkAuthSetup = async () => {
       if (authLoading) return; // Wait for auth loading to complete
       
-      const authSettings = await getAuthSettings();
-      if (!authSettings.isAuthenticated && !isAuthenticated) {
-        // Auth is not set up in Firestore, redirect to register
-        router.push('/register');
+      try {
+        const authSettings = await getAuthSettings();
+        if (!authSettings.isAuthenticated && !isAuthenticated) {
+          // Auth is not set up in Firestore, redirect to register
+          router.push('/register');
+        }
+      } catch (error) {
+        console.error('Error checking auth setup:', error);
+        setError(t.login.authError || 'Authentication error occurred');
       }
     };
     
     checkAuthSetup();
-  }, [authLoading, isAuthenticated, router]);
-
-  const getAuthSettings = async (): Promise<AuthSettings> => {
-    try {
-      const response = await fetch('/api/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get-auth-status' }),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch auth settings');
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching auth settings:', error);
-      return { isAuthenticated: false };
-    }
-  };
+  }, [authLoading, isAuthenticated, router, t.login.authError]);
 
   const [redirectTriggered, setRedirectTriggered] = useState(false);
   
@@ -73,17 +59,8 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // Get stored auth settings to check if auth is set up
-      const authSettings = await getAuthSettings();
-      
-      if (!authSettings.isAuthenticated) {
-        // If auth is not set up, redirect to register page
-        router.push('/register');
-        return;
-      }
-
       // Use the auth context to handle login
-      // The login function in the context will verify credentials against stored auth settings
+      // The login function in the context will verify credentials against Firestore
       const loginSuccess = await login(username, password);
       
       if (loginSuccess) {
@@ -91,10 +68,10 @@ export default function LoginPage() {
         setSuccess('Login successful! Redirecting...');
         setRedirectTriggered(true);
       } else {
-        setError(t.login.invalidCredentials);
+        setError(t.login.invalidCredentials || 'Invalid username or password');
       }
     } catch (err) {
-      setError(t.login.authError);
+      setError(t.login.authError || 'Authentication failed');
       console.error('Login error:', err);
     } finally {
       setLoading(false);

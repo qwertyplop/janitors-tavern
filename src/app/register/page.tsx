@@ -7,25 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useI18n } from '@/components/providers/I18nProvider';
-import { AuthSettings } from '@/types';
-
-// Create a function to get auth settings from the API
-const getAuthSettings = async (): Promise<AuthSettings> => {
-  try {
-    const response = await fetch('/api/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'get-auth-status' }),
-    });
-    if (!response.ok) {
-      throw new Error('Failed to fetch auth settings');
-    }
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching auth settings:', error);
-    return { isAuthenticated: false };
-  }
-};
+import { getAuthSettings, setupAuth } from '@/lib/auth';
 
 export default function RegisterPage() {
   const [username, setUsername] = useState('');
@@ -49,7 +31,7 @@ export default function RegisterPage() {
           return;
         }
         
-        // Use the same auth settings function as other pages
+        // Check if auth is already set up in Firestore
         const authSettings = await getAuthSettings();
         if (authSettings.isAuthenticated) {
           // If auth is already set up, redirect to login
@@ -57,11 +39,12 @@ export default function RegisterPage() {
         }
       } catch (err) {
         console.error('Error checking auth status:', err);
+        setError(t.login.authError || 'Error checking authentication status');
       }
     };
 
     checkAuthStatus();
-  }, [router]);
+  }, [router, t.login.authError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,29 +66,15 @@ export default function RegisterPage() {
     }
 
     try {
-      // Set up authentication
-      const response = await fetch('/api/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'setup',
-          username,
-          password
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setSuccess('Authentication set up successfully! Redirecting to login...');
-        
-        // Redirect to login after a brief delay
-        setTimeout(() => {
-          router.push('/login');
-        }, 2000);
-      } else {
-        setError(data.error || 'Failed to set up authentication');
-      }
+      // Set up authentication directly in Firestore
+      await setupAuth(username, password);
+      
+      setSuccess('Authentication set up successfully! Redirecting to login...');
+      
+      // Redirect to login after a brief delay
+      setTimeout(() => {
+        router.push('/login');
+      }, 2000);
     } catch (err) {
       setError(t.login.authError || 'Authentication setup failed');
       console.error('Registration error:', err);

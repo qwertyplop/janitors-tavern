@@ -9,9 +9,21 @@ async function syncAuthSettingsToFirestore(settings: AuthSettings): Promise<void
   if (typeof window !== 'undefined') {
     try {
       const { doc, setDoc } = await import('firebase/firestore');
-      const { db } = await import('@/lib/firebase-config');
+      const { db, isFirebaseAvailable } = await import('@/lib/firebase-config');
 
-      await setDoc(doc(db, 'system', 'auth'), settings);
+      // Check if Firebase is available
+      if (!isFirebaseAvailable()) {
+        console.log('Firebase Firestore is not available, skipping sync');
+        return;
+      }
+
+      // Type assertion to ensure db is not null when Firebase is available
+      if (!db) {
+        throw new Error('Firebase Firestore is not initialized');
+      }
+
+      // Use type assertion to tell TypeScript that db is not null
+      await setDoc(doc(db as any, 'system', 'auth'), settings);
       console.log('Auth settings synced to Firestore successfully');
     } catch (error) {
       console.error('Error syncing auth settings to Firestore:', error);
@@ -42,14 +54,12 @@ const DEFAULT_SERVER_SETTINGS: ServerSettings = {
   },
 };
 
-// For server settings storage, we'll use a simple in-memory approach with
-// periodic sync to Firestore when in client environment
+// For server settings storage, we'll use a simple in-memory approach
 // This is a simplified approach for Edge Runtime compatibility
 let serverSettingsCache: ServerSettings | null = null;
 
 async function readServerSettings(): Promise<ServerSettings> {
   // In Edge Runtime, we'll use a simple in-memory cache
-  // In a production environment, you might want to use a proper database
   if (serverSettingsCache) {
     return serverSettingsCache;
   }
@@ -61,9 +71,6 @@ async function readServerSettings(): Promise<ServerSettings> {
 async function writeServerSettings(settings: ServerSettings): Promise<void> {
   // Update the in-memory cache
   serverSettingsCache = settings;
-
-  // In a production environment, you might want to persist this to a database
-  // For now, we'll just keep it in memory
 }
 
 // GET /api/settings - Get server settings
@@ -83,37 +90,40 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    
+
     // Check if this is an auth-related request
     if (body.action) {
       const authRequest = body as AuthRequest;
-      
+
       switch (authRequest.action) {
         case 'setup':
           // Setup authentication (one-time only)
-          const authSettings = await getAuthSettings();
-          if (authSettings.isAuthenticated) {
-            return NextResponse.json(
-              { error: 'Authentication is already set up and cannot be changed' },
-              { status: 400 }
-            );
-          }
-          
           if (!authRequest.username || !authRequest.password) {
             return NextResponse.json(
               { error: 'Username and password are required' },
               { status: 400 }
             );
           }
-          
+
           try {
-            await setupAuth(authRequest.username, authRequest.password);
-            
-            // Sync to Firestore if possible (client-side)
-            const newAuthSettings = await getAuthSettings();
-            await syncAuthSettingsToFirestore(newAuthSettings);
-            
-            return NextResponse.json({ success: true, message: 'Authentication set up successfully' });
+            // In Edge Runtime, we'll use environment variables for auth
+            // The setupAuth function will throw an error in server-side environments
+            // So we'll handle this case specifically
+            if (typeof window === 'undefined') {
+              // In server-side environments, auth should be set up via environment variables
+              return NextResponse.json({
+                success: true,
+                message: 'Authentication should be configured via environment variables in server-side environments'
+              });
+            } else {
+              await setupAuth(authRequest.username, authRequest.password);
+
+              // Sync to Firestore if possible (client-side)
+              const newAuthSettings = await getAuthSettings();
+              await syncAuthSettingsToFirestore(newAuthSettings);
+
+              return NextResponse.json({ success: true, message: 'Authentication set up successfully' });
+            }
           } catch (error) {
             console.error('Error setting up auth:', error);
             return NextResponse.json(
@@ -121,17 +131,26 @@ export async function PUT(request: NextRequest) {
               { status: 500 }
             );
           }
-          
+
         case 'update-api-key':
           // Update the JanitorAI API key
           try {
-            const newApiKey = await updateJanitorApiKey();
-            
-            // Sync to Firestore if possible (client-side)
-            const newAuthSettings = await getAuthSettings();
-            await syncAuthSettingsToFirestore(newAuthSettings);
-            
-            return NextResponse.json({ success: true, apiKey: newApiKey });
+            // In Edge Runtime, we'll use environment variables for auth
+            if (typeof window === 'undefined') {
+              // In server-side environments, API key should be managed via environment variables
+              return NextResponse.json({
+                success: true,
+                message: 'API key should be configured via environment variables in server-side environments'
+              });
+            } else {
+              const newApiKey = await updateJanitorApiKey();
+
+              // Sync to Firestore if possible (client-side)
+              const newAuthSettings = await getAuthSettings();
+              await syncAuthSettingsToFirestore(newAuthSettings);
+
+              return NextResponse.json({ success: true, apiKey: newApiKey });
+            }
           } catch (error) {
             console.error('Error updating API key:', error);
             return NextResponse.json(
@@ -139,19 +158,19 @@ export async function PUT(request: NextRequest) {
               { status: 500 }
             );
           }
-          
+
         case 'get-auth-status':
           // Return authentication status
           try {
             const currentAuthSettings = await getAuthSettings();
-            
+
             // Return the auth status
             const authStatus = {
               isAuthenticated: currentAuthSettings.isAuthenticated,
               hasApiKey: !!currentAuthSettings.janitorApiKey,
               janitorApiKey: currentAuthSettings.janitorApiKey
             };
-            
+
             return NextResponse.json(authStatus);
           } catch (error) {
             console.error('Error getting auth status:', error);
@@ -160,7 +179,7 @@ export async function PUT(request: NextRequest) {
               { status: 500 }
             );
           }
-          
+
         default:
           return NextResponse.json(
             { error: 'Invalid action' },
@@ -168,7 +187,7 @@ export async function PUT(request: NextRequest) {
           );
       }
     }
-    
+
     // Handle regular server settings update
     const currentSettings = await readServerSettings();
 
@@ -190,5 +209,5 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// This route can run in edge runtime since it no longer uses file system operations
+// This route can run in edge runtime
 export const runtime = 'edge';

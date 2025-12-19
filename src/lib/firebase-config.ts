@@ -3,6 +3,7 @@
 // ============================================
 // Firebase configuration for the application
 // This file contains the Firebase configuration and initialization
+// Note: Firebase is only initialized in client-side environments
 
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, Firestore } from 'firebase/firestore';
@@ -30,21 +31,28 @@ const firebaseConfig: FirebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase only if not already initialized
+// Initialize Firebase only in client-side environments
 let app;
-let firestoreInstance: Firestore;
-let authInstance: Auth;
+let firestoreInstance: Firestore | null = null;
+let authInstance: Auth | null = null;
 
-if (getApps().length === 0) {
+if (typeof window !== 'undefined' && getApps().length === 0) {
   app = initializeApp(firebaseConfig);
   firestoreInstance = getFirestore(app);
   authInstance = getAuth(app);
-} else {
-  // If already initialized, get the existing instances
+} else if (typeof window !== 'undefined') {
+  // If already initialized in client-side, get the existing instances
   app = getApps()[0];
   firestoreInstance = getFirestore(app);
   authInstance = getAuth(app);
 }
 
-export { firestoreInstance as db, authInstance as auth };
+// Export Firebase instances (will be null in server-side environments)
+export const db = firestoreInstance;
+export const auth = authInstance;
 export type { FirebaseConfig };
+
+// Helper function to check if Firebase is available
+export function isFirebaseAvailable(): boolean {
+  return typeof window !== 'undefined' && db !== null;
+}

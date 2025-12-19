@@ -5,6 +5,9 @@ import { getAuthSettings } from '@/lib/auth';
 export async function GET() {
   try {
     const authSettings = await getAuthSettings();
+
+    // In server-side environments, we might get auth settings from environment variables
+    // Return them in the same format as Firestore data
     return NextResponse.json(authSettings);
   } catch (error) {
     console.error('Error getting auth settings:', error);
@@ -15,5 +18,5 @@ export async function GET() {
   }
 }
 
-// This route can run in edge runtime since it only uses environment variables
+// This route can run in edge runtime
 export const runtime = 'edge';

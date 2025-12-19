@@ -16,6 +16,9 @@ import {
   getDoc,
   setDoc,
   writeBatch,
+  collection,
+  getDocs,
+  deleteDoc,
 } from 'firebase/firestore';
 
 // ============================================
@@ -121,6 +124,11 @@ export class FirebaseStorageProvider implements StorageProvider {
     return `users/${this.userId}/storage/${key}`;
   }
 
+  private getFirestoreCollectionPath(key: StorageKey): string {
+    // For large arrays like presets, use a subcollection
+    return `users/${this.userId}/storage/${key}/items`;
+  }
+
   async get<K extends StorageKey>(key: K): Promise<StorageData[K]> {
     // Check cache first
     const cached = this.getCached<K>(key);
@@ -130,24 +138,43 @@ export class FirebaseStorageProvider implements StorageProvider {
     }
 
     try {
-      const docPath = this.getFirestoreDocPath(key);
-      const docRef = doc(db, docPath);
-      const docSnap = await getDoc(docRef);
-
-      let data: StorageData[K];
-      if (docSnap.exists()) {
-        const docData = docSnap.data();
-        data = docData[key] as StorageData[K];
-        console.log(`[FirebaseStorage] Retrieved ${key} from Firestore, count: ${Array.isArray(data) ? data.length : 'N/A'}`);
+      // For large arrays (connections, presets, regexScripts), use subcollections
+      if (key === 'connections' || key === 'presets' || key === 'regexScripts') {
+        const collectionPath = this.getFirestoreCollectionPath(key);
+        const querySnapshot = await getDocs(collection(db, collectionPath));
+        
+        const items: any[] = [];
+        querySnapshot.forEach((doc) => {
+          items.push({ id: doc.id, ...doc.data() });
+        });
+        
+        console.log(`[FirebaseStorage] Retrieved ${key} from Firestore collection, count: ${items.length}`);
+        const data = items as StorageData[K];
+        
+        // Cache the result
+        this.setCached<K>(key, data);
+        return data;
       } else {
-        // Return default value if document doesn't exist
-        data = DEFAULT_STORAGE_DATA[key];
-        console.log(`[FirebaseStorage] Document for ${key} not found, returning default`);
-      }
+        // For smaller data, use the original document approach
+        const docPath = this.getFirestoreDocPath(key);
+        const docRef = doc(db, docPath);
+        const docSnap = await getDoc(docRef);
 
-      // Cache the result
-      this.setCached<K>(key, data);
-      return data;
+        let data: StorageData[K];
+        if (docSnap.exists()) {
+          const docData = docSnap.data();
+          data = docData[key] as StorageData[K];
+          console.log(`[FirebaseStorage] Retrieved ${key} from Firestore, count: ${Array.isArray(data) ? data.length : 'N/A'}`);
+        } else {
+          // Return default value if document doesn't exist
+          data = DEFAULT_STORAGE_DATA[key];
+          console.log(`[FirebaseStorage] Document for ${key} not found, returning default`);
+        }
+
+        // Cache the result
+        this.setCached<K>(key, data);
+        return data;
+      }
     } catch (error) {
       console.error(`[FirebaseStorage] Error fetching ${key} from Firestore:`, error);
       return DEFAULT_STORAGE_DATA[key];
@@ -156,11 +183,33 @@ export class FirebaseStorageProvider implements StorageProvider {
 
   async set<K extends StorageKey>(key: K, value: StorageData[K]): Promise<void> {
     try {
-      const docPath = this.getFirestoreDocPath(key);
-      const docRef = doc(db, docPath);
-      
-      // Update only the specific key field in the document
-      await setDoc(docRef, { [key]: value }, { merge: true });
+      // For large arrays (connections, presets, regexScripts), use subcollections
+      if (key === 'connections' || key === 'presets' || key === 'regexScripts') {
+        const collectionPath = this.getFirestoreCollectionPath(key);
+        
+        // First, clear the existing collection
+        const existingDocs = await getDocs(collection(db, collectionPath));
+        const deletePromises = existingDocs.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(deletePromises);
+        
+        // Then add the new items
+        if (Array.isArray(value)) {
+          const addPromises = value.map(async (item: any) => {
+            // Use the item's id if it exists, otherwise generate a new one
+            const id = item.id || this.generateId();
+            const docRef = doc(db, collectionPath, id);
+            return setDoc(docRef, { ...item, id });
+          });
+          await Promise.all(addPromises);
+        }
+      } else {
+        // For smaller data, use the original document approach
+        const docPath = this.getFirestoreDocPath(key);
+        const docRef = doc(db, docPath);
+        
+        // Update only the specific key field in the document
+        await setDoc(docRef, { [key]: value }, { merge: true });
+      }
       
       // Update cache
       this.setCached<K>(key, value);
@@ -190,20 +239,37 @@ export class FirebaseStorageProvider implements StorageProvider {
 
   async setAll(data: StorageData): Promise<void> {
     try {
-      // Use a batch write to update all storage keys in a single operation
-      const batch = writeBatch(db);
-      
       const keys: StorageKey[] = ['connections', 'presets', 'settings', 'regexScripts'];
+      
+      // Handle large arrays separately using subcollections
+      const largeArrayPromises = [];
+      const smallDataUpdates = [];
       
       for (const key of keys) {
         if (data[key] !== undefined) {
-          const docPath = this.getFirestoreDocPath(key);
-          const docRef = doc(db, docPath);
-          batch.set(docRef, { [key]: data[key] }, { merge: true });
+          if (key === 'connections' || key === 'presets' || key === 'regexScripts') {
+            // Handle large arrays with subcollections
+            largeArrayPromises.push(this.set(key, data[key]));
+          } else {
+            // Handle smaller data with batch
+            smallDataUpdates.push({ key, value: data[key] });
+          }
         }
       }
       
-      await batch.commit();
+      // Process smaller data with batch
+      if (smallDataUpdates.length > 0) {
+        const batch = writeBatch(db);
+        for (const update of smallDataUpdates) {
+          const docPath = this.getFirestoreDocPath(update.key);
+          const docRef = doc(db, docPath);
+          batch.set(docRef, { [update.key]: update.value }, { merge: true });
+        }
+        await batch.commit();
+      }
+      
+      // Process large arrays (this will handle subcollections)
+      await Promise.all(largeArrayPromises);
       
       // Update cache
       Object.assign(this.cache, data);
@@ -217,6 +283,11 @@ export class FirebaseStorageProvider implements StorageProvider {
       console.error('[FirebaseStorage] Error saving all data to Firestore:', error);
       throw error;
     }
+  }
+
+  private generateId(): string {
+    // Generate a unique ID using timestamp and random number
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
   }
 
   async isAvailable(): Promise<boolean> {

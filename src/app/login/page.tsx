@@ -14,6 +14,7 @@ export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -66,11 +67,17 @@ export default function LoginPage() {
       if (loginSuccess) {
         // Show success message and redirect to dashboard after a brief delay
         setError(''); // Clear any previous error
-        // Redirect to dashboard (or original callback URL if it's not the login page)
-        const targetUrl = callbackUrl && callbackUrl !== '/login' ? callbackUrl : '/';
-        router.push(targetUrl);
+        setSuccess('Login successful! Redirecting...');
+        
+        // Redirect after a brief delay to show the success message
+        setTimeout(() => {
+          // Redirect to dashboard (or original callback URL if it's not the login page)
+          const targetUrl = callbackUrl && callbackUrl !== '/login' ? callbackUrl : '/';
+          router.push(targetUrl);
+        }, 1000); // 1 second delay to show success message
       } else {
         setError(t.login.invalidCredentials);
+        setSuccess(''); // Clear any previous success message
       }
     } catch (err) {
       setError(t.login.authError);
@@ -125,9 +132,15 @@ export default function LoginPage() {
               </div>
             )}
             
-            <Button 
-              type="submit" 
-              className="w-full" 
+            {success && (
+              <div className="p-3 rounded-md bg-green-50 text-green-800 dark:bg-green-900/30 dark:text-green-400 text-sm">
+                {success}
+              </div>
+            )}
+            
+            <Button
+              type="submit"
+              className="w-full"
               disabled={loading}
             >
               {loading ? t.login.loggingIn : t.login.signIn}

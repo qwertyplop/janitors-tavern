@@ -21,7 +21,8 @@ export default function LoginPage() {
   const { t } = useI18n();
   const { login, isAuthenticated, loading: authLoading } = useAuth();
   
-  const callbackUrl = searchParams.get('callbackUrl') || '/';
+  const encodedCallbackUrl = searchParams.get('callbackUrl') || '/';
+  const callbackUrl = decodeURIComponent(encodedCallbackUrl);
 
   // Check if already authenticated (only on initial load, not during login flow)
   useEffect(() => {

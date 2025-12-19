@@ -87,9 +87,7 @@ export default function SettingsPage() {
       });
       
       if (response.ok) {
-        const data = await response.json();
-        console.log('Auth status fetched:', data);
-        setAuthStatus(data);
+        setAuthStatus(await response.json());
       } else {
         console.error('Failed to fetch auth status:', response.status, response.statusText);
       }

@@ -57,9 +57,7 @@ export default function LoginPage() {
       if (!response.ok) {
         throw new Error('Failed to fetch auth settings');
       }
-      const settings = await response.json();
-      console.log('Login page - Auth settings fetched:', settings);
-      return settings;
+      return await response.json();
     } catch (error) {
       console.error('Error fetching auth settings:', error);
       return { isAuthenticated: false };
@@ -78,10 +76,8 @@ export default function LoginPage() {
       // Get stored auth settings to check if auth is set up
       const authSettings = await getAuthSettings();
       
-      console.log('Login - Auth settings check:', authSettings);
       if (!authSettings.isAuthenticated) {
         // If auth is not set up, redirect to register page
-        console.log('Login - Auth not set up, redirecting to register');
         router.push('/register');
         return;
       }

@@ -51,10 +51,8 @@ export default function RegisterPage() {
         
         // Use the same auth settings function as other pages
         const authSettings = await getAuthSettings();
-        console.log('Register - Auth status check:', authSettings);
         if (authSettings.isAuthenticated) {
           // If auth is already set up, redirect to login
-          console.log('Register - Auth already set up, redirecting to login');
           router.push('/login');
         }
       } catch (err) {
@@ -99,7 +97,6 @@ export default function RegisterPage() {
       const data = await response.json();
 
       if (response.ok) {
-        console.log('Registration successful, redirecting to login...');
         setSuccess('Authentication set up successfully! Redirecting to login...');
         
         // Redirect to login after a brief delay
@@ -107,7 +104,6 @@ export default function RegisterPage() {
           router.push('/login');
         }, 2000);
       } else {
-        console.error('Registration failed:', data.error);
         setError(data.error || 'Failed to set up authentication');
       }
     } catch (err) {

@@ -37,11 +37,9 @@ export async function getAuthSettings(): Promise<AuthSettings> {
           passwordHash: data.passwordHash,
           janitorApiKey: data.janitorApiKey
         };
-        console.log('Auth settings retrieved from Firestore');
         return authSettings;
       } else {
         // If no auth document exists, return default
-        console.log('No auth settings found in Firestore, returning default');
         return { isAuthenticated: false };
       }
     } catch (error) {
@@ -61,7 +59,6 @@ export async function getAuthSettings(): Promise<AuthSettings> {
       return JSON.parse(fileContent);
     } catch (error) {
       // If file doesn't exist or there's an error, return default
-      console.log('Server-side execution - returning default auth settings');
       return { isAuthenticated: false };
     }
   }
@@ -77,7 +74,6 @@ export async function saveAuthSettings(settings: AuthSettings): Promise<void> {
       const { db } = await import('./firebase-config');
       
       await setDoc(doc(db, 'system', 'auth'), settings);
-      console.log('Auth settings saved to Firestore successfully');
     } catch (error) {
       console.error('Error saving auth settings to Firestore:', error);
       throw error; // Re-throw the error to be handled by the caller
@@ -97,7 +93,6 @@ export async function saveAuthSettings(settings: AuthSettings): Promise<void> {
     }
     
     await fs.writeFile(authSettingsPath, JSON.stringify(settings, null, 2), 'utf-8');
-    console.log('Auth settings saved to file system successfully');
   }
 }
 
@@ -107,35 +102,27 @@ export async function hashPassword(password: string): Promise<string> {
   const data = encoder.encode(password);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  console.log('Password hashed successfully');
-  return hash;
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 // Verify password against hash
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   const passwordHash = await hashPassword(password);
-  const isValid = passwordHash === hash;
-  console.log('Password verification result:', isValid);
-  return isValid;
+  return passwordHash === hash;
 }
 
 // Generate a random API key
 export function generateApiKey(): string {
   const array = new Uint8Array(32);
   crypto.getRandomValues(array);
-  const apiKey = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
-  console.log('New API key generated');
-  return apiKey;
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 // Initialize auth settings if they don't exist
 export async function initializeAuthSettings(): Promise<void> {
   const authSettings = await getAuthSettings();
-  console.log('Initializing auth settings, current settings:', authSettings);
   if (!authSettings.isAuthenticated) {
     // Set default auth settings
-    console.log('No auth settings found, initializing with defaults');
     
     const settingsToSave: AuthSettings = {
       isAuthenticated: false,
@@ -151,7 +138,6 @@ export async function initializeAuthSettings(): Promise<void> {
         const { db } = await import('./firebase-config');
         
         await setDoc(doc(db, 'system', 'auth'), settingsToSave);
-        console.log('Auth settings initialized in Firestore successfully');
       } catch (error) {
         console.error('Error initializing auth settings in Firestore:', error);
         throw error; // Re-throw the error to be handled by the caller
@@ -171,10 +157,7 @@ export async function initializeAuthSettings(): Promise<void> {
       }
       
       await fs.writeFile(authSettingsPath, JSON.stringify(settingsToSave, null, 2), 'utf-8');
-      console.log('Auth settings initialized in file system successfully');
     }
-  } else {
-    console.log('Auth settings already exist, skipping initialization');
   }
 }
 
@@ -189,8 +172,6 @@ export async function setupAuth(username: string, password: string): Promise<voi
     janitorApiKey: apiKey
   };
   
-  console.log('Setting up authentication for user:', username);
-  
   // Check if we're in a browser environment (client-side)
   if (typeof window !== 'undefined') {
     // In browser, save to Firestore
@@ -200,7 +181,6 @@ export async function setupAuth(username: string, password: string): Promise<voi
       const { db } = await import('./firebase-config');
       
       await setDoc(doc(db, 'system', 'auth'), authSettings);
-      console.log('Auth settings saved to Firestore successfully');
     } catch (error) {
       console.error('Error saving auth settings to Firestore:', error);
       throw error; // Re-throw the error to be handled by the caller
@@ -221,16 +201,12 @@ export async function setupAuth(username: string, password: string): Promise<voi
     }
     
     await fs.writeFile(authSettingsPath, JSON.stringify(authSettings, null, 2), 'utf-8');
-    console.log('Auth settings saved to file system successfully');
   }
-  
-  console.log('Authentication settings saved successfully');
 }
 
 // Update the JanitorAI API key
 export async function updateJanitorApiKey(): Promise<string> {
   const authSettings = await getAuthSettings();
-  console.log('Updating Janitor API key, current settings:', authSettings);
   const newApiKey = generateApiKey();
   
   const updatedSettings: AuthSettings = {
@@ -247,7 +223,6 @@ export async function updateJanitorApiKey(): Promise<string> {
       const { db } = await import('./firebase-config');
       
       await setDoc(doc(db, 'system', 'auth'), updatedSettings);
-      console.log('Auth settings saved to Firestore successfully');
     } catch (error) {
       console.error('Error saving auth settings to Firestore:', error);
       throw error; // Re-throw the error to be handled by the caller
@@ -267,16 +242,14 @@ export async function updateJanitorApiKey(): Promise<string> {
     }
     
     await fs.writeFile(authSettingsPath, JSON.stringify(updatedSettings, null, 2), 'utf-8');
-    console.log('Auth settings saved to file system successfully');
   }
   
-  console.log('Janitor API key updated successfully');
   return newApiKey;
 }
 
 // Clear authentication
 export async function clearAuth(): Promise<void> {
-  console.log('Clearing authentication settings');
+  // Clearing authentication settings
   
   const settingsToSave: AuthSettings = { isAuthenticated: false };
   
@@ -289,7 +262,6 @@ export async function clearAuth(): Promise<void> {
       const { db } = await import('./firebase-config');
       
       await setDoc(doc(db, 'system', 'auth'), settingsToSave);
-      console.log('Auth settings cleared in Firestore successfully');
     } catch (error) {
       console.error('Error clearing auth settings in Firestore:', error);
       throw error; // Re-throw the error to be handled by the caller
@@ -309,8 +281,5 @@ export async function clearAuth(): Promise<void> {
     }
     
     await fs.writeFile(authSettingsPath, JSON.stringify(settingsToSave, null, 2), 'utf-8');
-    console.log('Auth settings cleared in file system successfully');
   }
-  
-  console.log('Authentication settings cleared');
 }

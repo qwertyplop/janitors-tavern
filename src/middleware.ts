@@ -3,12 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 // Create a server-side compatible isAuthenticated function for middleware
 async function isAuthenticated(request: NextRequest): Promise<boolean> {
   // Check if authentication is enforced via environment variable
-  const authEnforced = process.env.AUTH_ENFORCED === 'true' || process.env.AUTH_IS_SETUP === 'true';
-  console.log('Edge auth - Auth enforced:', authEnforced);
+  // This serves as a master switch for authentication enforcement
+  const authEnforced = process.env.AUTH_ENFORCED === 'true';
   
   // If authentication is not enforced, allow all requests
   if (!authEnforced) {
-    console.log('Edge auth - Auth not enforced, allowing request');
     return true;
   }
   
@@ -16,20 +15,13 @@ async function isAuthenticated(request: NextRequest): Promise<boolean> {
   const apiKey = request.headers.get('x-api-key');
   const expectedApiKey = process.env.JANITOR_API_KEY;
   
-  console.log('Edge auth - Checking API key:', {
-    hasApiKey: !!apiKey,
-    hasExpectedApiKey: !!expectedApiKey
-  });
-  
   // If no expected API key is set, allow access (shouldn't happen in properly configured system)
   if (!expectedApiKey) {
-    console.log('Edge auth - No expected API key set, allowing request');
     return true;
   }
   
   // Check if the provided API key matches the expected one
   const isAuth = apiKey === expectedApiKey;
-  console.log('Edge auth - Authentication result:', isAuth);
   return isAuth;
 }
 
@@ -125,13 +117,12 @@ export async function middleware(request: NextRequest) {
         // Allow access to get-auth-status action to check if auth is set up
         if (body.action === 'get-auth-status') {
           // Continue with the request without authentication check
-          console.log('Middleware - Allowing access to get-auth-status action');
         } else {
           // For other actions, check authentication as normal
           const authenticated = await isAuthenticated(request);
           
           if (!authenticated) {
-            console.log('Middleware - Request blocked, user not authenticated');
+            console.warn('Middleware - Request blocked, user not authenticated for protected route');
             return new NextResponse(
               JSON.stringify({ error: 'Unauthorized: API key required' }),
               {
@@ -146,7 +137,7 @@ export async function middleware(request: NextRequest) {
         const authenticated = await isAuthenticated(request);
         
         if (!authenticated) {
-          console.log('Middleware - Request blocked during fallback auth check');
+          console.warn('Middleware - Request blocked during fallback auth check');
           return new NextResponse(
             JSON.stringify({ error: 'Unauthorized: API key required' }),
             {
@@ -161,7 +152,7 @@ export async function middleware(request: NextRequest) {
       const authenticated = await isAuthenticated(request);
       
       if (!authenticated) {
-        console.log('Middleware - Request blocked, user not authenticated for protected route');
+        console.warn('Middleware - Request blocked, user not authenticated for protected route');
         return new NextResponse(
           JSON.stringify({ error: 'Unauthorized: API key required' }),
           {

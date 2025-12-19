@@ -141,9 +141,7 @@ export async function PUT(request: NextRequest) {
           }
           
           try {
-            console.log('API - Setting up authentication for user:', authRequest.username);
             await setupAuth(authRequest.username, authRequest.password);
-            console.log('API - Authentication set up successfully for user:', authRequest.username);
             
             // Sync to Firestore if possible (client-side)
             const newAuthSettings = await getAuthSettings();
@@ -161,9 +159,7 @@ export async function PUT(request: NextRequest) {
         case 'update-api-key':
           // Update the JanitorAI API key
           try {
-            console.log('API - Updating Janitor API key');
             const newApiKey = await updateJanitorApiKey();
-            console.log('API - New API key generated successfully');
             
             // Sync to Firestore if possible (client-side)
             const newAuthSettings = await getAuthSettings();
@@ -182,7 +178,6 @@ export async function PUT(request: NextRequest) {
           // Return authentication status
           try {
             const currentAuthSettings = await getAuthSettings();
-            console.log('API - Auth settings retrieved for status check:', currentAuthSettings);
             
             // Return the auth status
             const authStatus = {

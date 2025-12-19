@@ -52,19 +52,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (authed && storedUsername) {
         // Verify that auth is actually set up in the system
         const authSettings = await getAuthSettings();
-        console.log('Auth settings from server:', authSettings);
-        console.log('Stored username:', storedUsername);
         if (authSettings.isAuthenticated && authSettings.username === storedUsername) {
           setIsAuthenticated(true);
           setUsername(storedUsername);
-          console.log('Auth status: authenticated');
         } else {
           // Auth state is invalid, clear it
           localStorage.removeItem('jt.authenticated');
           localStorage.removeItem('jt.username');
           setIsAuthenticated(false);
           setUsername(null);
-          console.log('Auth status: cleared invalid auth state');
         }
       } else {
         // Check if auth is set up in the system but not in localStorage (edge case)
@@ -94,10 +90,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // Get auth settings to verify credentials
       const authSettings = await getAuthSettings();
-      console.log('Login - Auth settings retrieved:', authSettings);
       
       if (!authSettings.isAuthenticated) {
-        console.log('Login failed - auth not set up');
         return false;
       }
 
@@ -111,12 +105,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .map(b => b.toString(16).padStart(2, '0'))
           .join('');
         
-        console.log('Login - Comparing password hashes:', {
-          inputHash: passwordHash,
-          storedHash: authSettings.passwordHash,
-          match: passwordHash === authSettings.passwordHash
-        });
-        
         // Compare the hashed password with the stored hash
         if (passwordHash === authSettings.passwordHash) {
           // Store authentication state
@@ -125,17 +113,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           
           setIsAuthenticated(true);
           setUsername(username);
-          console.log('Login successful - auth state stored in localStorage');
           
           // Refresh auth status to ensure consistency
           await checkAuthStatus();
           
           return true;
-        } else {
-          console.log('Login failed - password hash mismatch');
         }
-      } else {
-        console.log('Login failed - username mismatch');
       }
       
       return false;

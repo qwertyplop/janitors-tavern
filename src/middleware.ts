@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Create a server-side compatible isAuthenticated function for middleware
-// This function checks if the user is authenticated by verifying the auth status in Firestore
+// This function checks if the user is authenticated by verifying the session cookie
 async function isAuthenticated(request: NextRequest): Promise<boolean> {
   try {
     // For API routes, check for the session cookie or API key
     const apiKey = request.headers.get('x-api-key');
+    const sessionCookie = request.cookies.get('janitor_session');
     
     // If API key is provided, we'll validate it against Firestore in the client-side
     // For now, we allow the request to pass through and let the client-side auth handle it
@@ -13,8 +14,12 @@ async function isAuthenticated(request: NextRequest): Promise<boolean> {
       return true;
     }
     
-    // For web pages, we can't directly access Firestore in middleware (edge runtime)
-    // So we'll redirect to login page and let the client-side auth handle the check
+    // For web pages, check if session cookie exists
+    // The presence of the session cookie indicates the user is authenticated
+    if (sessionCookie) {
+      return true;
+    }
+    
     return false;
   } catch (error) {
     console.error('Error checking authentication in middleware:', error);

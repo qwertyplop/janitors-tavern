@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { getAuthSettings, verifyPassword, hashPassword } from '@/lib/auth';
+import { getAuthSettings, verifyPassword, hashPassword, hasSessionCookie, clearSessionCookie } from '@/lib/auth';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -26,6 +26,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuthStatus = async () => {
     try {
+      // First check if session cookie exists
+      // If no session cookie, user is not authenticated
+      if (!hasSessionCookie()) {
+        setIsAuthenticated(false);
+        setUsername(null);
+        setLoading(false);
+        return;
+      }
+      
       // Get auth settings directly from Firestore
       const authSettings = await getAuthSettings();
       
@@ -76,6 +85,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     setIsAuthenticated(false);
     setUsername(null);
+    
+    // Clear session cookie
+    clearSessionCookie();
     
     // Redirect to login page
     router.push('/login');

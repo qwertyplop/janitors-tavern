@@ -1,5 +1,5 @@
-// This file provides authentication functions that work exclusively with Firestore
-// All authentication data is stored in Firestore and accessed client-side only
+// This file provides authentication functions that work with Firestore and session cookies
+// Authentication data is stored in Firestore and session state is maintained via cookies
 
 // Define auth-related types
 export interface AuthSettings {
@@ -7,6 +7,50 @@ export interface AuthSettings {
   username?: string;
   passwordHash?: string;
   janitorApiKey?: string;
+}
+
+// Session cookie configuration
+const SESSION_COOKIE_NAME = 'janitor_session';
+const SESSION_COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days in seconds
+
+/**
+ * Set session cookie after successful authentication
+ */
+export function setSessionCookie(): void {
+  if (typeof window === 'undefined') {
+    return; // Only run on client-side
+  }
+  
+  // Generate a simple session token (in production, use a more secure method)
+  const sessionToken = generateApiKey();
+  const expires = new Date();
+  expires.setDate(expires.getDate() + 7); // 7 days from now
+  
+  document.cookie = `${SESSION_COOKIE_NAME}=${sessionToken}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`;
+}
+
+/**
+ * Clear session cookie on logout
+ */
+export function clearSessionCookie(): void {
+  if (typeof window === 'undefined') {
+    return; // Only run on client-side
+  }
+  
+  document.cookie = `${SESSION_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+}
+
+/**
+ * Check if session cookie exists
+ */
+export function hasSessionCookie(): boolean {
+  if (typeof window === 'undefined') {
+    return false; // Only run on client-side
+  }
+  
+  return document.cookie.split(';').some(cookie =>
+    cookie.trim().startsWith(`${SESSION_COOKIE_NAME}=`)
+  );
 }
 
 /**

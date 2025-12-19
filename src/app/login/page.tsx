@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { getAuthSettings } from '@/lib/auth';
+import { getAuthSettings, setSessionCookie } from '@/lib/auth';
 import { useI18n } from '@/components/providers/I18nProvider';
 import { useAuth } from '@/components/providers/AuthProvider';
 
@@ -64,6 +64,9 @@ export default function LoginPage() {
       const loginSuccess = await login(username, password);
       
       if (loginSuccess) {
+        // Set session cookie to maintain authentication state
+        setSessionCookie();
+        
         // Show success message and redirect immediately
         setSuccess('Login successful! Redirecting...');
         // Use setTimeout to ensure the success message is shown before redirect

@@ -88,7 +88,10 @@ export default function SettingsPage() {
       
       if (response.ok) {
         const data = await response.json();
+        console.log('Auth status fetched:', data);
         setAuthStatus(data);
+      } else {
+        console.error('Failed to fetch auth status:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Failed to fetch auth status:', error);
@@ -626,7 +629,7 @@ JANITOR_API_KEY=${apiKey}
         </CardContent>
       </Card>
 
-      {/* Authentication Settings */}
+      {/* Authentication Settings - Only show setup form if not authenticated */}
       <Card>
         <CardHeader>
           <CardTitle>{t.settings.authentication}</CardTitle>
@@ -657,7 +660,7 @@ JANITOR_API_KEY=${apiKey}
                 )}
               </div>
               
-              {!authStatus.isAuthenticated ? (
+              {!authStatus?.isAuthenticated ? (
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="auth-username">{t.settings.username}</Label>
@@ -731,6 +734,12 @@ JANITOR_API_KEY=${apiKey}
                         {isGeneratingApiKey ? t.settings.generating : t.settings.generateNewApiKey}
                       </Button>
                     </div>
+                  </div>
+                  
+                  <div className="pt-4 border-t border-zinc-200 dark:border-zinc-700">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {t.login.authCredentialsInfo}
+                    </p>
                   </div>
                 </div>
               )}

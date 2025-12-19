@@ -94,7 +94,9 @@ export async function PUT(request: NextRequest) {
           }
           
           try {
+            console.log('API - Setting up authentication for user:', authRequest.username);
             await setupAuth(authRequest.username, authRequest.password);
+            console.log('API - Authentication set up successfully for user:', authRequest.username);
             return NextResponse.json({ success: true, message: 'Authentication set up successfully' });
           } catch (error) {
             console.error('Error setting up auth:', error);
@@ -107,7 +109,9 @@ export async function PUT(request: NextRequest) {
         case 'update-api-key':
           // Update the JanitorAI API key
           try {
+            console.log('API - Updating Janitor API key');
             const newApiKey = await updateJanitorApiKey();
+            console.log('API - New API key generated successfully');
             return NextResponse.json({ success: true, apiKey: newApiKey });
           } catch (error) {
             console.error('Error updating API key:', error);
@@ -121,6 +125,7 @@ export async function PUT(request: NextRequest) {
           // Return authentication status
           try {
             const currentAuthSettings = await getAuthSettings();
+            console.log('API - Auth settings retrieved for status check:', currentAuthSettings);
             return NextResponse.json({
               isAuthenticated: currentAuthSettings.isAuthenticated,
               hasApiKey: !!currentAuthSettings.janitorApiKey,

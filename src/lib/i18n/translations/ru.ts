@@ -306,6 +306,7 @@ export const ru: TranslationKeys = {
     setupAuth: 'Настроить аутентификацию',
     goToRegistration: 'Перейти к регистрации',
     goToLogin: 'Войти',
+    authCredentialsInfo: 'Учетные данные для аутентификации хранятся в защищенной базе данных. Имя пользователя и хэшированный пароль сохраняются в документе system/auth.',
   },
 
   // Extensions

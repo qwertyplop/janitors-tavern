@@ -38,8 +38,10 @@ export default function RegisterPage() {
         
         if (response.ok) {
           const data = await response.json();
+          console.log('Register - Auth status check:', data);
           if (data.isAuthenticated) {
             // If auth is already set up, redirect to login
+            console.log('Register - Auth already set up, redirecting to login');
             router.push('/login');
           }
         }
@@ -85,6 +87,7 @@ export default function RegisterPage() {
       const data = await response.json();
 
       if (response.ok) {
+        console.log('Registration successful, redirecting to login...');
         setSuccess('Authentication set up successfully! Redirecting to login...');
         
         // Redirect to login after a brief delay
@@ -92,6 +95,7 @@ export default function RegisterPage() {
           router.push('/login');
         }, 2000);
       } else {
+        console.error('Registration failed:', data.error);
         setError(data.error || 'Failed to set up authentication');
       }
     } catch (err) {

@@ -304,6 +304,7 @@ export const en = {
     setupAuth: 'Set Up Authentication',
     goToRegistration: 'Go to Registration',
     goToLogin: 'Go to Login',
+    authCredentialsInfo: 'Authentication credentials are stored securely in your database. Username and hashed password are saved in the system/auth document.',
   },
 
   // Extensions

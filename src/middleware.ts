@@ -93,11 +93,13 @@ export async function middleware(request: NextRequest) {
         // Allow access to get-auth-status action to check if auth is set up
         if (body.action === 'get-auth-status') {
           // Continue with the request without authentication check
+          console.log('Middleware - Allowing access to get-auth-status action');
         } else {
           // For other actions, check authentication as normal
           const authenticated = await isAuthenticated(request);
           
           if (!authenticated) {
+            console.log('Middleware - Request blocked, user not authenticated');
             return new NextResponse(
               JSON.stringify({ error: 'Unauthorized: API key required' }),
               {
@@ -112,6 +114,7 @@ export async function middleware(request: NextRequest) {
         const authenticated = await isAuthenticated(request);
         
         if (!authenticated) {
+          console.log('Middleware - Request blocked during fallback auth check');
           return new NextResponse(
             JSON.stringify({ error: 'Unauthorized: API key required' }),
             {
@@ -126,6 +129,7 @@ export async function middleware(request: NextRequest) {
       const authenticated = await isAuthenticated(request);
       
       if (!authenticated) {
+        console.log('Middleware - Request blocked, user not authenticated for protected route');
         return new NextResponse(
           JSON.stringify({ error: 'Unauthorized: API key required' }),
           {

@@ -294,6 +294,14 @@ export const en = {
     invalidCredentials: 'Invalid username or password',
     noAuthSetup: 'Authentication is not set up. Please configure authentication first.',
     authError: 'An error occurred during authentication',
+    passwordsDontMatch: 'Passwords do not match',
+    passwordTooShort: 'Password must be at least 6 characters',
+    setupAuthTitle: 'Set Up Authentication',
+    setupAuthDescription: 'Create your initial username and password',
+    confirmPassword: 'Confirm Password',
+    confirmPasswordPlaceholder: 'Confirm your password',
+    settingUp: 'Setting up...',
+    setupAuth: 'Set Up Authentication',
   },
 
   // Extensions

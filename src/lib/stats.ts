@@ -2,9 +2,9 @@
 // Usage Statistics Tracking
 // ============================================
 // Tracks request counts and token usage with daily resets
-// Optimized to minimize Vercel Blob operations
+// Optimized to minimize Firebase operations
 
-import { put, head } from '@vercel/blob';
+import { storageManager } from './storage-provider';
 
 // ============================================
 // Types
@@ -30,10 +30,10 @@ export interface UsageStats {
 // Constants
 // ============================================
 
-const STATS_BLOB_PATH = 'janitors-tavern/stats.json';
+const STATS_KEY = 'stats';
 const RESET_HOUR_UTC = 7; // 10 AM GMT+3 = 7 AM UTC
 
-// Save to blob every N requests (reduces advanced operations drastically)
+// Save to Firebase every N requests (reduces operations drastically)
 const SAVE_INTERVAL = 10;
 
 // ============================================
@@ -109,16 +109,11 @@ export function calculateMessageTokens(messages: Array<{ content?: string; role?
 }
 
 // ============================================
-// Blob Storage Functions (Optimized)
+// Firebase Storage Functions (Optimized)
 // ============================================
 
-function isBlobConfigured(): boolean {
-  return !!process.env.BLOB_READ_WRITE_TOKEN;
-}
-
 /**
- * Load stats from blob (with caching)
- * Uses head() which is a simple operation
+ * Load stats from Firebase (with caching)
  */
 async function loadStats(): Promise<UsageStats> {
   // Return cached if fresh enough
@@ -126,25 +121,16 @@ async function loadStats(): Promise<UsageStats> {
     return cachedStats;
   }
 
-  if (!isBlobConfigured()) {
-    cachedStats = getDefaultStats();
-    lastLoadTime = Date.now();
-    return cachedStats;
-  }
-
   try {
-    // head() is a simple operation
-    const blobInfo = await head(STATS_BLOB_PATH);
-    if (blobInfo) {
-      // Fetching by URL is simple (or free if cached)
-      const response = await fetch(blobInfo.url);
-      const data = await response.json();
+    // Use storage manager to get stats
+    const data = await storageManager.get(STATS_KEY as any);
+    if (data && typeof data === 'object') {
       cachedStats = data as UsageStats;
       lastLoadTime = Date.now();
       return cachedStats;
     }
   } catch {
-    // Blob doesn't exist or error
+    // Firebase doesn't exist or error
   }
 
   cachedStats = getDefaultStats();
@@ -153,21 +139,13 @@ async function loadStats(): Promise<UsageStats> {
 }
 
 /**
- * Save stats to blob
- * Uses put() which is an advanced operation - call sparingly!
+ * Save stats to Firebase
  */
 async function saveStats(stats: UsageStats): Promise<void> {
-  if (!isBlobConfigured()) return;
-
   try {
-    // Direct put() overwrites - no need to delete first
-    // This is 1 advanced operation instead of 2 (head + del + put was 1 simple + 1 advanced)
-    await put(STATS_BLOB_PATH, JSON.stringify(stats, null, 2), {
-      access: 'public',
-      contentType: 'application/json',
-      addRandomSuffix: false,
-    });
-    console.log('[Stats] Saved to blob');
+    // Use storage manager to save stats
+    await storageManager.set(STATS_KEY as any, stats);
+    console.log('[Stats] Saved to Firebase');
   } catch (error) {
     console.error('[Stats] Failed to save stats:', error);
   }
@@ -206,7 +184,7 @@ export async function getStats(): Promise<UsageStats> {
 
 /**
  * Increment request count and add tokens
- * Batches writes to blob - only saves every SAVE_INTERVAL requests
+ * Batches writes to Firebase - only saves every SAVE_INTERVAL requests
  */
 export async function recordUsage(inputTokens: number, outputTokens: number): Promise<UsageStats> {
   try {
@@ -233,7 +211,7 @@ export async function recordUsage(inputTokens: number, outputTokens: number): Pr
     cachedStats = stats;
     pendingChanges++;
 
-    // Only save to blob every N requests (reduces advanced operations by ~90%)
+    // Only save to Firebase every N requests (reduces operations by ~90%)
     if (pendingChanges >= SAVE_INTERVAL) {
       pendingChanges = 0;
       saveStats(stats).catch(() => {}); // Fire and forget

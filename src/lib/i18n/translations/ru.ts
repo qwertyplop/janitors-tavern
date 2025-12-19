@@ -201,7 +201,7 @@ export const ru: TranslationKeys = {
     // Log Viewer
     logViewer: 'Просмотр логов',
     entries: 'записей',
-    viewRecentLogs: 'Просмотр недавних логов запросов/ответов (хранятся в Vercel Blob)',
+    viewRecentLogs: 'Просмотр недавних логов запросов/ответов',
     refreshLogs: 'Обновить логи',
     clearLogs: 'Очистить логи',
     noLogsYet: 'Логов пока нет. Нажмите "Обновить логи" для загрузки.',
@@ -215,7 +215,7 @@ export const ru: TranslationKeys = {
     exportBackup: 'Экспорт резервной копии',
     importBackup: 'Импорт резервной копии',
     backupHint: 'Экспортируйте все подключения, пресеты и настройки в JSON-файл для резервного копирования или миграции.',
-    cloudSync: 'Облачная синхронизация (Vercel Blob)',
+    cloudSync: 'Облачная синхронизация (Firebase)',
     pushToCloud: 'Отправить в облако',
     pullFromCloud: 'Загрузить из облака',
     syncingData: 'Синхронизация...',
@@ -229,7 +229,7 @@ export const ru: TranslationKeys = {
     autoSyncEnabledMessage: 'Автосинхронизация включена.',
     changesAutoSaved: 'Изменения автоматически сохраняются в облачное хранилище.',
     localStorageOnly: 'Только локальное хранилище.',
-    addBlobStore: 'Для включения облачного хранилища добавьте Blob store в панели Vercel.',
+    addBlobStore: 'Для включения облачного хранилища настройте Firebase в переменных окружения.',
     // Appearance
     appearance: 'Внешний вид',
     customizeAppLooks: 'Настройте внешний вид приложения',

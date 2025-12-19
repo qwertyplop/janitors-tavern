@@ -199,7 +199,7 @@ export const en = {
     // Log Viewer
     logViewer: 'Log Viewer',
     entries: 'entries',
-    viewRecentLogs: 'View recent request/response logs (stored in Vercel Blob)',
+    viewRecentLogs: 'View recent request/response logs',
     refreshLogs: 'Refresh Logs',
     clearLogs: 'Clear Logs',
     noLogsYet: 'No logs yet. Click "Refresh Logs" to load.',
@@ -213,7 +213,7 @@ export const en = {
     exportBackup: 'Export Backup',
     importBackup: 'Import Backup',
     backupHint: 'Export all connections, presets, and settings as a JSON file for backup or migration.',
-    cloudSync: 'Cloud Sync (Vercel Blob)',
+    cloudSync: 'Cloud Sync (Firebase)',
     pushToCloud: 'Push to Cloud',
     pullFromCloud: 'Pull from Cloud',
     syncingData: 'Syncing...',
@@ -227,7 +227,7 @@ export const en = {
     autoSyncEnabledMessage: 'Auto-sync is enabled.',
     changesAutoSaved: 'Changes are automatically saved to cloud storage.',
     localStorageOnly: 'Local storage only.',
-    addBlobStore: 'To enable cloud storage, add a Blob store in your Vercel dashboard.',
+    addBlobStore: 'To enable cloud storage, configure Firebase in your environment variables.',
     // Appearance
     appearance: 'Appearance',
     customizeAppLooks: 'Customize how the app looks',

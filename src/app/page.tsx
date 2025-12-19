@@ -68,7 +68,7 @@ export default function DashboardPage() {
     fetchStats();
   }, [fetchStats]);
 
-  // Reload data when sync initializes (data may have been pulled from blob)
+  // Reload data when sync initializes (data may have been pulled from Firebase)
   useEffect(() => {
     if (initialized) {
       loadData();
@@ -113,8 +113,8 @@ export default function DashboardPage() {
     setConfirmed(false);
 
     try {
-      // Force push to blob storage to ensure proxy has latest settings
-      await forceSync('push');
+      // Force push to Firebase to ensure proxy has latest settings
+      await forceSync('push').catch(() => {});
       setConfirmed(true);
       // Auto-hide after 3 seconds
       setTimeout(() => setConfirmed(false), 3000);

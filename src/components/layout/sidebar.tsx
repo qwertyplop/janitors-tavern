@@ -94,7 +94,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
-  const { initialized, blobConfigured, syncing } = useSync();
+  const { initialized, blobConfigured: firebaseConfigured, syncing } = useSync();
   const { t, language, setLanguage, languages } = useI18n();
 
   // Load collapsed state from localStorage on mount
@@ -195,7 +195,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         isCollapsed ? 'p-4 lg:p-2' : 'p-4'
       )}>
         {/* Cloud Sync Status */}
-        {initialized && blobConfigured && (
+        {initialized && firebaseConfigured && (
           <div
             className={cn(
               'flex items-center rounded-md text-sm font-medium mb-2',

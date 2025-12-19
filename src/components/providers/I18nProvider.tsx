@@ -28,7 +28,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   const setLanguage = useCallback((lang: Language) => {
     setLanguageState(lang);
-    // Save to settings storage (auto-syncs to blob)
+    // Save to settings storage (auto-syncs to Firebase)
     updateSettings({ language: lang });
   }, []);
 

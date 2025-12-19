@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { put, head } from '@vercel/blob';
 import { invalidateCache } from '@/lib/server-storage';
+import { storageManager } from '@/lib/storage-provider';
+import { RegexScript } from '@/types';
 
 // Valid storage keys
 const VALID_KEYS = ['connections', 'presets', 'settings', 'regexScripts'] as const;
@@ -10,16 +11,13 @@ function isValidKey(key: string): key is StorageKey {
   return VALID_KEYS.includes(key as StorageKey);
 }
 
-function getBlobPath(key: StorageKey): string {
-  return `janitors-tavern/${key}.json`;
-}
-
 // Default values for each key
 const DEFAULTS: Record<StorageKey, unknown> = {
   connections: [],
   presets: [],
   settings: {
     theme: 'system',
+    language: 'en',
     showAdvancedOptions: false,
     logging: {
       enabled: false,
@@ -45,32 +43,9 @@ export async function GET(
     );
   }
 
-  // Check if blob is configured
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return NextResponse.json(
-      { error: 'Blob storage not configured' },
-      { status: 503 }
-    );
-  }
-
   try {
-    const blobPath = getBlobPath(key);
-
-    // Check if blob exists
-    try {
-      const blobInfo = await head(blobPath);
-      if (blobInfo) {
-        // Fetch the blob content
-        const response = await fetch(blobInfo.url);
-        const data = await response.json();
-        return NextResponse.json(data);
-      }
-    } catch {
-      // Blob doesn't exist, return default
-      return NextResponse.json(DEFAULTS[key]);
-    }
-
-    return NextResponse.json(DEFAULTS[key]);
+    const data = await storageManager.get(key as any);
+    return NextResponse.json(data);
   } catch (error) {
     console.error(`Error fetching ${key}:`, error);
     return NextResponse.json(DEFAULTS[key]);
@@ -91,32 +66,17 @@ export async function PUT(
     );
   }
 
-  // Check if blob is configured
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return NextResponse.json(
-      { error: 'Blob storage not configured' },
-      { status: 503 }
-    );
-  }
-
   try {
     const data = await request.json();
-    const blobPath = getBlobPath(key);
-
-    // put() with addRandomSuffix: false already overwrites existing blobs
-    // No need for head() + del() - saves 1 simple + 1 advanced operation!
-    const blob = await put(blobPath, JSON.stringify(data, null, 2), {
-      access: 'public',
-      contentType: 'application/json',
-      addRandomSuffix: false,
-    });
+    
+    // Use storage manager to save the data
+    await storageManager.set(key as any, data);
 
     // Invalidate server-side cache so proxy picks up new data
     invalidateCache(key);
 
     return NextResponse.json({
       success: true,
-      url: blob.url,
     });
   } catch (error) {
     console.error(`Error saving ${key}:`, error);
@@ -149,28 +109,17 @@ export async function POST(
     );
   }
 
-  // Check if blob is configured
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return NextResponse.json(
-      { error: 'Blob storage not configured' },
-      { status: 503 }
-    );
-  }
-
   try {
     const incoming = await request.json();
-    const blobPath = getBlobPath(key);
 
     // Fetch existing data
-    let existing: any[] = [];
+    let existing: RegexScript[] = [];
     try {
-      const blobInfo = await head(blobPath);
-      if (blobInfo) {
-        const response = await fetch(blobInfo.url);
-        existing = await response.json();
-      }
+      const existingData = await storageManager.get('regexScripts');
+      existing = Array.isArray(existingData) ? existingData : [];
     } catch {
-      // Blob doesn't exist, keep empty array
+      // If there's an error fetching, start with empty array
+      existing = [];
     }
 
     if (!Array.isArray(existing)) {
@@ -206,11 +155,7 @@ export async function POST(
     }
 
     // Save merged data
-    const blob = await put(blobPath, JSON.stringify(merged, null, 2), {
-      access: 'public',
-      contentType: 'application/json',
-      addRandomSuffix: false,
-    });
+    await storageManager.set('regexScripts', merged);
 
     // Invalidate server-side cache
     invalidateCache(key);
@@ -219,7 +164,6 @@ export async function POST(
       success: true,
       imported: incomingArray.length,
       total: merged.length,
-      url: blob.url,
     });
   } catch (error) {
     console.error(`Error importing ${key}:`, error);

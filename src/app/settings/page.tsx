@@ -49,7 +49,7 @@ export default function SettingsPage() {
 
 
   // Storage sync from context
-  const { initialized, blobConfigured, lastSync, syncing, forcePush, forcePull } = useSync();
+  const { initialized, blobConfigured: firebaseConfigured, lastSync, syncing, forcePush, forcePull } = useSync();
   const { t } = useI18n();
 
   // Local sync status for UI feedback
@@ -68,7 +68,7 @@ export default function SettingsPage() {
     fetchServerSettings();
   }, []);
 
-  // Re-fetch data when sync initializes (data may have been pulled from blob)
+  // Re-fetch data when sync initializes (data may have been pulled from Firebase)
   useEffect(() => {
     if (initialized) {
       setSettings(getSettings());
@@ -172,8 +172,8 @@ export default function SettingsPage() {
       saveChatCompletionPresets(backup.presets);
       saveSettingsToStorage(backup.settings);
 
-      // Force sync to cloud before reloading (if blob is configured)
-      if (blobConfigured) {
+      // Force sync to cloud before reloading (if Firebase is configured)
+      if (firebaseConfigured) {
         setSyncFeedback({ type: 'success', message: 'Syncing imported data to cloud...' });
         await forcePush();
       }
@@ -191,9 +191,9 @@ export default function SettingsPage() {
     }
   };
 
-  // Push local data to Vercel Blob
-  const handlePushToBlob = async () => {
-    if (!blobConfigured) return;
+  // Push local data to Firebase
+  const handlePushToFirebase = async () => {
+    if (!firebaseConfigured) return;
 
     setSyncFeedback(null);
 
@@ -207,9 +207,9 @@ export default function SettingsPage() {
     }
   };
 
-  // Pull data from Vercel Blob to local
-  const handlePullFromBlob = async () => {
-    if (!blobConfigured) return;
+  // Pull data from Firebase to local
+  const handlePullFromFirebase = async () => {
+    if (!firebaseConfigured) return;
 
     if (!confirm('This will replace your local data with cloud data. Continue?')) {
       return;
@@ -327,10 +327,10 @@ export default function SettingsPage() {
         <CardContent>
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-900">
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              Logs are available in the Vercel Function logs dashboard.
+              Logs are available in the Function logs dashboard.
             </p>
             <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-500">
-              Go to your Vercel project → Logs → Runtime Logs to view request/response logs.
+              Go to your deployment platform logs to view request/response logs.
             </p>
           </div>
         </CardContent>
@@ -341,11 +341,11 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             {t.settings.dataManagement}
-            <Badge className={blobConfigured
+            <Badge className={firebaseConfigured
               ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
               : 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200'
             }>
-              {blobConfigured ? t.settings.autoSyncEnabled : t.settings.localOnly}
+              {firebaseConfigured ? t.settings.autoSyncEnabled : t.settings.localOnly}
             </Badge>
           </CardTitle>
           <CardDescription>
@@ -377,20 +377,20 @@ export default function SettingsPage() {
           </div>
 
           {/* Cloud Sync */}
-          {blobConfigured && (
+          {firebaseConfigured && (
             <div className="space-y-3 border-t pt-4">
               <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{t.settings.cloudSync}</h4>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  onClick={handlePushToBlob}
+                  onClick={handlePushToFirebase}
                   disabled={syncing}
                 >
                   {syncing ? t.settings.syncingData : t.settings.pushToCloud}
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={handlePullFromBlob}
+                  onClick={handlePullFromFirebase}
                   disabled={syncing}
                 >
                   {t.settings.pullFromCloud}
@@ -417,7 +417,7 @@ export default function SettingsPage() {
           {/* Storage Status Info */}
           <div className="rounded-md bg-zinc-50 dark:bg-zinc-800 p-3 text-sm">
             <p className="text-zinc-600 dark:text-zinc-400">
-              {blobConfigured ? (
+              {firebaseConfigured ? (
                 <>
                   <span className="font-medium text-green-600 dark:text-green-400">{t.settings.autoSyncEnabledMessage}</span>
                   {' '}{t.settings.changesAutoSaved}

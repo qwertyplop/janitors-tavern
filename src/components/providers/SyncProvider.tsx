@@ -1,11 +1,11 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { initializeSync, getSyncStatus, forceSync, isBlobConfigured, addSyncListener } from '@/lib/storage-sync';
+import { initializeSync, getSyncStatus, forceSync, isFirebaseConfigured, addSyncListener } from '@/lib/storage-sync';
 
 interface SyncContextValue {
   initialized: boolean;
-  blobConfigured: boolean;
+  blobConfigured: boolean; // Keeping this name for compatibility with existing code
   lastSync: string | null;
   syncing: boolean;
   forcePush: () => Promise<boolean>;
@@ -16,7 +16,7 @@ const SyncContext = createContext<SyncContextValue | null>(null);
 
 export function SyncProvider({ children }: { children: ReactNode }) {
   const [initialized, setInitialized] = useState(false);
-  const [blobConfigured, setBlobConfigured] = useState(false);
+  const [firebaseConfigured, setFirebaseConfigured] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
 
@@ -25,7 +25,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     initializeSync().then(() => {
       setInitialized(true);
       const status = getSyncStatus();
-      setBlobConfigured(status.configured);
+      setFirebaseConfigured(status.configured);
       setLastSync(status.lastSync);
     });
 
@@ -74,7 +74,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     <SyncContext.Provider
       value={{
         initialized,
-        blobConfigured,
+        blobConfigured: firebaseConfigured,
         lastSync,
         syncing,
         forcePush,

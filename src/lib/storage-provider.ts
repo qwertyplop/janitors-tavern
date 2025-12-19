@@ -1,7 +1,7 @@
 // ============================================
 // Storage Provider Abstraction
 // ============================================
-// Provides a unified interface for localStorage (dev) and Vercel Blob (prod)
+// Provides a unified interface for localStorage (dev) and Firebase (prod)
 
 import {
   ConnectionPreset,
@@ -9,6 +9,7 @@ import {
   AppSettings,
   STORAGE_KEYS,
 } from '@/types';
+import { FirebaseStorageProvider } from './firebase-storage-provider';
 
 // ============================================
 // Types
@@ -18,6 +19,7 @@ export interface StorageData {
   connections: ConnectionPreset[];
   presets: ChatCompletionPreset[];
   settings: AppSettings;
+  regexScripts: any[]; // Using any for now to match the server-storage implementation
 }
 
 export type StorageKey = keyof StorageData;
@@ -50,6 +52,7 @@ export const DEFAULT_STORAGE_DATA: StorageData = {
   connections: [],
   presets: [],
   settings: DEFAULT_SETTINGS,
+  regexScripts: [],
 };
 
 // ============================================
@@ -60,6 +63,7 @@ const LOCAL_STORAGE_KEYS: Record<StorageKey, string> = {
   connections: STORAGE_KEYS.CONNECTION_PRESETS,
   presets: STORAGE_KEYS.CHAT_COMPLETION_PRESETS,
   settings: STORAGE_KEYS.SETTINGS,
+  regexScripts: STORAGE_KEYS.REGEX_SCRIPTS,
 };
 
 export class LocalStorageProvider implements StorageProvider {
@@ -92,6 +96,7 @@ export class LocalStorageProvider implements StorageProvider {
       connections: await this.get('connections'),
       presets: await this.get('presets'),
       settings: await this.get('settings'),
+      regexScripts: await this.get('regexScripts'),
     };
   }
 
@@ -100,6 +105,7 @@ export class LocalStorageProvider implements StorageProvider {
       this.set('connections', data.connections),
       this.set('presets', data.presets),
       this.set('settings', data.settings),
+      this.set('regexScripts', data.regexScripts),
     ]);
   }
 
@@ -117,108 +123,39 @@ export class LocalStorageProvider implements StorageProvider {
 }
 
 // ============================================
-// Blob API Provider (for Vercel deployment)
+// Firebase Provider (for Firebase deployment)
 // ============================================
 
-export class BlobApiProvider implements StorageProvider {
-  private baseUrl: string;
-  private cache: Partial<StorageData> = {};
+export class FirebaseProvider implements StorageProvider {
+  private firebaseProvider: FirebaseStorageProvider;
 
-  constructor(baseUrl: string = '/api/storage') {
-    this.baseUrl = baseUrl;
+  constructor() {
+    // Initialize Firebase provider directly
+    this.firebaseProvider = new FirebaseStorageProvider();
   }
 
   async get<K extends StorageKey>(key: K): Promise<StorageData[K]> {
-    // Return from cache if available
-    if (this.cache[key] !== undefined) {
-      return this.cache[key] as StorageData[K];
-    }
-
-    try {
-      const response = await fetch(`${this.baseUrl}/${key}`);
-      if (!response.ok) {
-        if (response.status === 404) {
-          return DEFAULT_STORAGE_DATA[key];
-        }
-        throw new Error(`Failed to fetch ${key}: ${response.statusText}`);
-      }
-      const data = await response.json();
-      this.cache[key] = data;
-      return data;
-    } catch (error) {
-      console.error(`Failed to fetch ${key} from blob:`, error);
-      return DEFAULT_STORAGE_DATA[key];
-    }
+    return this.firebaseProvider.get(key);
   }
 
   async set<K extends StorageKey>(key: K, value: StorageData[K]): Promise<void> {
-    try {
-      const response = await fetch(`${this.baseUrl}/${key}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(value),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to save ${key}: ${response.statusText}`);
-      }
-
-      // Update cache
-      this.cache[key] = value;
-    } catch (error) {
-      console.error(`Failed to save ${key} to blob:`, error);
-      throw error;
-    }
+    return this.firebaseProvider.set(key, value);
   }
 
   async getAll(): Promise<StorageData> {
-    try {
-      const response = await fetch(`${this.baseUrl}/all`);
-      if (!response.ok) {
-        if (response.status === 404) {
-          return DEFAULT_STORAGE_DATA;
-        }
-        throw new Error(`Failed to fetch all data: ${response.statusText}`);
-      }
-      const data = await response.json();
-      this.cache = data;
-      return data;
-    } catch (error) {
-      console.error('Failed to fetch all data from blob:', error);
-      return DEFAULT_STORAGE_DATA;
-    }
+    return this.firebaseProvider.getAll();
   }
 
   async setAll(data: StorageData): Promise<void> {
-    try {
-      const response = await fetch(`${this.baseUrl}/all`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to save all data: ${response.statusText}`);
-      }
-
-      this.cache = data;
-    } catch (error) {
-      console.error('Failed to save all data to blob:', error);
-      throw error;
-    }
+    return this.firebaseProvider.setAll(data);
   }
 
   async isAvailable(): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.baseUrl}/status`);
-      return response.ok;
-    } catch {
-      return false;
-    }
+    return this.firebaseProvider.isAvailable();
   }
 
   clearCache(): void {
-    this.cache = {};
+    this.firebaseProvider.clearCache();
   }
 }
 
@@ -228,24 +165,24 @@ export class BlobApiProvider implements StorageProvider {
 
 export class StorageManager {
   private provider: StorageProvider | null = null;
-  private blobProvider: BlobApiProvider;
+  private firebaseProvider: FirebaseProvider;
   private localProvider: LocalStorageProvider;
   private initPromise: Promise<void> | null = null;
 
   constructor() {
-    this.blobProvider = new BlobApiProvider();
+    this.firebaseProvider = new FirebaseProvider();
     this.localProvider = new LocalStorageProvider();
   }
 
   private async init(): Promise<void> {
     if (this.provider) return;
 
-    // Check if Blob API is available (Vercel deployment)
-    const blobAvailable = await this.blobProvider.isAvailable();
+    // Check if Firebase is available (Firebase deployment)
+    const firebaseAvailable = await this.firebaseProvider.isAvailable();
 
-    if (blobAvailable) {
-      this.provider = this.blobProvider;
-      console.log('Using Vercel Blob storage');
+    if (firebaseAvailable) {
+      this.provider = this.firebaseProvider;
+      console.log('Using Firebase storage');
     } else {
       this.provider = this.localProvider;
       console.log('Using localStorage');
@@ -280,14 +217,14 @@ export class StorageManager {
     return provider.setAll(data);
   }
 
-  async getProviderType(): Promise<'blob' | 'local'> {
+  async getProviderType(): Promise<'firebase' | 'local'> {
     await this.ensureInitialized();
-    return this.provider === this.blobProvider ? 'blob' : 'local';
+    return this.provider === this.firebaseProvider ? 'firebase' : 'local';
   }
 
   // Force use of a specific provider (useful for testing)
-  forceProvider(type: 'blob' | 'local'): void {
-    this.provider = type === 'blob' ? this.blobProvider : this.localProvider;
+  forceProvider(type: 'firebase' | 'local'): void {
+    this.provider = type === 'firebase' ? this.firebaseProvider : this.localProvider;
   }
 }
 

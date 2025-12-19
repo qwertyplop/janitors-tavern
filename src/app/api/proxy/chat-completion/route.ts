@@ -14,7 +14,7 @@ import {
   logResponse,
   logError,
   generateRequestId,
-} from '@/lib/vercel-logger';
+} from '@/lib/logger';
 import { parseJanitorRequest, janitorDataToMacroContext, JanitorRequest } from '@/lib/janitor-parser';
 import { processMacros, MacroContext } from '@/lib/macros';
 import { buildMessages as buildPresetMessages, OutputMessage } from '@/lib/prompt-builder';
@@ -236,7 +236,7 @@ export async function POST(request: NextRequest) {
     let connectionPreset = body.connectionPreset;
     let chatCompletionPreset = body.chatCompletionPreset;
 
-    // If no presets provided, load defaults from Blob storage
+    // If no presets provided, load defaults from Firebase storage
     if (!connectionPreset) {
       connectionPreset = await getDefaultConnectionPreset() || undefined;
     }

@@ -33,7 +33,7 @@ function setToStorage<T>(key: string, value: T, autoSync: boolean = true): void 
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(key, JSON.stringify(value));
-    // Trigger auto-push to blob if enabled
+    // Trigger auto-push to Firebase if enabled
     if (autoSync) {
       triggerPush();
     }

@@ -1,16 +1,14 @@
 // ============================================
 // Server-Side Storage Reader
 // ============================================
-// Reads presets and settings from Vercel Blob storage for server-side use (API routes)
-// Includes in-memory caching to minimize blob operations
+// Reads presets and settings from Firebase storage for server-side use (API routes)
+// Includes in-memory caching to minimize Firebase operations
 
-import { head } from '@vercel/blob';
 import { ConnectionPreset, ChatCompletionPreset, AppSettings, RegexScript } from '@/types';
-
-const STORAGE_PREFIX = 'janitors-tavern/';
+import { storageManager } from './storage-provider';
 
 // ============================================
-// In-Memory Cache (reduces blob operations drastically)
+// In-Memory Cache (reduces Firebase operations drastically)
 // ============================================
 
 interface CacheEntry<T> {
@@ -19,7 +17,7 @@ interface CacheEntry<T> {
 }
 
 const cache = new Map<string, CacheEntry<unknown>>();
-const CACHE_TTL = 60000; // 1 minute - balances freshness vs blob operations
+const CACHE_TTL = 60000; // 1 minute - balances freshness vs Firebase operations
 
 function getCached<T>(key: string): T | null {
   const entry = cache.get(key);
@@ -43,52 +41,45 @@ export function invalidateCache(key?: string): void {
 }
 
 // ============================================
-// Blob Fetchers
+// Firebase Fetchers
 // ============================================
 
-async function fetchBlobJson<T>(key: string, defaultValue: T): Promise<T> {
-  // Check cache first - avoids blob operations entirely
+async function fetchFirebaseJson<T>(key: string, defaultValue: T): Promise<T> {
+  // Check cache first - avoids Firebase operations entirely
   const cached = getCached<T>(key);
   if (cached !== null) {
     console.log(`[ServerStorage] Cache hit for ${key}`);
     return cached;
   }
 
-  console.log(`[ServerStorage] Cache miss for ${key}, attempting to fetch from blob`);
+  console.log(`[ServerStorage] Cache miss for ${key}, attempting to fetch from Firebase`);
   
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    console.log(`[ServerStorage] BLOB_READ_WRITE_TOKEN not configured, returning default for ${key}`);
-    return defaultValue;
-  }
-
   try {
-    const blobPath = `${STORAGE_PREFIX}${key}.json`;
-    const blobInfo = await head(blobPath);
-    if (blobInfo) {
-      console.log(`[ServerStorage] Found blob for ${key}, fetching...`);
-      const response = await fetch(blobInfo.url);
-      let data = await response.json();
+    // Use the storage manager to get data from Firebase
+    const data = await storageManager.get(key as any);
+    
+    // Handle regex scripts specifically to add default roles for backward compatibility
+    if (key === 'regexScripts' && Array.isArray(data)) {
+      const scripts = data as any[];
+      const processedData = scripts.map((script: any) => {
+        // If the script doesn't have roles, add the default ['assistant', 'user']
+        if (!script.hasOwnProperty('roles')) {
+          return { ...script, roles: ['assistant', 'user'] };
+        }
+        return script;
+      });
       
-      // Handle regex scripts specifically to add default roles for backward compatibility
-      if (key === 'regexScripts' && Array.isArray(data)) {
-        data = data.map((script: any) => {
-          // If the script doesn't have roles, add the default ['assistant', 'user']
-          if (!script.hasOwnProperty('roles')) {
-            return { ...script, roles: ['assistant', 'user'] };
-          }
-          return script;
-        });
-      }
-      
-      setCache(key, data);
-      console.log(`[ServerStorage] Successfully fetched ${key} from blob, count: ${Array.isArray(data) ? data.length : 'N/A'}`);
-      return data;
-    } else {
-      console.log(`[ServerStorage] Blob not found for ${key}, returning default`);
+      setCache(key, processedData);
+      console.log(`[ServerStorage] Successfully fetched ${key} from Firebase, count: ${processedData.length}`);
+      return processedData as any;
     }
+    
+    setCache(key, data);
+    console.log(`[ServerStorage] Successfully fetched ${key} from Firebase, count: ${Array.isArray(data) ? data.length : 'N/A'}`);
+    return data as any;
   } catch (error) {
-    console.error(`[ServerStorage] Error fetching ${key} from blob:`, error);
-    // Blob doesn't exist or error
+    console.error(`[ServerStorage] Error fetching ${key} from Firebase:`, error);
+    // Return default value if Firebase fails
   }
 
   setCache(key, defaultValue);
@@ -112,15 +103,15 @@ export async function getServerSettings(): Promise<AppSettings> {
       logFilePath: 'logs/proxy.log',
     },
   };
-  return fetchBlobJson<AppSettings>('settings', defaultSettings);
+  return fetchFirebaseJson<AppSettings>('settings', defaultSettings);
 }
 
 export async function getServerConnectionPresets(): Promise<ConnectionPreset[]> {
-  return fetchBlobJson<ConnectionPreset[]>('connections', []);
+  return fetchFirebaseJson<ConnectionPreset[]>('connections', []);
 }
 
 export async function getServerChatCompletionPresets(): Promise<ChatCompletionPreset[]> {
-  return fetchBlobJson<ChatCompletionPreset[]>('presets', []);
+  return fetchFirebaseJson<ChatCompletionPreset[]>('presets', []);
 }
 
 export async function getServerConnectionPreset(id: string): Promise<ConnectionPreset | null> {
@@ -134,7 +125,7 @@ export async function getServerChatCompletionPreset(id: string): Promise<ChatCom
 }
 
 export async function getServerRegexScripts(): Promise<RegexScript[]> {
-  return fetchBlobJson<RegexScript[]>('regexScripts', []);
+  return fetchFirebaseJson<RegexScript[]>('regexScripts', []);
 }
 
 // ============================================

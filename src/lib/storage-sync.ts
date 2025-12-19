@@ -1,7 +1,7 @@
 // ============================================
 // Storage Sync Service
 // ============================================
-// Handles auto-sync between localStorage and Vercel Blob
+// Handles auto-sync between localStorage and Firebase
 
 import { ConnectionPreset, ChatCompletionPreset, AppSettings, RegexScript } from '@/types';
 
@@ -26,7 +26,7 @@ interface SyncStatus {
 // Sync State (Module-level singleton)
 // ============================================
 
-let blobConfigured: boolean | null = null;
+let firebaseConfigured: boolean | null = null;
 let isSyncing = false;
 let syncInitialized = false;
 let initPromise: Promise<void> | null = null;
@@ -49,10 +49,10 @@ function notifySyncListeners(syncing: boolean): void {
 }
 
 // ============================================
-// Check Blob Configuration
+// Check Firebase Configuration
 // ============================================
 
-async function checkBlobStatus(): Promise<boolean> {
+async function checkFirebaseStatus(): Promise<boolean> {
   try {
     const response = await fetch('/api/storage/status');
     if (response.ok) {
@@ -60,16 +60,16 @@ async function checkBlobStatus(): Promise<boolean> {
       return data.configured === true;
     }
   } catch (error) {
-    console.error('Failed to check blob status:', error);
+    console.error('Failed to check Firebase status:', error);
   }
   return false;
 }
 
 // ============================================
-// Pull from Blob
+// Pull from Firebase
 // ============================================
 
-async function pullFromBlob(): Promise<StorageData | null> {
+async function pullFromFirebase(): Promise<StorageData | null> {
   try {
     const response = await fetch('/api/storage/all');
     if (response.ok) {
@@ -90,16 +90,16 @@ async function pullFromBlob(): Promise<StorageData | null> {
       return null;
     }
   } catch (error) {
-    console.error('Failed to pull from blob:', error);
+    console.error('Failed to pull from Firebase:', error);
   }
   return null;
 }
 
 // ============================================
-// Push to Blob
+// Push to Firebase
 // ============================================
 
-async function pushToBlob(data: Partial<StorageData>): Promise<boolean> {
+async function pushToFirebase(data: Partial<StorageData>): Promise<boolean> {
   try {
     const response = await fetch('/api/storage/all', {
       method: 'PUT',
@@ -108,7 +108,7 @@ async function pushToBlob(data: Partial<StorageData>): Promise<boolean> {
     });
     return response.ok;
   } catch (error) {
-    console.error('Failed to push to blob:', error);
+    console.error('Failed to push to Firebase:', error);
     return false;
   }
 }
@@ -122,7 +122,7 @@ const STORAGE_KEYS = {
   presets: 'jt.chatCompletionPresets',
   settings: 'jt.settings',
   regexScripts: 'jt.regexScripts',
-  lastSync: 'jt.lastBlobSync',
+  lastSync: 'jt.lastFirebaseSync',
 };
 
 function getLocalData(): StorageData {
@@ -181,45 +181,45 @@ export async function initializeSync(): Promise<void> {
   initPromise = (async () => {
     console.log('[Storage Sync] Initializing...');
 
-    // Check if blob is configured
-    blobConfigured = await checkBlobStatus();
-    console.log(`[Storage Sync] Blob configured: ${blobConfigured}`);
+    // Check if Firebase is configured
+    firebaseConfigured = await checkFirebaseStatus();
+    console.log(`[Storage Sync] Firebase configured: ${firebaseConfigured}`);
 
-    if (blobConfigured) {
-      // Pull from blob on launch
+    if (firebaseConfigured) {
+      // Pull from Firebase on launch
       console.log('[Storage Sync] Pulling data from cloud...');
-      const blobData = await pullFromBlob();
+      const firebaseData = await pullFromFirebase();
 
-      if (blobData) {
+      if (firebaseData) {
         const localData = getLocalData();
 
-        // Merge strategy: Blob data takes precedence if it has content
-        // But keep local data if blob is empty for that category
+        // Merge strategy: Firebase data takes precedence if it has content
+        // But keep local data if Firebase is empty for that category
         const mergedData: StorageData = {
-          connections: blobData.connections?.length > 0 ? blobData.connections : localData.connections,
-          presets: blobData.presets?.length > 0 ? blobData.presets : localData.presets,
-          settings: blobData.settings || localData.settings,
-          regexScripts: blobData.regexScripts?.length > 0 ? blobData.regexScripts : localData.regexScripts,
+          connections: firebaseData.connections?.length > 0 ? firebaseData.connections : localData.connections,
+          presets: firebaseData.presets?.length > 0 ? firebaseData.presets : localData.presets,
+          settings: firebaseData.settings || localData.settings,
+          regexScripts: firebaseData.regexScripts?.length > 0 ? firebaseData.regexScripts : localData.regexScripts,
         };
 
         setLocalData(mergedData);
         console.log('[Storage Sync] Data pulled from cloud successfully');
 
-        // If local had data that blob didn't, push it back
+        // If local had data that Firebase didn't, push it back
         if (
-          (localData.connections.length > 0 && blobData.connections?.length === 0) ||
-          (localData.presets.length > 0 && blobData.presets?.length === 0) ||
-          (localData.regexScripts.length > 0 && blobData.regexScripts?.length === 0)
+          (localData.connections.length > 0 && firebaseData.connections?.length === 0) ||
+          (localData.presets.length > 0 && firebaseData.presets?.length === 0) ||
+          (localData.regexScripts.length > 0 && firebaseData.regexScripts?.length === 0)
         ) {
           console.log('[Storage Sync] Pushing local data to cloud...');
-          await pushToBlob(mergedData);
+          await pushToFirebase(mergedData);
         }
       } else {
-        // Blob is empty, push local data if we have any
+        // Firebase is empty, push local data if we have any
         const localData = getLocalData();
         if (localData.connections.length > 0 || localData.presets.length > 0 || localData.regexScripts.length > 0) {
           console.log('[Storage Sync] Cloud is empty, pushing local data...');
-          await pushToBlob(localData);
+          await pushToFirebase(localData);
         }
       }
 
@@ -239,7 +239,7 @@ export async function initializeSync(): Promise<void> {
 // ============================================
 
 export function triggerPush(): void {
-  if (!blobConfigured || typeof window === 'undefined') return;
+  if (!firebaseConfigured || typeof window === 'undefined') return;
 
   // Clear existing timer
   if (pushDebounceTimer) {
@@ -256,7 +256,7 @@ export function triggerPush(): void {
 
     try {
       const localData = getLocalData();
-      const success = await pushToBlob(localData);
+      const success = await pushToFirebase(localData);
 
       if (success) {
         localStorage.setItem(STORAGE_KEYS.lastSync, new Date().toISOString());
@@ -275,18 +275,18 @@ export function triggerPush(): void {
 
 export function getSyncStatus(): SyncStatus {
   return {
-    configured: blobConfigured ?? false,
+    configured: firebaseConfigured ?? false,
     lastSync: typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.lastSync) : null,
     syncing: isSyncing,
   };
 }
 
 // ============================================
-// Check if Blob is Configured
+// Check if Firebase is Configured
 // ============================================
 
-export function isBlobConfigured(): boolean {
-  return blobConfigured ?? false;
+export function isFirebaseConfigured(): boolean {
+  return firebaseConfigured ?? false;
 }
 
 // ============================================
@@ -294,22 +294,22 @@ export function isBlobConfigured(): boolean {
 // ============================================
 
 export async function forceSync(direction: 'push' | 'pull'): Promise<boolean> {
-  if (!blobConfigured) return false;
+  if (!firebaseConfigured) return false;
 
   isSyncing = true;
 
   try {
     if (direction === 'push') {
       const localData = getLocalData();
-      const success = await pushToBlob(localData);
+      const success = await pushToFirebase(localData);
       if (success) {
         localStorage.setItem(STORAGE_KEYS.lastSync, new Date().toISOString());
       }
       return success;
     } else {
-      const blobData = await pullFromBlob();
-      if (blobData) {
-        setLocalData(blobData);
+      const firebaseData = await pullFromFirebase();
+      if (firebaseData) {
+        setLocalData(firebaseData);
         localStorage.setItem(STORAGE_KEYS.lastSync, new Date().toISOString());
         return true;
       }

@@ -1,155 +1,183 @@
-import { promises as fs } from 'fs';
-import path from 'path';
+// ============================================
+// Firebase-Compatible Logger
+// ============================================
+// Logs to console only (visible in Function logs)
+// No storage to save on quota
+
+// ============================================
+// Types
+// ============================================
 
 export interface LogEntry {
+  id: string;
   timestamp: string;
-  type: 'request' | 'response' | 'error';
+  type: 'request' | 'response' | 'error' | 'info';
   requestId: string;
   data: unknown;
+  durationMs?: number;
 }
 
-export interface LoggingConfig {
-  enabled: boolean;
-  logRequests: boolean;
-  logResponses: boolean;
-  logFilePath: string;
+// ============================================
+// Constants
+// ============================================
+
+const LOG_PREFIX = '[JT]';
+
+// ============================================
+// Console Logging (Shows in Function logs dashboard)
+// ============================================
+
+function consoleLog(level: 'info' | 'warn' | 'error', requestId: string, message: string, data?: unknown): void {
+  const timestamp = new Date().toISOString();
+  const prefix = `${LOG_PREFIX} [${timestamp}] [${requestId}]`;
+
+  const logFn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
+
+  if (data) {
+    logFn(`${prefix} ${message}`, JSON.stringify(data, null, 2));
+  } else {
+    logFn(`${prefix} ${message}`);
+  }
 }
 
-// Generate a unique request ID
+// ============================================
+// Public Logging Functions
+// ============================================
+
 export function generateRequestId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 }
 
-// Ensure the log directory exists
-async function ensureLogDirectory(filePath: string): Promise<void> {
-  const dir = path.dirname(filePath);
-  try {
-    await fs.access(dir);
-  } catch {
-    await fs.mkdir(dir, { recursive: true });
-  }
-}
-
-// Format log entry as a string
-function formatLogEntry(entry: LogEntry): string {
-  const separator = '='.repeat(80);
-  const header = `[${entry.timestamp}] [${entry.type.toUpperCase()}] [${entry.requestId}]`;
-  const content = JSON.stringify(entry.data, null, 2);
-  return `${separator}\n${header}\n${separator}\n${content}\n\n`;
-}
-
-// Write log entry to file
-export async function writeLog(
-  config: LoggingConfig,
-  entry: LogEntry
-): Promise<void> {
-  if (!config.enabled) return;
-
-  // Check if we should log this type
-  if (entry.type === 'request' && !config.logRequests) return;
-  if (entry.type === 'response' && !config.logResponses) return;
-
-  try {
-    const logPath = path.resolve(process.cwd(), config.logFilePath);
-    await ensureLogDirectory(logPath);
-
-    const formattedEntry = formatLogEntry(entry);
-    await fs.appendFile(logPath, formattedEntry, 'utf-8');
-  } catch (error) {
-    console.error('Failed to write log:', error);
-  }
-}
-
-// Log a request
 export async function logRequest(
-  config: LoggingConfig,
   requestId: string,
-  requestBody: unknown
+  data: {
+    url?: string;
+    method?: string;
+    headers?: Record<string, string>;
+    body?: unknown;
+    incomingMessages?: unknown[];
+    connectionPreset?: { name: string; baseUrl: string; model: string };
+    chatCompletionPreset?: { name: string };
+  }
 ): Promise<void> {
-  await writeLog(config, {
-    timestamp: new Date().toISOString(),
-    type: 'request',
-    requestId,
-    data: requestBody,
-  });
+  try {
+    // Log summary to console
+    consoleLog('info', requestId, 'REQUEST', {
+      url: data.url,
+      method: data.method,
+      connection: data.connectionPreset?.name,
+      model: data.connectionPreset?.model,
+      preset: data.chatCompletionPreset?.name,
+      messageCount: data.incomingMessages?.length,
+    });
+
+    // Detailed log for debugging (can be disabled in production if too verbose)
+    if (process.env.VERBOSE_LOGGING === 'true') {
+      console.log(`${LOG_PREFIX} [${requestId}] Full request body:`, JSON.stringify(data.body, null, 2));
+    }
+  } catch (error) {
+    console.error(`${LOG_PREFIX} [${requestId}] Failed to log request:`, error);
+  }
 }
 
-// Log a response
+export async function logProcessedRequest(
+  requestId: string,
+  data: {
+    processedMessages: unknown[];
+    samplerSettings?: unknown;
+    providerUrl: string;
+    model: string;
+    streaming?: boolean;
+    postProcessingMode?: string;
+  }
+): Promise<void> {
+  try {
+    const timestamp = new Date().toISOString();
+
+    // Build full messages - no truncation for debugging
+    const messagesPreview = data.processedMessages.map((msg: unknown, index: number) => {
+      const message = msg as { role?: string; content?: string };
+      return `  [${index}] ${message.role}:\n${message.content || ''}`;
+    }).join('\n\n');
+
+    // Single log entry with all info - full body for debugging
+    console.log(`${LOG_PREFIX} [${timestamp}] [${requestId}] PROCESSED REQUEST
+Provider: ${data.providerUrl}
+Model: ${data.model}
+Streaming: ${data.streaming ?? false}
+Post-processing: ${data.postProcessingMode || 'none'}
+Message count: ${data.processedMessages.length}
+Sampler: ${JSON.stringify(data.samplerSettings || {})}
+--- MESSAGES ---
+${messagesPreview}
+--- END ---`);
+
+  } catch (error) {
+    console.error(`${LOG_PREFIX} [${requestId}] Failed to log processed request:`, error);
+  }
+}
+
 export async function logResponse(
-  config: LoggingConfig,
   requestId: string,
-  responseBody: unknown,
-  durationMs?: number
+  data: {
+    status: number;
+    response?: unknown;
+    message?: string;
+    usage?: unknown;
+  },
+  durationMs: number
 ): Promise<void> {
-  await writeLog(config, {
-    timestamp: new Date().toISOString(),
-    type: 'response',
-    requestId,
-    data: {
-      response: responseBody,
-      durationMs,
-    },
-  });
+  try {
+    consoleLog('info', requestId, `RESPONSE (${durationMs}ms)`, {
+      status: data.status,
+      messagePreview: data.message?.substring(0, 100),
+      usage: data.usage,
+    });
+
+    // Detailed log for debugging
+    if (process.env.VERBOSE_LOGGING === 'true') {
+      console.log(`${LOG_PREFIX} [${requestId}] Full response:`, JSON.stringify(data.response, null, 2));
+    }
+  } catch (error) {
+    console.error(`${LOG_PREFIX} [${requestId}] Failed to log response:`, error);
+  }
 }
 
-// Log an error
 export async function logError(
-  config: LoggingConfig,
   requestId: string,
-  error: unknown
+  error: unknown,
+  context?: string
 ): Promise<void> {
-  await writeLog(config, {
-    timestamp: new Date().toISOString(),
-    type: 'error',
-    requestId,
-    data: {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    },
-  });
-}
-
-// Read recent log entries (for viewing in UI)
-export async function readRecentLogs(
-  filePath: string,
-  maxEntries: number = 50
-): Promise<string> {
   try {
-    const logPath = path.resolve(process.cwd(), filePath);
-    const content = await fs.readFile(logPath, 'utf-8');
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
 
-    // Split by separator and get last N entries
-    const entries = content.split('='.repeat(80)).filter(Boolean);
-    const recentEntries = entries.slice(-maxEntries);
-
-    return recentEntries.join('='.repeat(80));
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return 'No logs found.';
-    }
-    throw error;
+    consoleLog('error', requestId, `ERROR${context ? ` (${context})` : ''}`, {
+      message: errorMessage,
+      stack: errorStack,
+    });
+  } catch (loggingError) {
+    console.error(`${LOG_PREFIX} [${requestId}] Failed to log error:`, loggingError);
   }
 }
 
-// Clear log file
-export async function clearLogs(filePath: string): Promise<void> {
-  try {
-    const logPath = path.resolve(process.cwd(), filePath);
-    await fs.writeFile(logPath, '', 'utf-8');
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-      throw error;
-    }
-  }
+// ============================================
+// Stub functions for backward compatibility
+// (These no longer use storage)
+// ============================================
+
+export async function getLogs(): Promise<LogEntry[]> {
+  // Logs are in Function logs, not stored in storage
+  console.log(`${LOG_PREFIX} getLogs() called - logs are available in Function logs dashboard`);
+  return [];
 }
 
-// Get log file size
-export async function getLogFileSize(filePath: string): Promise<number> {
-  try {
-    const logPath = path.resolve(process.cwd(), filePath);
-    const stats = await fs.stat(logPath);
-    return stats.size;
-  } catch {
-    return 0;
-  }
+export async function clearLogs(): Promise<void> {
+  // No-op - logs are managed by platform
+  console.log(`${LOG_PREFIX} clearLogs() called - logs are managed by platform dashboard`);
+}
+
+export async function getLogStats(): Promise<{ count: number; lastUpdated: string | null }> {
+  // No storage for logs
+  return { count: 0, lastUpdated: null };
 }

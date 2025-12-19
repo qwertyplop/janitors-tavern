@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
+import { storageManager } from '@/lib/storage-provider';
 
-// Check if Vercel Blob is configured
+// Check if Firebase is configured
 export async function GET() {
-  // Check for BLOB_READ_WRITE_TOKEN environment variable
-  const blobConfigured = !!process.env.BLOB_READ_WRITE_TOKEN;
+  // Check if Firebase is available by getting the provider type
+  const providerType = await storageManager.getProviderType();
 
   return NextResponse.json({
-    configured: blobConfigured,
-    provider: blobConfigured ? 'blob' : 'local',
+    configured: providerType === 'firebase',
+    provider: providerType,
   });
 }

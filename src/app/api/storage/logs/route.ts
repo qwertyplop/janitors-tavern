@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getLogs, clearLogs, getLogStats } from '@/lib/vercel-logger';
+import { getLogs, clearLogs, getLogStats } from '@/lib/logger';
 
 // GET /api/storage/logs - Get all logs
 export async function GET() {

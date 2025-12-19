@@ -46,6 +46,8 @@ export default function DashboardPage() {
   const [loadingStats, setLoadingStats] = useState(true);
   const [confirmed, setConfirmed] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const { initialized } = useSync();
   const { t } = useI18n();
 
@@ -67,6 +69,7 @@ export default function DashboardPage() {
   useEffect(() => {
     loadData();
     fetchStats();
+    fetchApiKey();
   }, [fetchStats]);
 
   // Reload data when sync initializes (data may have been pulled from Firebase)
@@ -87,6 +90,23 @@ export default function DashboardPage() {
     setConnections(getConnectionPresets());
     setPresets(getChatCompletionPresets());
     setSettings(getSettings());
+  };
+
+  const fetchApiKey = async () => {
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get-auth-status' }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setApiKey(data.janitorApiKey || null);
+      }
+    } catch (error) {
+      console.error('Failed to fetch API key:', error);
+    }
   };
 
   const handleConnectionChange = (connectionId: string) => {
@@ -171,7 +191,7 @@ export default function DashboardPage() {
             <Label className="mb-2 block">API Key</Label>
             <div className="flex gap-2">
               <Input
-                value="Include this in X-API-Key header"
+                value={apiKey ? `${apiKey.substring(0, 4)}....${apiKey.slice(-2)}` : 'Loading...'}
                 readOnly
                 className="font-mono text-xs"
               />
@@ -179,10 +199,15 @@ export default function DashboardPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  navigator.clipboard.writeText('Include this in X-API-Key header');
+                  if (apiKey) {
+                    navigator.clipboard.writeText(apiKey);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }
                 }}
+                disabled={!apiKey}
               >
-                Copy
+                {copied ? 'Copied!' : 'Copy'}
               </Button>
             </div>
             <p className="mt-2 text-xs text-zinc-500">

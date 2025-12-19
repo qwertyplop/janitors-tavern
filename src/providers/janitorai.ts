@@ -1,6 +1,6 @@
 import { ChatProvider, ProviderRequest, ProviderConfig } from './base';
 import { InternalChatResponse, ChatMessage } from '@/types';
-import { getAuthSettings } from '@/lib/edge-auth';
+import { getAuthSettings } from '@/lib/auth';
 
 // JanitorAI provider - uses OpenAI-compatible format by default
 // but can be customized for JanitorAI-specific endpoints if needed

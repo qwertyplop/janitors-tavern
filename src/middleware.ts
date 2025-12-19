@@ -21,6 +21,15 @@ const protectedRoutes = [
   '/api/logs',
 ];
 
+// Define routes that should be protected (all web pages except public ones)
+const protectedPages = [
+  '/',           // Dashboard
+  '/connections', // Connections page
+  '/presets',    // Presets page
+  '/extensions', // Extensions page
+  '/settings',   // Settings page
+];
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
@@ -36,6 +45,23 @@ export async function middleware(request: NextRequest) {
   
   // If it's a public route, allow access
   if (isPublicRoute) {
+    // Check if this is a protected page (web interface)
+    const isProtectedPage = protectedPages.some(page =>
+      pathname === page || pathname.startsWith(page + '/')
+    );
+    
+    // If it's a protected page but not authenticated, redirect to login
+    if (isProtectedPage) {
+      // Check authentication using the same logic as API routes
+      const authenticated = await isAuthenticated(request);
+      
+      if (!authenticated) {
+        // Redirect to login page with callback URL
+        const callbackUrl = encodeURIComponent(request.nextUrl.pathname + request.nextUrl.search);
+        return NextResponse.redirect(new URL(`/login?callbackUrl=${callbackUrl}`, request.url));
+      }
+    }
+    
     return NextResponse.next();
   }
   

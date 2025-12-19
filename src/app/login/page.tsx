@@ -52,8 +52,6 @@ export default function LoginPage() {
     checkAuthSetup();
   }, [authLoading, isAuthenticated, router, t.login.authError]);
 
-  const [redirectTriggered, setRedirectTriggered] = useState(false);
-  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -66,28 +64,23 @@ export default function LoginPage() {
       const loginSuccess = await login(username, password);
       
       if (loginSuccess) {
-        // Show success message and set redirect trigger
+        // Show success message and redirect immediately
         setSuccess('Login successful! Redirecting...');
-        setRedirectTriggered(true);
+        // Use setTimeout to ensure the success message is shown before redirect
+        setTimeout(() => {
+          const targetUrl = callbackUrl && callbackUrl !== '/login' ? callbackUrl : '/';
+          router.push(targetUrl);
+        }, 500);
       } else {
         setError(t.login.invalidCredentials || 'Invalid username or password');
+        setLoading(false);
       }
     } catch (err) {
       setError(t.login.authError || 'Authentication failed');
       console.error('Login error:', err);
-    } finally {
       setLoading(false);
     }
   };
-  
-  // Handle redirect immediately after login success
-  useEffect(() => {
-    if (success && redirectTriggered) {
-      // Redirect immediately without delay to prevent race conditions
-      const targetUrl = callbackUrl && callbackUrl !== '/login' ? callbackUrl : '/';
-      router.push(targetUrl);
-    }
-  }, [success, redirectTriggered, callbackUrl, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-900 p-4">

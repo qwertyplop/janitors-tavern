@@ -64,7 +64,11 @@ export default function LoginPage() {
       const loginSuccess = await login(username, password);
       
       if (loginSuccess) {
-        router.push(callbackUrl);
+        // Show success message and redirect to dashboard after a brief delay
+        setError(''); // Clear any previous error
+        // Redirect to dashboard (or original callback URL if it's not the login page)
+        const targetUrl = callbackUrl && callbackUrl !== '/login' ? callbackUrl : '/';
+        router.push(targetUrl);
       } else {
         setError(t.login.invalidCredentials);
       }

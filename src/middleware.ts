@@ -67,34 +67,40 @@ export async function middleware(request: NextRequest) {
                    !pathname.startsWith('/public/') &&
                    !pathname.startsWith('/static/');
   
-  // If it's a web page but not a public route, redirect to login
-  // The login page will check Firestore and redirect to register if needed
-  if (isWebPage && !isPublicRoute) {
+  // DEBUG LOGGING
+  console.log(`Middleware - Processing: ${pathname}, Public: ${isPublicRoute}, WebPage: ${isWebPage}, Protected: ${isProtectedRoute}`);
+  
+  // If it's a public route, allow access regardless of authentication
+  if (isPublicRoute) {
+    console.log(`Middleware - Allowing access to public route: ${pathname}`);
+    return NextResponse.next();
+  }
+  
+  // Check authentication status
+  const authenticated = await isAuthenticated(request);
+  console.log(`Middleware - Authenticated: ${authenticated}`);
+  
+  // If it's a web page and user is not authenticated, redirect to login
+  if (isWebPage && !authenticated) {
+    console.log(`Middleware - Redirecting to login from ${pathname}`);
     const callbackUrl = encodeURIComponent(request.nextUrl.pathname + request.nextUrl.search);
     return NextResponse.redirect(new URL(`/login?callbackUrl=${callbackUrl}`, request.url));
   }
   
-  // If it's a public route, allow access
-  if (isPublicRoute) {
-    return NextResponse.next();
+  // If it's a protected API route and user is not authenticated, block access
+  if (isProtectedRoute && !authenticated) {
+    console.warn(`Middleware - Request blocked for ${pathname}, user not authenticated`);
+    return new NextResponse(
+      JSON.stringify({ error: 'Unauthorized: API key or session required' }),
+      {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
   }
   
-  // If it's a protected API route, check for API key
-  if (isProtectedRoute) {
-    const authenticated = await isAuthenticated(request);
-    
-    if (!authenticated) {
-      console.warn('Middleware - Request blocked, user not authenticated for protected route');
-      return new NextResponse(
-        JSON.stringify({ error: 'Unauthorized: API key required' }),
-        {
-          status: 401,
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
-    }
-  }
-  
+  // If authenticated or not a protected route, allow access
+  console.log(`Middleware - Allowing access to ${pathname}`);
   return NextResponse.next();
 }
 

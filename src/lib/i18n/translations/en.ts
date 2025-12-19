@@ -199,6 +199,7 @@ export const en = {
     setupAuth: 'Set up authentication',
     authSetupComplete: 'Authentication is set up and cannot be changed.',
     apiKeyManagement: 'API Key Management',
+    currentApiKey: 'Current API Key',
     generating: 'Generating...',
     generateNewApiKey: 'Generate New API Key',
     generatedApiKey: 'Generated API Key',
@@ -278,6 +279,21 @@ export const en = {
     clearAllDataHint: 'This will delete all presets, profiles, and settings from local storage.',
     confirmClearData: 'Are you sure you want to clear all data? This cannot be undone.',
     saveSettings: 'Save Settings',
+  },
+  
+  // Login
+  login: {
+    title: 'Sign In',
+    description: 'Enter your credentials to access the dashboard',
+    username: 'Username',
+    usernamePlaceholder: 'Enter your username',
+    password: 'Password',
+    passwordPlaceholder: 'Enter your password',
+    signIn: 'Sign In',
+    loggingIn: 'Signing in...',
+    invalidCredentials: 'Invalid username or password',
+    noAuthSetup: 'Authentication is not set up. Please configure authentication first.',
+    authError: 'An error occurred during authentication',
   },
 
   // Extensions

@@ -123,7 +123,8 @@ export async function PUT(request: NextRequest) {
             const currentAuthSettings = await getAuthSettings();
             return NextResponse.json({
               isAuthenticated: currentAuthSettings.isAuthenticated,
-              hasApiKey: !!currentAuthSettings.janitorApiKey
+              hasApiKey: !!currentAuthSettings.janitorApiKey,
+              janitorApiKey: currentAuthSettings.janitorApiKey
             });
           } catch (error) {
             console.error('Error getting auth status:', error);

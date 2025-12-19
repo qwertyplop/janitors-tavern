@@ -47,7 +47,7 @@ export default function SettingsPage() {
   const [samplers, setSamplers] = useState<SamplerPreset[]>([]);
   const [saved, setSaved] = useState(false);
   const [serverSaved, setServerSaved] = useState(false);
-  const [authStatus, setAuthStatus] = useState<{ isAuthenticated: boolean; hasApiKey: boolean } | null>(null);
+  const [authStatus, setAuthStatus] = useState<{ isAuthenticated: boolean; hasApiKey: boolean; janitorApiKey?: string } | null>(null);
   const [authForm, setAuthForm] = useState({ username: '', password: '' });
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [authMessage, setAuthMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -115,6 +115,65 @@ export default function SettingsPage() {
       
       if (response.ok) {
         setAuthMessage({ type: 'success', message: 'Authentication set up successfully' });
+        setAuthForm({ username: '', password: '' });
+        fetchAuthStatus(); // Refresh auth status
+      } else {
+        setAuthMessage({ type: 'error', message: data.error || 'Failed to set up authentication' });
+      }
+    } catch (error) {
+      setAuthMessage({ type: 'error', message: 'Failed to set up authentication' });
+    }
+  };
+  
+  const handleSetupAuthAndDownloadEnv = async () => {
+    if (!authForm.username || !authForm.password) {
+      setAuthMessage({ type: 'error', message: 'Username and password are required' });
+      return;
+    }
+    
+    try {
+      // First, set up the auth
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'setup',
+          username: authForm.username,
+          password: authForm.password
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Generate the .env content
+        const apiKey = await updateJanitorApiKey(); // Generate a new API key
+        const envContent = `# Authentication Settings
+AUTH_IS_SETUP=true
+AUTH_ENFORCED=true
+AUTH_USERNAME=${authForm.username}
+# Note: Password is stored as a hash, not in plain text
+JANITOR_API_KEY=${apiKey}
+
+# Use these settings in your deployment environment
+# After setting these variables, restart your application
+`;
+        
+        // Create and download the .env file
+        const blob = new Blob([envContent], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = '.env';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        setAuthMessage({
+          type: 'success',
+          message: 'Authentication set up successfully! Downloaded .env file with environment variables. Please set these in your deployment and restart the application.'
+        });
         setAuthForm({ username: '', password: '' });
         fetchAuthStatus(); // Refresh auth status
       } else {
@@ -610,7 +669,7 @@ export default function SettingsPage() {
                     <p className="text-xs text-zinc-500">{t.settings.authPasswordHint}</p>
                   </div>
                   
-                  <Button onClick={handleSetupAuth} disabled={!authForm.username || !authForm.password}>
+                  <Button onClick={handleSetupAuthAndDownloadEnv} disabled={!authForm.username || !authForm.password}>
                     {t.settings.setupAuth}
                   </Button>
                 </div>
@@ -622,41 +681,43 @@ export default function SettingsPage() {
                   
                   <div className="space-y-3">
                     <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                      {t.settings.apiKeyManagement}
+                      {t.settings.currentApiKey}
                     </h4>
                     
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex gap-2">
+                        <Input
+                          value={authStatus.janitorApiKey ? `${authStatus.janitorApiKey.substring(0, 8)}...${authStatus.janitorApiKey.slice(-4)}` : 'API key not available'}
+                          readOnly
+                          className="font-mono text-xs"
+                        />
                         <Button
-                          onClick={handleGenerateApiKey}
-                          disabled={isGeneratingApiKey}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (authStatus.janitorApiKey) {
+                              navigator.clipboard.writeText(authStatus.janitorApiKey);
+                              setAuthMessage({ type: 'success', message: 'API key copied to clipboard!' });
+                            }
+                          }}
                         >
-                          {isGeneratingApiKey ? t.settings.generating : t.settings.generateNewApiKey}
+                          {t.settings.copy}
                         </Button>
                       </div>
-                      
-                      {apiKey && (
-                        <div className="space-y-2">
-                          <Label>{t.settings.generatedApiKey}</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              value={apiKey}
-                              readOnly
-                              className="font-mono text-xs"
-                            />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={handleCopyApiKey}
-                            >
-                              {t.settings.copy}
-                            </Button>
-                          </div>
-                          <p className="text-xs text-zinc-500">
-                            {t.settings.apiKeyUsageHint}
-                          </p>
-                        </div>
-                      )}
+                      <p className="text-xs text-zinc-500">
+                        {t.settings.apiKeyUsageHint}
+                      </p>
+                    </div>
+                    
+                    <div className="pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleGenerateApiKey}
+                        disabled={isGeneratingApiKey}
+                      >
+                        {isGeneratingApiKey ? t.settings.generating : t.settings.generateNewApiKey}
+                      </Button>
                     </div>
                   </div>
                 </div>

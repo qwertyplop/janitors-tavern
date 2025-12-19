@@ -201,6 +201,7 @@ export const ru: TranslationKeys = {
     setupAuth: 'Настроить аутентификацию',
     authSetupComplete: 'Аутентификация настроена и не может быть изменена.',
     apiKeyManagement: 'Управление API-ключом',
+    currentApiKey: 'Текущий API-ключ',
     generating: 'Генерация...',
     generateNewApiKey: 'Сгенерировать новый API-ключ',
     generatedApiKey: 'Сгенерированный API-ключ',
@@ -280,6 +281,21 @@ export const ru: TranslationKeys = {
     clearAllDataHint: 'Это удалит все пресеты, профили и настройки из локального хранилища.',
     confirmClearData: 'Вы уверены, что хотите очистить все данные? Это действие нельзя отменить.',
     saveSettings: 'Сохранить настройки',
+  },
+  
+  // Login
+  login: {
+    title: 'Вход',
+    description: 'Введите свои учетные данные для доступа к панели управления',
+    username: 'Имя пользователя',
+    usernamePlaceholder: 'Введите имя пользователя',
+    password: 'Пароль',
+    passwordPlaceholder: 'Введите пароль',
+    signIn: 'Войти',
+    loggingIn: 'Выполняется вход...',
+    invalidCredentials: 'Неверное имя пользователя или пароль',
+    noAuthSetup: 'Аутентификация не настроена. Сначала настройте аутентификацию.',
+    authError: 'Произошла ошибка при аутентификации',
   },
 
   // Extensions

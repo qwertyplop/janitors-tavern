@@ -4,6 +4,9 @@ import { useState } from 'react';
 import { Sidebar } from './sidebar';
 import { SyncProvider } from '@/components/providers/SyncProvider';
 import { I18nProvider } from '@/components/providers/I18nProvider';
+import { useAuth } from '@/components/providers/AuthProvider';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -11,6 +14,36 @@ interface MainLayoutProps {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isAuthenticated, loading } = useAuth();
+  const router = useRouter();
+
+  // Check authentication status and redirect if not authenticated
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      // Redirect to login page with current path as callback
+      const currentPath = window.location.pathname + window.location.search;
+      if (currentPath !== '/login') {
+        const callbackUrl = encodeURIComponent(currentPath);
+        router.push(`/login?callbackUrl=${callbackUrl}`);
+      }
+    }
+  }, [isAuthenticated, loading, router]);
+
+  // Show loading state while checking auth
+  if (loading) {
+    return (
+      <I18nProvider>
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-lg">Loading...</div>
+        </div>
+      </I18nProvider>
+    );
+  }
+
+  // If not authenticated, don't render the layout (redirect will happen in useEffect)
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <I18nProvider>
@@ -45,7 +78,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
                 </svg>
               </button>
-              <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Janitor&apos;s Tavern</h1>
+              <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Janitor's Tavern</h1>
             </div>
 
             <div className="container mx-auto p-4 sm:p-6">{children}</div>

@@ -9,6 +9,7 @@ const publicRoutes = [
   '/api/storage/status',
   '/api/storage/stats',
   '/api/storage/logs',
+  '/login',  // Allow access to login page
 ];
 
 // Define routes that require authentication

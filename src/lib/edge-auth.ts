@@ -1,4 +1,6 @@
 import { NextRequest } from 'next/server';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from './firebase-config';
 
 // Define auth-related types
 export interface AuthSettings {
@@ -22,21 +24,47 @@ export async function isAuthenticated(request: NextRequest): Promise<boolean> {
   
   // If authentication is enforced, check for API key in headers
   const apiKey = request.headers.get('x-api-key');
-  const expectedApiKey = process.env.JANITOR_API_KEY;
   
   console.log('Edge auth - Checking API key:', {
     hasApiKey: !!apiKey,
-    hasExpectedApiKey: !!expectedApiKey
+    hasFirebase: !!db
   });
   
-  // If no expected API key is set, allow access (shouldn't happen in properly configured system)
-  if (!expectedApiKey) {
-    console.log('Edge auth - No expected API key set, allowing request');
-    return true;
+  // If no API key is provided, deny access
+  if (!apiKey) {
+    console.log('Edge auth - No API key provided');
+    return false;
   }
   
-  // Check if the provided API key matches the expected one
-  const isAuth = apiKey === expectedApiKey;
-  console.log('Edge auth - Authentication result:', isAuth);
-  return isAuth;
+  // If Firebase is not available, deny access
+  if (!db) {
+    console.log('Edge auth - Firebase not available');
+    return false;
+  }
+  
+  try {
+    // Check if the provided API key matches the one in Firestore
+    const authDoc = await getDoc(doc(db, 'system', 'auth'));
+    
+    if (authDoc.exists()) {
+      const data = authDoc.data();
+      const storedApiKey = data.janitorApiKey;
+      
+      console.log('Edge auth - API key validation:', {
+        provided: apiKey.substring(0, 8) + '...',
+        stored: storedApiKey ? storedApiKey.substring(0, 8) + '...' : 'none',
+        match: apiKey === storedApiKey
+      });
+      
+      const isAuth = apiKey === storedApiKey;
+      console.log('Edge auth - Authentication result:', isAuth);
+      return isAuth;
+    } else {
+      console.log('Edge auth - No auth document found in Firestore');
+      return false;
+    }
+  } catch (error) {
+    console.error('Edge auth - Error validating API key:', error);
+    return false;
+  }
 }

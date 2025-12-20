@@ -67,6 +67,7 @@ export default function DashboardPage() {
 
   // Load data on mount
   useEffect(() => {
+    console.log('Dashboard - Component mounted, loading data...');
     loadData();
     fetchStats();
     fetchApiKey();
@@ -94,20 +95,38 @@ export default function DashboardPage() {
 
   const fetchApiKey = async () => {
     try {
+      console.log('=== Dashboard API Key Fetch Start ===');
       console.log('Dashboard - Fetching API key from /api/settings/auth');
-      const response = await fetch('/api/settings/auth');
+      console.log('Dashboard - Current origin:', window.location.origin);
+      console.log('Dashboard - Full URL:', window.location.origin + '/api/settings/auth');
+      
+      const response = await fetch('/api/settings/auth', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin'
+      });
+      
+      console.log('Dashboard - Fetch completed, status:', response.status);
+      console.log('Dashboard - Response headers:', Object.fromEntries(response.headers.entries()));
       
       if (response.ok) {
         const data = await response.json();
         console.log('Dashboard - API key fetch response:', data);
+        console.log('Dashboard - API key from response:', data.janitorApiKey);
         setApiKey(data.janitorApiKey || null);
       } else {
         console.error('Dashboard - Failed to fetch API key:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('Dashboard - Error response body:', errorText);
         setApiKey(null);
       }
     } catch (error) {
       console.error('Dashboard - Error fetching API key:', error);
       setApiKey(null);
+    } finally {
+      console.log('=== Dashboard API Key Fetch End ===');
     }
   };
 

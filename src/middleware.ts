@@ -35,6 +35,7 @@ const publicRoutes = [
   '/api/health',
   '/api/proxy/test-connection',
   '/api/proxy/models',
+  '/api/proxy/chat-completion', // Proxy endpoint is public - API key validation happens in the route itself
   '/api/storage/status',
   '/api/storage/stats',
   '/api/storage/logs',
@@ -44,7 +45,6 @@ const publicRoutes = [
 
 // Define routes that require authentication
 const protectedRoutes = [
-  '/api/proxy/chat-completion',
   '/api/settings',
   '/api/storage',
   '/api/logs',

@@ -17,6 +17,7 @@ import { forceSync } from '@/lib/storage-sync';
 import { ConnectionPreset, ChatCompletionPreset, AppSettings, PromptPostProcessingMode } from '@/types';
 import { useSync } from '@/components/providers/SyncProvider';
 import { useI18n } from '@/components/providers/I18nProvider';
+import { getAuthSettings } from '@/lib/auth';
 
 interface UsageStats {
   totalRequests: number;
@@ -95,38 +96,19 @@ export default function DashboardPage() {
 
   const fetchApiKey = async () => {
     try {
-      console.log('=== Dashboard API Key Fetch Start ===');
-      console.log('Dashboard - Fetching API key from /api/settings/auth');
-      console.log('Dashboard - Current origin:', window.location.origin);
-      console.log('Dashboard - Full URL:', window.location.origin + '/api/settings/auth');
+      console.log('Dashboard - Fetching API key using getAuthSettings() from client-side');
       
-      const response = await fetch('/api/settings/auth', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'same-origin'
+      const authSettings = await getAuthSettings();
+      console.log('Dashboard - Auth settings received:', {
+        isAuthenticated: authSettings.isAuthenticated,
+        hasApiKey: !!authSettings.janitorApiKey,
+        apiKeyPreview: authSettings.janitorApiKey ? authSettings.janitorApiKey.substring(0, 8) + '...' : 'none'
       });
       
-      console.log('Dashboard - Fetch completed, status:', response.status);
-      console.log('Dashboard - Response headers:', Object.fromEntries(response.headers.entries()));
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Dashboard - API key fetch response:', data);
-        console.log('Dashboard - API key from response:', data.janitorApiKey);
-        setApiKey(data.janitorApiKey || null);
-      } else {
-        console.error('Dashboard - Failed to fetch API key:', response.status, response.statusText);
-        const errorText = await response.text();
-        console.error('Dashboard - Error response body:', errorText);
-        setApiKey(null);
-      }
+      setApiKey(authSettings.janitorApiKey || null);
     } catch (error) {
       console.error('Dashboard - Error fetching API key:', error);
       setApiKey(null);
-    } finally {
-      console.log('=== Dashboard API Key Fetch End ===');
     }
   };
 

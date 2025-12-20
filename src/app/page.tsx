@@ -94,15 +94,13 @@ export default function DashboardPage() {
 
   const fetchApiKey = async () => {
     try {
-      const response = await fetch('/api/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get-auth-status' }),
-      });
+      const response = await fetch('/api/settings/auth');
       
       if (response.ok) {
         const data = await response.json();
         setApiKey(data.janitorApiKey || null);
+      } else {
+        console.error('Failed to fetch API key:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Failed to fetch API key:', error);

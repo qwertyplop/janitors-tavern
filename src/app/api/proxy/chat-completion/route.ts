@@ -476,6 +476,9 @@ export async function POST(request: NextRequest) {
         }
       });
 
+      // Log streaming response initiation
+      console.log(`[JT] [${requestId}] STREAMING RESPONSE initiated (status: ${streamResult.status})`);
+
       // Fire-and-forget: Log and record stats without blocking the stream
       // This is critical - awaiting these would delay/break the stream response
       logResponse(requestId, {
@@ -493,6 +496,10 @@ export async function POST(request: NextRequest) {
 
         const transformStream = new TransformStream({
           transform(chunk, controller) {
+            // Log raw chunk before any processing
+            const rawText = decoder.decode(chunk, { stream: true });
+            console.log(`[JT] [${requestId}] RAW STREAM CHUNK:`, rawText);
+
             // If prefix already sent, pass through as-is
             if (prefixSent) {
               controller.enqueue(chunk);
@@ -565,6 +572,9 @@ export async function POST(request: NextRequest) {
     if (provider instanceof OpenAICompatibleProvider) {
       const rawResult = await provider.sendChatCompletionRaw(providerRequest);
 
+      // Log the FULL raw response body before any processing
+      console.log(`[JT] [${requestId}] RAW RESPONSE BODY (before processing):`, rawResult.body);
+
       // Fire-and-forget logging
       logResponse(requestId, {
         status: rawResult.status,
@@ -590,6 +600,9 @@ export async function POST(request: NextRequest) {
 
       // Apply regex scripts (placement 2) and startReplyWith to AI output
       try {
+        // Log the raw response body before JSON parsing
+        console.log(`[JT] [${requestId}] RAW RESPONSE BODY (before JSON parsing):`, rawResult.body);
+        
         const responseJson = JSON.parse(rawResult.body);
         if (responseJson.choices?.[0]?.message?.content) {
           let content = responseJson.choices[0].message.content;
@@ -611,8 +624,9 @@ export async function POST(request: NextRequest) {
           status: rawResult.status,
           headers: responseHeaders,
         });
-      } catch {
-        // If parsing fails, return as-is (no regex processing)
+      } catch (parseError) {
+        // If parsing fails, log the error and return as-is (no regex processing)
+        console.log(`[JT] [${requestId}] Failed to parse JSON response:`, parseError);
       }
 
       // Pure passthrough - return provider's response as-is
@@ -637,6 +651,9 @@ export async function POST(request: NextRequest) {
         },
       });
     }
+
+    // Log the raw response before processing
+    console.log(`[JT] [${requestId}] RAW RESPONSE (fallback provider):`, JSON.stringify(result, null, 2));
 
     // Process AI output content with startReplyWith and regex scripts
     let aiContent = result.message?.content || '';

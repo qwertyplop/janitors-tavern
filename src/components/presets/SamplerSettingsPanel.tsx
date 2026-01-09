@@ -290,7 +290,7 @@ export function SamplerSettingsPanel({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="n">Number of Completions</Label>
+            <Label htmlFor="n">Number of Completions (Not tested, probably doesn't work)</Label>
             <Input
               id="n"
               type="number"

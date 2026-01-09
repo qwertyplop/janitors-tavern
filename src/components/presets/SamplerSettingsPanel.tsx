@@ -235,8 +235,12 @@ export function SamplerSettingsPanel({
             <Input
               id="max_context"
               type="number"
-              value={settings.openai_max_context}
-              onChange={(e) => handleChange('openai_max_context', parseInt(e.target.value) || 4096)}
+              value={isNaN(settings.openai_max_context) ? '' : settings.openai_max_context}
+              onChange={(e) => {
+                const val = e.target.value;
+                const parsed = parseInt(val);
+                handleChange('openai_max_context', isNaN(parsed) ? NaN : parsed);
+              }}
               min={1}
             />
             <p className="text-xs text-gray-500">Maximum context window size (internal use)</p>
@@ -255,8 +259,12 @@ export function SamplerSettingsPanel({
             <Input
               id="max_tokens"
               type="number"
-              value={settings.openai_max_tokens}
-              onChange={(e) => handleChange('openai_max_tokens', parseInt(e.target.value) || 2048)}
+              value={isNaN(settings.openai_max_tokens) ? '' : settings.openai_max_tokens}
+              onChange={(e) => {
+                const val = e.target.value;
+                const parsed = parseInt(val);
+                handleChange('openai_max_tokens', isNaN(parsed) ? NaN : parsed);
+              }}
               min={1}
               disabled={!isEnabled('openai_max_tokens')}
             />
@@ -282,8 +290,12 @@ export function SamplerSettingsPanel({
             <Input
               id="seed"
               type="number"
-              value={settings.seed}
-              onChange={(e) => handleChange('seed', parseInt(e.target.value) || -1)}
+              value={isNaN(settings.seed) ? '' : settings.seed}
+              onChange={(e) => {
+                const val = e.target.value;
+                const parsed = parseInt(val);
+                handleChange('seed', isNaN(parsed) ? NaN : parsed);
+              }}
               disabled={!isEnabled('seed')}
             />
             <p className="text-xs text-gray-500">-1 for random. Same seed = reproducible outputs</p>
@@ -294,8 +306,12 @@ export function SamplerSettingsPanel({
             <Input
               id="n"
               type="number"
-              value={settings.n}
-              onChange={(e) => handleChange('n', parseInt(e.target.value) || 1)}
+              value={isNaN(settings.n) ? '' : settings.n}
+              onChange={(e) => {
+                const val = e.target.value;
+                const parsed = parseInt(val);
+                handleChange('n', isNaN(parsed) ? NaN : parsed);
+              }}
               min={1}
               max={10}
             />

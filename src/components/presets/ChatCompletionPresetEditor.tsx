@@ -104,6 +104,29 @@ export function ChatCompletionPresetEditor({
     });
   };
 
+  // Clean up NaN values in sampler settings before saving
+  const cleanupPresetForSave = (presetToClean: ChatCompletionPreset): ChatCompletionPreset => {
+    const cleanedSampler = { ...presetToClean.sampler };
+
+    // Replace NaN with defaults
+    if (isNaN(cleanedSampler.openai_max_context)) {
+      cleanedSampler.openai_max_context = 4096;
+    }
+    if (isNaN(cleanedSampler.openai_max_tokens)) {
+      cleanedSampler.openai_max_tokens = 2048;
+    }
+    if (isNaN(cleanedSampler.seed)) {
+      cleanedSampler.seed = -1;
+    }
+    if (isNaN(cleanedSampler.n)) {
+      cleanedSampler.n = 1;
+    }
+
+    return {
+      ...presetToClean,
+      sampler: cleanedSampler,
+    };
+  };
 
   return (
     <div className="space-y-6">
@@ -153,7 +176,7 @@ export function ChatCompletionPresetEditor({
         <Button variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button onClick={() => onSave(preset)}>Save Preset</Button>
+        <Button onClick={() => onSave(cleanupPresetForSave(preset))}>Save Preset</Button>
       </div>
 
       {/* Tabs */}

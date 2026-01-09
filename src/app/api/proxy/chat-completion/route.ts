@@ -326,10 +326,18 @@ export async function POST(request: NextRequest) {
     console.log(`[JT] [${requestId}] Settings retrieved:`, JSON.stringify(settings, null, 2));
     console.log(`[JT] [${requestId}] Connection preset promptPostProcessing:`, connectionPreset.promptPostProcessing);
     console.log(`[JT] [${requestId}] Settings defaultPostProcessing:`, settings.defaultPostProcessing);
-    const postProcessingMode: PromptPostProcessingMode =
-      connectionPreset.promptPostProcessing ||
-      settings.defaultPostProcessing ||
-      'none';
+
+    // Priority: connection preset (if not 'none') → app settings → default 'none'
+    // 'none' in connection preset means "use app default", not "force no processing"
+    let postProcessingMode: PromptPostProcessingMode;
+    if (connectionPreset.promptPostProcessing && connectionPreset.promptPostProcessing !== 'none') {
+      postProcessingMode = connectionPreset.promptPostProcessing;
+    } else if (settings.defaultPostProcessing !== undefined) {
+      postProcessingMode = settings.defaultPostProcessing;
+    } else {
+      postProcessingMode = 'none';
+    }
+
     console.log(`[JT] [${requestId}] Final postProcessingMode:`, postProcessingMode);
 
     // Load regex scripts for processing

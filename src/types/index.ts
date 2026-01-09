@@ -131,13 +131,6 @@ export interface STChatCompletionPreset {
   names_behavior: number;
   send_if_empty: string;
 
-  // Special prompts
-  impersonation_prompt: string;
-  new_chat_prompt: string;
-  new_group_chat_prompt: string;
-  new_example_chat_prompt: string;
-  continue_nudge_prompt: string;
-  group_nudge_prompt: string;
 
   // Format strings
   wi_format: string;
@@ -169,9 +162,6 @@ export interface STChatCompletionPreset {
   inline_image_quality: string;
   video_inlining: boolean;
 
-  // Continue settings
-  continue_prefill: boolean;
-  continue_postfix: string;
 
   // Advanced features
   function_calling: boolean;
@@ -216,15 +206,6 @@ export interface ChatCompletionPreset {
   // Prompt ordering (defines enabled/disabled and order)
   promptOrder: STPromptOrder[];
 
-  // Special prompts
-  specialPrompts: {
-    impersonation: string;
-    newChat: string;
-    newGroupChat: string;
-    newExampleChat: string;
-    continueNudge: string;
-    groupNudge: string;
-  };
 
   // Format strings
   formatStrings: {
@@ -252,11 +233,6 @@ export interface ChatCompletionPreset {
     videoInlining: boolean;
   };
 
-  // Continue settings
-  continueSettings: {
-    prefill: boolean;
-    postfix: string;
-  };
 
   // Advanced settings
   advancedSettings: {

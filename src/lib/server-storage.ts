@@ -96,6 +96,7 @@ export async function getServerSettings(): Promise<AppSettings> {
     theme: 'system',
     language: 'en',
     showAdvancedOptions: false,
+    defaultPostProcessing: 'none',
     logging: {
       enabled: false,
       logRequests: true,

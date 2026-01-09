@@ -164,6 +164,7 @@ function getDefaultSettings(): AppSettings {
     theme: 'system',
     language: 'en',
     showAdvancedOptions: false,
+    defaultPostProcessing: 'none',
     logging: {
       enabled: false,
       logRequests: true,

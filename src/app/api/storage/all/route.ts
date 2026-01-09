@@ -11,6 +11,7 @@ const DEFAULTS: StorageData = {
     theme: 'system',
     language: 'en',
     showAdvancedOptions: false,
+    defaultPostProcessing: 'none',
     logging: {
       enabled: false,
       logRequests: true,

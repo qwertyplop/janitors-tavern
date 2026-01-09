@@ -128,6 +128,7 @@ export default function DashboardPage() {
     const newSettings = updateSettings({
       defaultPostProcessing: (mode || 'none') as PromptPostProcessingMode
     });
+    console.log('[Dashboard] Post-processing changed to:', mode, 'New settings:', newSettings);
     setSettings(newSettings);
     setConfirmed(false);
   };

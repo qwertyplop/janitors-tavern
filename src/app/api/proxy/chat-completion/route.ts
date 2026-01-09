@@ -323,10 +323,14 @@ export async function POST(request: NextRequest) {
 
     // Get settings for post-processing mode
     const settings = await getServerSettings();
+    console.log(`[JT] [${requestId}] Settings retrieved:`, JSON.stringify(settings, null, 2));
+    console.log(`[JT] [${requestId}] Connection preset promptPostProcessing:`, connectionPreset.promptPostProcessing);
+    console.log(`[JT] [${requestId}] Settings defaultPostProcessing:`, settings.defaultPostProcessing);
     const postProcessingMode: PromptPostProcessingMode =
       connectionPreset.promptPostProcessing ||
       settings.defaultPostProcessing ||
       'none';
+    console.log(`[JT] [${requestId}] Final postProcessingMode:`, postProcessingMode);
 
     // Load regex scripts for processing
     const regexScripts = await getServerRegexScripts();

@@ -104,7 +104,10 @@ export async function getServerSettings(): Promise<AppSettings> {
       logFilePath: 'logs/proxy.log',
     },
   };
-  return fetchFirebaseJson<AppSettings>('settings', defaultSettings);
+  const settings = await fetchFirebaseJson<AppSettings>('settings', defaultSettings);
+  console.log('[ServerStorage] getServerSettings() returned:', JSON.stringify(settings, null, 2));
+  console.log('[ServerStorage] defaultPostProcessing value:', settings.defaultPostProcessing);
+  return settings;
 }
 
 export async function getServerConnectionPresets(): Promise<ConnectionPreset[]> {

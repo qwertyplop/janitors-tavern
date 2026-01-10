@@ -913,6 +913,70 @@ export function getAllRegexScripts(): Array<RegexScript & { source: 'standalone'
   return result;
 }
 
+/**
+ * Update a preset-specific regex script
+ * @param presetId The ID of the preset containing the script
+ * @param scriptId The ID of the script to update
+ * @param updates The updates to apply to the script
+ * @returns The updated preset or null if not found
+ */
+export function updatePresetRegexScript(
+  presetId: string,
+  scriptId: string,
+  updates: Partial<Omit<RegexScript, 'id' | 'createdAt' | 'updatedAt' | '_presetId' | '_presetName'>>
+): ChatCompletionPreset | null {
+  const preset = getChatCompletionPreset(presetId);
+  if (!preset || !preset.regexScripts) return null;
+  
+  const scriptIndex = preset.regexScripts.findIndex(s => s.id === scriptId);
+  if (scriptIndex === -1) return null;
+  
+  const updatedScripts = [...preset.regexScripts];
+  const now = new Date().toISOString();
+  
+  updatedScripts[scriptIndex] = {
+    ...updatedScripts[scriptIndex],
+    ...updates,
+    findRegex: updates.findRegex ? normalizeRegexPattern(updates.findRegex) : updatedScripts[scriptIndex].findRegex,
+    roles: updates.roles !== undefined ? updates.roles : updatedScripts[scriptIndex].roles || ['assistant', 'user'],
+    updatedAt: now,
+  };
+  
+  return updateChatCompletionPreset(presetId, {
+    regexScripts: updatedScripts,
+  });
+}
+
+/**
+ * Toggle the disabled state of a preset-specific regex script
+ * @param presetId The ID of the preset containing the script
+ * @param scriptId The ID of the script to toggle
+ * @returns The updated preset or null if not found
+ */
+export function togglePresetRegexScriptDisabled(
+  presetId: string,
+  scriptId: string
+): ChatCompletionPreset | null {
+  const preset = getChatCompletionPreset(presetId);
+  if (!preset || !preset.regexScripts) return null;
+  
+  const scriptIndex = preset.regexScripts.findIndex(s => s.id === scriptId);
+  if (scriptIndex === -1) return null;
+  
+  const updatedScripts = [...preset.regexScripts];
+  const now = new Date().toISOString();
+  
+  updatedScripts[scriptIndex] = {
+    ...updatedScripts[scriptIndex],
+    disabled: !updatedScripts[scriptIndex].disabled,
+    updatedAt: now,
+  };
+  
+  return updateChatCompletionPreset(presetId, {
+    regexScripts: updatedScripts,
+  });
+}
+
 // Create a default/empty chat completion preset
 export function createDefaultChatCompletionPreset(): Omit<ChatCompletionPreset, 'id' | 'createdAt' | 'updatedAt'> {
   return {

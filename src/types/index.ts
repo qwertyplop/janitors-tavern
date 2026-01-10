@@ -379,6 +379,9 @@ export interface RegexScript {
   order: number; // execution order (lower numbers execute first)
   createdAt: string; // ISO timestamp
   updatedAt: string; // ISO timestamp
+  // Optional fields for preset-specific regex scripts
+  _presetId?: string; // ID of the preset this script belongs to
+  _presetName?: string; // Name of the preset this script belongs to
 }
 
 // A pipeline of regex scripts (ordered collection)

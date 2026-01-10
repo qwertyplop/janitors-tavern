@@ -20,6 +20,8 @@ import {
   updateRegexScriptsOrder,
   migrateRegexScriptsOrder,
   getPresetRegexScripts,
+  updatePresetRegexScript,
+  togglePresetRegexScriptDisabled,
 } from '@/lib/storage';
 import { RegexScript } from '@/types';
 import { applyRegexScript, applyRegexScripts } from '@/lib/regex-processor';
@@ -212,19 +214,38 @@ export default function RegexScriptManager() {
     setIsDialogOpen(true);
   };
 
-  const handleEdit = (script: RegexScript) => {
-    setEditingId(script.id);
-    setFormName(script.scriptName);
-    setFormFindRegex(script.findRegex);
-    setFormReplaceString(script.replaceString);
-    setFormTrimStrings([...script.trimStrings]);
-    setFormPlacement([...script.placement]);
-    setFormRoles(script.roles || ['assistant', 'user']); // Default to assistant and user if not set
-    setFormMarkdownOnly(script.markdownOnly);
-    setFormSubstituteRegex(script.substituteRegex);
-    setFormMinDepth(script.minDepth);
-    setFormMaxDepth(script.maxDepth);
-    setIsDialogOpen(true);
+  const handleEdit = (script: RegexScript, isPresetScript?: boolean, presetId?: string) => {
+    if (isPresetScript && presetId) {
+      // For preset scripts, we need to track that we're editing a preset script
+      setEditingId(script.id);
+      setFormName(script.scriptName);
+      setFormFindRegex(script.findRegex);
+      setFormReplaceString(script.replaceString);
+      setFormTrimStrings([...script.trimStrings]);
+      setFormPlacement([...script.placement]);
+      setFormRoles(script.roles || ['assistant', 'user']); // Default to assistant and user if not set
+      setFormMarkdownOnly(script.markdownOnly);
+      setFormSubstituteRegex(script.substituteRegex);
+      setFormMinDepth(script.minDepth);
+      setFormMaxDepth(script.maxDepth);
+      // Store preset info for saving
+      (window as any)._editingPresetScript = { scriptId: script.id, presetId };
+      setIsDialogOpen(true);
+    } else {
+      // Regular standalone script
+      setEditingId(script.id);
+      setFormName(script.scriptName);
+      setFormFindRegex(script.findRegex);
+      setFormReplaceString(script.replaceString);
+      setFormTrimStrings([...script.trimStrings]);
+      setFormPlacement([...script.placement]);
+      setFormRoles(script.roles || ['assistant', 'user']); // Default to assistant and user if not set
+      setFormMarkdownOnly(script.markdownOnly);
+      setFormSubstituteRegex(script.substituteRegex);
+      setFormMinDepth(script.minDepth);
+      setFormMaxDepth(script.maxDepth);
+      setIsDialogOpen(true);
+    }
   };
 
   const resetForm = () => {
@@ -238,12 +259,14 @@ export default function RegexScriptManager() {
     setFormSubstituteRegex(0);
     setFormMinDepth(null);
     setFormMaxDepth(null);
+    // Clear preset script info
+    delete (window as any)._editingPresetScript;
   };
 
   const handleSave = () => {
     if (!formName || !formFindRegex) return;
 
-    const scriptData: Omit<RegexScript, 'id' | 'createdAt' | 'updatedAt' | 'order'> = {
+    const scriptData: Omit<RegexScript, 'id' | 'createdAt' | 'updatedAt' | 'order' | '_presetId' | '_presetName'> = {
         scriptName: formName,
         findRegex: formFindRegex,
         replaceString: formReplaceString,
@@ -261,13 +284,25 @@ export default function RegexScriptManager() {
         runOnEdit: false,
     };
 
-    if (editingId) {
+    // Check if we're editing a preset script
+    const presetScriptInfo = (window as any)._editingPresetScript;
+    if (editingId && presetScriptInfo) {
+      // Update preset script
+      updatePresetRegexScript(presetScriptInfo.presetId, editingId, scriptData);
+      // Clear the preset script info
+      delete (window as any)._editingPresetScript;
+      // Refresh preset scripts
+      setPresetScriptGroups(getPresetRegexScripts());
+    } else if (editingId) {
+      // Regular standalone script
       updateRegexScript(editingId, scriptData);
+      setScripts(getRegexScripts());
     } else {
+      // New standalone script
       addRegexScript(scriptData);
+      setScripts(getRegexScripts());
     }
 
-    setScripts(getRegexScripts());
     setIsDialogOpen(false);
   };
 
@@ -531,22 +566,24 @@ export default function RegexScriptManager() {
                                   className="h-6 w-6 p-0 hover:bg-zinc-300 dark:hover:bg-zinc-600"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    // Toggle enabled for preset script
-                                    const updatedGroups = presetScriptGroups.map(g => {
-                                      if (g.presetId === group.presetId) {
-                                        return {
-                                          ...g,
-                                          scripts: g.scripts.map(s =>
-                                            s.id === script.id ? { ...s, disabled: !s.disabled } : s
-                                          )
-                                        };
-                                      }
-                                      return g;
-                                    });
-                                    setPresetScriptGroups(updatedGroups);
+                                    // Toggle enabled for preset script using storage function
+                                    togglePresetRegexScriptDisabled(group.presetId, script.id);
+                                    // Refresh preset scripts
+                                    setPresetScriptGroups(getPresetRegexScripts());
                                   }}
                                 >
                                   {script.disabled ? '🔴' : '🟢'}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEdit(script, true, group.presetId);
+                                  }}
+                                >
+                                  ✎
                                 </Button>
                               </div>
                             </div>

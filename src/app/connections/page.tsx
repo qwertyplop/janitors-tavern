@@ -335,18 +335,23 @@ export default function ConnectionsPage() {
     const connection = connections.find(c => c.id === keyManagementConnectionId);
     if (!connection) return;
 
-    // Check for duplicate key names
-    const hasDuplicate = connection.apiKeys?.some(key => key.name === newKeyName);
-    if (hasDuplicate) {
-      // Show error or handle duplicate
-      return;
+    try {
+      addApiKeyToConnection(keyManagementConnectionId, newKeyName, newKeyValue);
+      
+      // Update the connections list
+      setConnections(getConnectionPresets());
+      
+      // Clear form fields on success
+      setNewKeyName('');
+      setNewKeyValue('');
+      
+      // Show success feedback (could add a toast notification here)
+      console.log('API key added successfully');
+    } catch (error) {
+      // Show error to user (could add a toast notification here)
+      console.error('Failed to add API key:', error);
+      alert(`Failed to add API key: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-
-    addApiKeyToConnection(keyManagementConnectionId, newKeyName, newKeyValue);
-
-    setConnections(getConnectionPresets());
-    setNewKeyName('');
-    setNewKeyValue('');
   };
 
   const handleEditKey = (keyId: string) => {
@@ -364,15 +369,22 @@ export default function ConnectionsPage() {
   const handleSaveEditKey = () => {
     if (!keyManagementConnectionId || !editingKeyId || !editKeyName || !editKeyValue) return;
 
-    updateApiKey(keyManagementConnectionId, editingKeyId, {
-      name: editKeyName,
-      value: editKeyValue,
-    });
+    try {
+      updateApiKey(keyManagementConnectionId, editingKeyId, {
+        name: editKeyName,
+        value: editKeyValue,
+      });
 
-    setConnections(getConnectionPresets());
-    setEditingKeyId(null);
-    setEditKeyName('');
-    setEditKeyValue('');
+      setConnections(getConnectionPresets());
+      setEditingKeyId(null);
+      setEditKeyName('');
+      setEditKeyValue('');
+      
+      console.log('API key updated successfully');
+    } catch (error) {
+      console.error('Failed to update API key:', error);
+      alert(`Failed to update API key: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   const handleDeleteKey = (keyId: string) => {

@@ -133,6 +133,20 @@ export function PromptBlockList({
     onChange(blocks, newPromptOrder);
   };
 
+  const handleActivateBlock = (identifier: string) => {
+    // Add the block to the end of the prompt order with enabled: true
+    const newPromptOrder = promptOrder.map((po) => {
+      if (po.character_id === characterId) {
+        return {
+          ...po,
+          order: [...po.order, { identifier, enabled: true }],
+        };
+      }
+      return po;
+    });
+    onChange(blocks, newPromptOrder);
+  };
+
   const handleDragStart = (index: number) => {
     setDraggedIndex(index);
   };
@@ -382,15 +396,15 @@ export function PromptBlockList({
 
                     {/* Enable/Disable toggle - disabled for inactive blocks */}
                     <button
-                      onClick={() => handleToggleEnabled(block.identifier)}
-                      disabled
+                      onClick={() => handleActivateBlock(block.identifier)}
                       className={cn(
-                        'w-6 h-6 rounded border-2 flex items-center justify-center transition-colors cursor-not-allowed',
-                        'bg-gray-200 border-gray-300 text-gray-400'
+                        'w-6 h-6 rounded border-2 flex items-center justify-center transition-colors cursor-pointer hover:bg-gray-300',
+                        'bg-gray-100 border-gray-300 text-gray-600'
                       )}
+                      title="Click to activate this block"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
                       </svg>
                     </button>
 

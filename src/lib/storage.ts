@@ -725,6 +725,34 @@ export function importSTPreset(
     forbid_overrides: p.forbid_overrides,
   }));
 
+  // Extract regex scripts from extensions.regex_scripts if present
+  const regexScripts: RegexScript[] = [];
+  const extensions = (rawJson as any).extensions;
+  if (extensions && Array.isArray(extensions.regex_scripts)) {
+    const now = new Date().toISOString();
+    extensions.regex_scripts.forEach((script: any, index: number) => {
+      const newScript: RegexScript = {
+        id: generateId(),
+        scriptName: script.scriptName || `Script ${index + 1}`,
+        findRegex: normalizeRegexPattern(script.findRegex || ''),
+        replaceString: script.replaceString || '',
+        trimStrings: script.trimStrings || [],
+        placement: script.placement || [1, 2], // Default to both user input and AI output
+        roles: script.roles || ['assistant', 'user'],
+        disabled: script.disabled ?? false,
+        markdownOnly: script.markdownOnly ?? false,
+        runOnEdit: script.runOnEdit ?? false,
+        substituteRegex: script.substituteRegex ?? 0,
+        minDepth: script.minDepth ?? null,
+        maxDepth: script.maxDepth ?? null,
+        order: index,
+        createdAt: now,
+        updatedAt: now,
+      };
+      regexScripts.push(newScript);
+    });
+  }
+
   const now = new Date().toISOString();
   const presetName = fileName?.replace(/\.json$/i, '') || 'Imported Preset';
 
@@ -736,6 +764,7 @@ export function importSTPreset(
     sampler,
     promptBlocks,
     promptOrder: rawJson.prompt_order || [],
+    regexScripts: regexScripts.length > 0 ? regexScripts : undefined,
     formatStrings: {
       worldInfo: rawJson.wi_format || '{0}',
       scenario: rawJson.scenario_format || '{{scenario}}',
@@ -815,6 +844,73 @@ export function exportToSTPreset(preset: ChatCompletionPreset): STChatCompletion
     enable_web_search: preset.advancedSettings.enableWebSearch,
     request_images: preset.advancedSettings.requestImages,
   };
+}
+
+/**
+ * Get all preset-specific regex scripts grouped by preset name
+ * Returns an array of objects with preset info and its regex scripts
+ */
+export function getPresetRegexScripts(): Array<{
+  presetId: string;
+  presetName: string;
+  scripts: RegexScript[];
+}> {
+  const presets = getChatCompletionPresets();
+  const result: Array<{
+    presetId: string;
+    presetName: string;
+    scripts: RegexScript[];
+  }> = [];
+
+  presets.forEach(preset => {
+    if (preset.regexScripts && preset.regexScripts.length > 0) {
+      result.push({
+        presetId: preset.id,
+        presetName: preset.name,
+        scripts: preset.regexScripts.map(script => ({
+          ...script,
+          // Add preset reference to each script for identification
+          _presetId: preset.id,
+          _presetName: preset.name,
+        })),
+      });
+    }
+  });
+
+  return result;
+}
+
+/**
+ * Get all regex scripts including both standalone and preset-specific
+ * Returns a flat array with source information
+ */
+export function getAllRegexScripts(): Array<RegexScript & { source: 'standalone' | 'preset'; presetId?: string; presetName?: string }> {
+  const standaloneScripts = getRegexScripts();
+  const presetScripts = getPresetRegexScripts();
+  
+  const result: Array<RegexScript & { source: 'standalone' | 'preset'; presetId?: string; presetName?: string }> = [];
+  
+  // Add standalone scripts
+  standaloneScripts.forEach(script => {
+    result.push({
+      ...script,
+      source: 'standalone',
+    });
+  });
+  
+  // Add preset scripts
+  presetScripts.forEach(presetGroup => {
+    presetGroup.scripts.forEach(script => {
+      result.push({
+        ...script,
+        source: 'preset',
+        presetId: presetGroup.presetId,
+        presetName: presetGroup.presetName,
+      });
+    });
+  });
+  
+  return result;
 }
 
 // Create a default/empty chat completion preset

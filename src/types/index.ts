@@ -215,6 +215,8 @@ export interface ChatCompletionPreset {
   // Prompt ordering (defines enabled/disabled and order)
   promptOrder: STPromptOrder[];
 
+  // Regex scripts integrated with the preset
+  regexScripts?: RegexScript[];
 
   // Format strings
   formatStrings: {

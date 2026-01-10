@@ -129,7 +129,30 @@ export async function getServerChatCompletionPreset(id: string): Promise<ChatCom
 }
 
 export async function getServerRegexScripts(): Promise<RegexScript[]> {
-  return fetchFirebaseJson<RegexScript[]>('regexScripts', []);
+  const standaloneScripts = await fetchFirebaseJson<RegexScript[]>('regexScripts', []);
+  
+  // Also get preset-specific regex scripts
+  const presets = await getServerChatCompletionPresets();
+  const presetScripts: RegexScript[] = [];
+  
+  presets.forEach(preset => {
+    if (preset.regexScripts && preset.regexScripts.length > 0) {
+      preset.regexScripts.forEach(script => {
+        // Add preset reference to each script for identification
+        const scriptWithPreset = {
+          ...script,
+          _presetId: preset.id,
+          _presetName: preset.name,
+        };
+        presetScripts.push(scriptWithPreset);
+      });
+    }
+  });
+  
+  // Combine standalone and preset scripts
+  const allScripts = [...standaloneScripts, ...presetScripts];
+  console.log(`[ServerStorage] getServerRegexScripts() returned ${allScripts.length} scripts (${standaloneScripts.length} standalone, ${presetScripts.length} preset)`);
+  return allScripts;
 }
 
 // ============================================

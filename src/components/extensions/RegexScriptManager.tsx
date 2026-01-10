@@ -19,6 +19,7 @@ import {
   normalizeRegexPattern,
   updateRegexScriptsOrder,
   migrateRegexScriptsOrder,
+  getPresetRegexScripts,
 } from '@/lib/storage';
 import { RegexScript } from '@/types';
 import { applyRegexScript, applyRegexScripts } from '@/lib/regex-processor';
@@ -27,11 +28,18 @@ import { useI18n } from '@/components/providers/I18nProvider';
 
 export default function RegexScriptManager() {
   const [scripts, setScripts] = useState<RegexScript[]>([]);
+  const [presetScriptGroups, setPresetScriptGroups] = useState<Array<{
+    presetId: string;
+    presetName: string;
+    scripts: RegexScript[];
+  }>>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedPresetScriptId, setSelectedPresetScriptId] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [expandedPresets, setExpandedPresets] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { t } = useI18n();
   
@@ -68,6 +76,16 @@ export default function RegexScriptManager() {
     const stored = getRegexScripts();
     const sorted = [...stored].sort((a, b) => a.order - b.order);
     setScripts(sorted);
+    
+    // Load preset-specific regex scripts
+    const presetGroups = getPresetRegexScripts();
+    setPresetScriptGroups(presetGroups);
+    
+    // Expand all preset groups by default
+    const expanded = new Set<string>();
+    presetGroups.forEach(group => expanded.add(group.presetId));
+    setExpandedPresets(expanded);
+    
     if (sorted.length > 0) {
       setSelectedId(sorted[0].id);
     }
@@ -162,6 +180,31 @@ export default function RegexScriptManager() {
   ]);
 
   const selectedScript = scripts.find(s => s.id === selectedId);
+  
+  // Find selected preset script
+  let selectedPresetScript: RegexScript | undefined;
+  let selectedPresetGroup: { presetId: string; presetName: string; scripts: RegexScript[] } | undefined;
+  
+  if (selectedPresetScriptId) {
+    for (const group of presetScriptGroups) {
+      const script = group.scripts.find(s => s.id === selectedPresetScriptId);
+      if (script) {
+        selectedPresetScript = script;
+        selectedPresetGroup = group;
+        break;
+      }
+    }
+  }
+
+  const togglePresetExpansion = (presetId: string) => {
+    const newExpanded = new Set(expandedPresets);
+    if (newExpanded.has(presetId)) {
+      newExpanded.delete(presetId);
+    } else {
+      newExpanded.add(presetId);
+    }
+    setExpandedPresets(newExpanded);
+  };
 
   const handleCreate = () => {
     setEditingId(null);
@@ -328,93 +371,192 @@ export default function RegexScriptManager() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Panel - Script List */}
-        <div className="lg:col-span-1 space-y-2">
-          <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">
-            Saved Scripts ({scripts.length})
-          </h3>
-          {scripts.length === 0 ? (
-            <Card className="p-4">
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
-                No regex scripts yet. Create your first one!
-              </p>
-            </Card>
-          ) : (
+        <div className="lg:col-span-1 space-y-6">
+          {/* Standalone Scripts Section */}
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">
+              Standalone Scripts ({scripts.length})
+            </h3>
+            {scripts.length === 0 ? (
+              <Card className="p-4">
+                <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
+                  No standalone regex scripts yet. Create your first one!
+                </p>
+              </Card>
+            ) : (
+              <div className="space-y-2">
+                {scripts.map((script, index) => (
+                  <Card
+                    key={script.id}
+                    draggable
+                    onDragStart={() => handleDragStart(index)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDragEnd={handleDragEnd}
+                    className={cn(
+                      'p-3 cursor-pointer transition-colors',
+                      selectedId === script.id
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
+                        : 'hover:bg-zinc-50 dark:hover:bg-zinc-800',
+                      draggedIndex === index && 'ring-2 ring-blue-500'
+                    )}
+                    onClick={() => {
+                      setSelectedId(script.id);
+                      setSelectedPresetScriptId(null);
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          {/* Drag handle */}
+                          <svg
+                            className="w-4 h-4 text-zinc-400 dark:text-zinc-500 cursor-move"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                          </svg>
+                          <h4 className="font-medium text-sm truncate">{script.scriptName}</h4>
+                          {script.disabled && (
+                            <Badge variant="secondary" className="text-xs">Disabled</Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                          {script.findRegex.substring(0, 50)}...
+                        </p>
+                      </div>
+                      <div className="flex gap-1 ml-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleEnabled(script.id);
+                          }}
+                        >
+                          {script.disabled ? '🔴' : '🟢'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(script);
+                          }}
+                        >
+                          ✎
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteConfirmId(script.id);
+                          }}
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Preset-Specific Regex Section */}
+          {presetScriptGroups.length > 0 && (
             <div className="space-y-2">
-              {scripts.map((script, index) => (
-                <Card
-                  key={script.id}
-                  draggable
-                  onDragStart={() => handleDragStart(index)}
-                  onDragOver={(e) => handleDragOver(e, index)}
-                  onDragEnd={handleDragEnd}
-                  className={cn(
-                    'p-3 cursor-pointer transition-colors',
-                    selectedId === script.id
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
-                      : 'hover:bg-zinc-50 dark:hover:bg-zinc-800',
-                    draggedIndex === index && 'ring-2 ring-blue-500'
-                  )}
-                  onClick={() => setSelectedId(script.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">
+                Preset-Specific Regex ({presetScriptGroups.reduce((total, group) => total + group.scripts.length, 0)})
+              </h3>
+              <div className="space-y-2">
+                {presetScriptGroups.map((group) => (
+                  <div key={group.presetId} className="space-y-1">
+                    <div
+                      className="flex items-center justify-between p-2 bg-zinc-100 dark:bg-zinc-800 rounded cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                      onClick={() => togglePresetExpansion(group.presetId)}
+                    >
                       <div className="flex items-center gap-2">
-                        {/* Drag handle */}
                         <svg
-                          className="w-4 h-4 text-zinc-400 dark:text-zinc-500 cursor-move"
+                          className={`w-4 h-4 transition-transform ${expandedPresets.has(group.presetId) ? 'rotate-90' : ''}`}
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
                         >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>
-                        <h4 className="font-medium text-sm truncate">{script.scriptName}</h4>
-                        {script.disabled && (
-                          <Badge variant="secondary" className="text-xs">Disabled</Badge>
-                        )}
+                        <span className="font-medium text-sm">{group.presetName}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {group.scripts.length} script{group.scripts.length !== 1 ? 's' : ''}
+                        </Badge>
                       </div>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
-                        {script.findRegex.substring(0, 50)}...
-                      </p>
                     </div>
-                    <div className="flex gap-1 ml-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 hover:bg-zinc-300 dark:hover:bg-zinc-600"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleEnabled(script.id);
-                        }}
-                      >
-                        {script.disabled ? '🔴' : '🟢'}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 hover:bg-zinc-300 dark:hover:bg-zinc-600"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEdit(script);
-                        }}
-                      >
-                        ✎
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/50"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteConfirmId(script.id);
-                        }}
-                      >
-                        ✕
-                      </Button>
-                    </div>
+                    
+                    {expandedPresets.has(group.presetId) && (
+                      <div className="ml-4 space-y-1">
+                        {group.scripts.map((script) => (
+                          <Card
+                            key={script.id}
+                            className={cn(
+                              'p-2 cursor-pointer transition-colors',
+                              selectedPresetScriptId === script.id
+                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
+                                : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                            )}
+                            onClick={() => {
+                              setSelectedPresetScriptId(script.id);
+                              setSelectedId(null);
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-medium text-sm truncate">{script.scriptName}</h4>
+                                  {script.disabled && (
+                                    <Badge variant="secondary" className="text-xs">Disabled</Badge>
+                                  )}
+                                </div>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                                  {script.findRegex.substring(0, 50)}...
+                                </p>
+                              </div>
+                              <div className="flex gap-1 ml-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    // Toggle enabled for preset script
+                                    const updatedGroups = presetScriptGroups.map(g => {
+                                      if (g.presetId === group.presetId) {
+                                        return {
+                                          ...g,
+                                          scripts: g.scripts.map(s =>
+                                            s.id === script.id ? { ...s, disabled: !s.disabled } : s
+                                          )
+                                        };
+                                      }
+                                      return g;
+                                    });
+                                    setPresetScriptGroups(updatedGroups);
+                                  }}
+                                >
+                                  {script.disabled ? '🔴' : '🟢'}
+                                </Button>
+                              </div>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </Card>
-              ))}
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -468,11 +610,63 @@ export default function RegexScriptManager() {
                 </div>
               </CardContent>
             </Card>
+          ) : selectedPresetScript ? (
+            <Card className="p-6">
+              <CardHeader className="p-0 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">{selectedPresetScript.scriptName}</CardTitle>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                      From preset: {selectedPresetGroup?.presetName}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {selectedPresetScript.disabled && (
+                      <Badge variant="destructive">Disabled</Badge>
+                    )}
+                    {selectedPresetScript.markdownOnly && (
+                      <Badge variant="outline">Markdown Only</Badge>
+                    )}
+                    <Badge variant="outline">Preset Script</Badge>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0 space-y-6">
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Find Regex</h4>
+                  <pre className="text-sm bg-zinc-100 dark:bg-zinc-800 p-3 rounded overflow-x-auto">
+                    {selectedPresetScript.findRegex}
+                  </pre>
+                </div>
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Replace With</h4>
+                  <pre className="text-sm bg-zinc-100 dark:bg-zinc-800 p-3 rounded overflow-x-auto">
+                    {selectedPresetScript.replaceString}
+                  </pre>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Affects</h4>
+                    <p className="text-sm">{formatPlacement(selectedPresetScript.placement)}</p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Trim Strings</h4>
+                    <p className="text-sm">{selectedPresetScript.trimStrings.length > 0 ? selectedPresetScript.trimStrings.join(', ') : 'None'}</p>
+                  </div>
+                </div>
+                <div className="pt-4 border-t">
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-2">
+                    This regex script is part of the "{selectedPresetGroup?.presetName}" preset.
+                    It will be automatically loaded when that preset is selected.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           ) : (
             <Card className="p-12 flex items-center justify-center">
               <div className="text-center">
                 <p className="text-zinc-500 dark:text-zinc-400 mb-4">
-                  {scripts.length === 0
+                  {scripts.length === 0 && presetScriptGroups.length === 0
                     ? 'Create your first regex script to get started'
                     : 'Select a script from the list to view details'}
                 </p>

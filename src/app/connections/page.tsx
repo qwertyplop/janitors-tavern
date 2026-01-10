@@ -107,15 +107,23 @@ export default function ConnectionsPage() {
   const [editKeyName, setEditKeyName] = useState('');
   const [editKeyValue, setEditKeyValue] = useState('');
 
+  // Helper function to get sorted connections
+  const getSortedConnections = (): ConnectionPreset[] => {
+    const presets = getConnectionPresets();
+    return [...presets].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+    );
+  };
+
   useEffect(() => {
     // Migrate existing connection presets to multi-key system
     migrateConnectionPresetsToMultiKey();
     
-    const presets = getConnectionPresets();
-    setConnections(presets);
+    const sortedPresets = getSortedConnections();
+    setConnections(sortedPresets);
 
-    if (presets.length > 0) {
-      setSelectedId(presets[0].id);
+    if (sortedPresets.length > 0) {
+      setSelectedId(sortedPresets[0].id);
     }
   }, []);
 
@@ -308,13 +316,13 @@ export default function ConnectionsPage() {
       selectAndSetDefault(newPreset.id);
     }
 
-    setConnections(getConnectionPresets());
+    setConnections(getSortedConnections());
     setIsDialogOpen(false);
   };
 
   const handleDelete = (id: string) => {
     deleteConnectionPreset(id);
-    const updated = getConnectionPresets();
+    const updated = getSortedConnections();
     setConnections(updated);
     if (selectedId === id) {
       setSelectedId(updated.length > 0 ? updated[0].id : null);
@@ -339,7 +347,7 @@ export default function ConnectionsPage() {
       addApiKeyToConnection(keyManagementConnectionId, newKeyName, newKeyValue);
       
       // Update the connections list
-      setConnections(getConnectionPresets());
+      setConnections(getSortedConnections());
       
       // Clear form fields on success
       setNewKeyName('');
@@ -375,7 +383,7 @@ export default function ConnectionsPage() {
         value: editKeyValue,
       });
 
-      setConnections(getConnectionPresets());
+      setConnections(getSortedConnections());
       setEditingKeyId(null);
       setEditKeyName('');
       setEditKeyValue('');
@@ -390,13 +398,13 @@ export default function ConnectionsPage() {
   const handleDeleteKey = (keyId: string) => {
     if (!keyManagementConnectionId) return;
     deleteApiKey(keyManagementConnectionId, keyId);
-    setConnections(getConnectionPresets());
+    setConnections(getSortedConnections());
   };
 
   const handleSelectKey = (keyId: string) => {
     if (!keyManagementConnectionId) return;
     setSelectedApiKey(keyManagementConnectionId, keyId);
-    setConnections(getConnectionPresets());
+    setConnections(getSortedConnections());
   };
 
   const handleExport = (connection: ConnectionPreset) => {
@@ -431,7 +439,7 @@ export default function ConnectionsPage() {
 
       const existingPresets = getConnectionPresets();
       saveConnectionPresets([...existingPresets, ...newPresets]);
-      setConnections(getConnectionPresets());
+      setConnections(getSortedConnections());
     } catch (error) {
       console.error('Import failed:', error);
     }

@@ -40,6 +40,7 @@ export function PromptBlockList({
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
 
   // Get the order array for the current character
   const currentOrder = promptOrder.find((po) => po.character_id === characterId)?.order || [];
@@ -149,35 +150,67 @@ export function PromptBlockList({
 
   const handleDragStart = (index: number) => {
     setDraggedIndex(index);
+    setDropIndex(index);
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
-    if (draggedIndex === null || draggedIndex === index) return;
+    // Update drop position for visual feedback
+    if (draggedIndex !== null && index !== dropIndex) {
+      setDropIndex(index);
+    }
+  };
 
-    // Check if we're dragging from inactive to active section or vice versa
-    const isDraggingFromInactive = draggedIndex >= activeBlocks.length;
-    const isDroppingInActive = index < activeBlocks.length;
+  const handleDragEnd = () => {
+    if (draggedIndex === null || dropIndex === null) {
+      setDraggedIndex(null);
+      setDropIndex(null);
+      return;
+    }
 
-    // Build new order from current visual order
-    const reorderedIds = [...allBlocks.map((sb) => sb.block.identifier)];
-    const draggedId = reorderedIds[draggedIndex];
+    const originalIndex = draggedIndex;
+    const targetIndex = dropIndex;
     
-    reorderedIds.splice(draggedIndex, 1);
-    reorderedIds.splice(index, 0, draggedId);
+    if (originalIndex === targetIndex) {
+      setDraggedIndex(null);
+      setDropIndex(null);
+      return;
+    }
+
+    const isDraggingFromInactive = originalIndex >= activeBlocks.length;
+    const isDroppingInActive = targetIndex < activeBlocks.length;
+
+    // Create a new array of all block identifiers
+    const allIds = allBlocks.map((sb) => sb.block.identifier);
+    
+    // Remove the dragged block from its original position
+    const draggedId = allIds[originalIndex];
+    const idsWithoutDragged = [...allIds];
+    idsWithoutDragged.splice(originalIndex, 1);
+    
+    // Insert it at the target position
+    const reorderedIds = [...idsWithoutDragged];
+    reorderedIds.splice(targetIndex, 0, draggedId);
 
     // Rebuild prompt order - only include blocks that should be active
     // Preserve existing enabled states, but NEVER enable inactive blocks
     const enabledMap = new Map(currentOrder.map((item) => [item.identifier, item.enabled]));
-    const newOrderItems: STPromptOrderItem[] = reorderedIds
-      .slice(0, activeBlocks.length + (isDroppingInActive ? 1 : 0)) // Only include active section
-      .map((id) => {
-        const wasPreviouslyActive = enabledMap.has(id);
-        return {
-          identifier: id,
-          enabled: wasPreviouslyActive ? enabledMap.get(id)! : false, // Only preserve existing state, never enable new blocks
-        };
-      });
+    
+    // Determine which blocks should be in the active section
+    // If dragging from inactive to active, include the dragged block
+    // Otherwise, only include originally active blocks
+    const shouldIncludeDragged = isDraggingFromInactive && isDroppingInActive;
+    
+    // Get the identifiers that should be in the active section
+    const activeSectionIds = reorderedIds.slice(0, activeBlocks.length + (shouldIncludeDragged ? 1 : 0));
+    
+    const newOrderItems: STPromptOrderItem[] = activeSectionIds.map((id) => {
+      const wasPreviouslyActive = enabledMap.has(id);
+      return {
+        identifier: id,
+        enabled: wasPreviouslyActive ? enabledMap.get(id)! : false,
+      };
+    });
 
     const newPromptOrder = promptOrder.map((po) => {
       if (po.character_id === characterId) {
@@ -187,11 +220,8 @@ export function PromptBlockList({
     });
 
     onChange(blocks, newPromptOrder);
-    setDraggedIndex(index);
-  };
-
-  const handleDragEnd = () => {
     setDraggedIndex(null);
+    setDropIndex(null);
   };
 
   const createEmptyBlock = (): STPromptBlock => ({
@@ -276,7 +306,7 @@ export function PromptBlockList({
                 className={cn(
                   'p-3 transition-all cursor-move',
                   !enabled && 'opacity-50',
-                  draggedIndex === index && 'ring-2 ring-blue-500',
+                  (draggedIndex === index || dropIndex === index) && 'ring-2 ring-blue-500',
                   block.marker && 'bg-amber-50 dark:bg-amber-950/30 border-l-4 border-l-amber-500'
                 )}
               >
@@ -376,7 +406,7 @@ export function PromptBlockList({
                   className={cn(
                     'p-3 transition-all cursor-move bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700',
                     !enabled && 'opacity-50',
-                    draggedIndex === actualIndex && 'ring-2 ring-blue-500',
+                    (draggedIndex === actualIndex || dropIndex === actualIndex) && 'ring-2 ring-blue-500',
                     block.marker && 'bg-amber-50 dark:bg-amber-950/30 border-l-4 border-l-amber-500'
                   )}
                 >

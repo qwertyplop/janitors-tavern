@@ -561,6 +561,71 @@ export default function ConnectionsPage() {
                   </p>
                 </div>
 
+                {/* Key Management */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 border-b pb-2">
+                    API Key Management
+                  </h3>
+                  {selectedConnection && (() => {
+                    const apiKeys = selectedConnection.apiKeys || [];
+                    const selectedKeyId = selectedConnection.selectedKeyId;
+                    const selectedKey = apiKeys.find(k => k.id === selectedKeyId);
+                    
+                    return (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            {apiKeys.length === 0 ? (
+                              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                                No API keys configured. Click the key button (🔑) on the left to add keys.
+                              </p>
+                            ) : (
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium">Selected Key:</span>
+                                  {selectedKey ? (
+                                    <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                                      {selectedKey.name}
+                                    </span>
+                                  ) : (
+                                    <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                                      No key selected
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  {apiKeys.map((key) => (
+                                    <div
+                                      key={key.id}
+                                      className={`px-3 py-1.5 text-xs rounded border ${
+                                        selectedKeyId === key.id
+                                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
+                                          : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+                                      }`}
+                                    >
+                                      {key.name}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleKeyManagement(selectedConnection.id)}
+                          >
+                            Manage Keys
+                          </Button>
+                        </div>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                          Add, edit, or select API keys for this connection. The selected key will be used for API calls.
+                        </p>
+                      </div>
+                    );
+                  })()}
+                </div>
+
                 {/* Model Selection */}
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 border-b pb-2">

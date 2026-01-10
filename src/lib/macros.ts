@@ -281,8 +281,8 @@ export function processMacros(content: string, context: MacroContext = {}): stri
     if (macroLower === 'noop') return '';
 
     // User/Character macros
-    if (macroLower === 'user' || macroContent === '<USER>') return context.user || '';
-    if (macroLower === 'char' || macroContent === '<BOT>') return context.char || '';
+    if (macroLower === 'user' || macroContent === '<USER>' || macroContent === '<user>') return context.user || '';
+    if (macroLower === 'char' || macroContent === '<BOT>' || macroContent === '<bot>') return context.char || '';
 
     // Description and Personality - with deduplication for JanitorAI
     // In JanitorAI, both come from the same field, so we track usage to prevent duplicates
@@ -500,6 +500,15 @@ export function processMacros(content: string, context: MacroContext = {}): stri
 
   // Handle {{trim}} - remove surrounding newlines
   result = result.replace(/\n*\{\{trim\}\}\n*/gi, '');
+
+  // Process standalone <user> and <bot> tags (not inside {{...}})
+  // These are commonly used in presets and should be replaced with context values
+  if (context.user) {
+    result = result.replace(/<user>/gi, context.user);
+  }
+  if (context.char) {
+    result = result.replace(/<bot>/gi, context.char);
+  }
 
   return result;
 }

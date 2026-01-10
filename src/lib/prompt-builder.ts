@@ -228,7 +228,23 @@ export function buildMessages(
     return { role: block.role, content };
   };
 
-  // Build messages in proper order
+  // TWO-PASS APPROACH: First pass to set all variables
+  // Process all blocks in order to execute setvar operations
+  const firstPassBlocks = [
+    ...blocksBeforeChatHistory,
+    ...sortedInChatBlocks,
+    ...blocksAfterChatHistory
+  ];
+  
+  for (const block of firstPassBlocks) {
+    if (!block.marker) {
+      // Process block content to execute setvar operations
+      // We don't care about the output, just need to process macros
+      processBlockContent(block, context);
+    }
+  }
+
+  // SECOND PASS: Build actual messages with variables now set
   const allMessages: OutputMessage[] = [];
 
   // 1. Process blocks before chatHistory

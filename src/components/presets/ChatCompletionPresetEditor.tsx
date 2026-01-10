@@ -309,57 +309,6 @@ export function ChatCompletionPresetEditor({
               </div>
             </Card>
 
-            <Card className="p-4">
-              <h3 className="text-lg font-semibold mb-4">Media Settings</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
-                  <input
-                    type="checkbox"
-                    checked={preset.mediaSettings.imageInlining}
-                    onChange={(e) =>
-                      onChange({
-                        ...preset,
-                        mediaSettings: { ...preset.mediaSettings, imageInlining: e.target.checked },
-                      })
-                    }
-                    className="w-4 h-4 rounded"
-                  />
-                  <div>
-                    <span className="text-sm font-medium">Send Inline Images</span>
-                    <p className="text-xs text-zinc-500">Enable multimodal image processing</p>
-                  </div>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
-                  <input
-                    type="checkbox"
-                    checked={preset.mediaSettings.videoInlining}
-                    onChange={(e) =>
-                      onChange({
-                        ...preset,
-                        mediaSettings: { ...preset.mediaSettings, videoInlining: e.target.checked },
-                      })
-                    }
-                    className="w-4 h-4 rounded"
-                  />
-                  <div>
-                    <span className="text-sm font-medium">Send Inline Videos</span>
-                    <p className="text-xs text-zinc-500">Enable multimodal video processing</p>
-                  </div>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
-                  <input
-                    type="checkbox"
-                    checked={preset.advancedSettings.requestImages}
-                    onChange={(e) => handleAdvancedSettingsChange('requestImages', e.target.checked)}
-                    className="w-4 h-4 rounded"
-                  />
-                  <div>
-                    <span className="text-sm font-medium">Request Inline Images</span>
-                    <p className="text-xs text-zinc-500">Allow model to return image attachments</p>
-                  </div>
-                </label>
-              </div>
-            </Card>
 
             <Card className="p-4">
               <h3 className="text-lg font-semibold mb-4">Advanced Features</h3>

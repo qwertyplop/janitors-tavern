@@ -15,6 +15,12 @@ import {
   saveConnectionPresets,
   generateId,
   updateSettings,
+  getSelectedApiKey,
+  addApiKeyToConnection,
+  updateApiKey,
+  deleteApiKey,
+  setSelectedApiKey,
+  migrateConnectionPresetsToMultiKey,
 } from '@/lib/storage';
 import { ConnectionPreset } from '@/types';
 import { downloadJson, readJsonFile } from '@/lib/utils';
@@ -84,7 +90,6 @@ export default function ConnectionsPage() {
   // Form state for create/edit dialog
   const [formName, setFormName] = useState('');
   const [formUrl, setFormUrl] = useState('');
-  const [formApiKey, setFormApiKey] = useState('');
 
   // Connection state (for selected connection)
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('none');
@@ -95,8 +100,17 @@ export default function ConnectionsPage() {
   // Test message state
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [keyManagementConnectionId, setKeyManagementConnectionId] = useState<string | null>(null);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [newKeyValue, setNewKeyValue] = useState('');
+  const [editingKeyId, setEditingKeyId] = useState<string | null>(null);
+  const [editKeyName, setEditKeyName] = useState('');
+  const [editKeyValue, setEditKeyValue] = useState('');
 
   useEffect(() => {
+    // Migrate existing connection presets to multi-key system
+    migrateConnectionPresetsToMultiKey();
+    
     const presets = getConnectionPresets();
     setConnections(presets);
 
@@ -132,6 +146,10 @@ export default function ConnectionsPage() {
     try {
       console.log('[Connections] Fetching models via proxy for:', connection.baseUrl);
 
+      // Get selected API key
+      const selectedKey = getSelectedApiKey(connection.id);
+      const apiKeyValue = selectedKey?.value;
+
       // Use our server-side proxy to bypass CORS
       const response = await fetch('/api/proxy/models', {
         method: 'POST',
@@ -140,7 +158,7 @@ export default function ConnectionsPage() {
         },
         body: JSON.stringify({
           baseUrl: connection.baseUrl,
-          apiKey: connection.apiKeyLocalEncrypted,
+          apiKey: apiKeyValue,
         }),
       });
 
@@ -212,7 +230,9 @@ export default function ConnectionsPage() {
         'Content-Type': 'application/json',
       };
 
-      const apiKey = selectedConnection.apiKeyLocalEncrypted;
+      // Get selected API key
+      const selectedKey = getSelectedApiKey(selectedConnection.id);
+      const apiKey = selectedKey?.value;
       if (apiKey) {
         headers['Authorization'] = `Bearer ${apiKey}`;
       }
@@ -258,7 +278,6 @@ export default function ConnectionsPage() {
     setEditingId(null);
     setFormName('');
     setFormUrl('');
-    setFormApiKey('');
     setIsDialogOpen(true);
   };
 
@@ -266,7 +285,6 @@ export default function ConnectionsPage() {
     setEditingId(connection.id);
     setFormName(connection.name);
     setFormUrl(connection.baseUrl);
-    setFormApiKey(connection.apiKeyLocalEncrypted || '');
     setIsDialogOpen(true);
   };
 
@@ -277,14 +295,12 @@ export default function ConnectionsPage() {
       updateConnectionPreset(editingId, {
         name: formName,
         baseUrl: formUrl,
-        apiKeyLocalEncrypted: formApiKey || undefined,
         apiKeyRef: 'local',
       });
     } else {
       const newPreset = addConnectionPreset({
         name: formName,
         baseUrl: formUrl,
-        apiKeyLocalEncrypted: formApiKey || undefined,
         apiKeyRef: 'local',
         providerType: 'openai-compatible',
         model: '',
@@ -304,6 +320,71 @@ export default function ConnectionsPage() {
       setSelectedId(updated.length > 0 ? updated[0].id : null);
     }
     setDeleteConfirmId(null);
+  };
+
+  const handleKeyManagement = (connectionId: string) => {
+    setKeyManagementConnectionId(connectionId);
+    setNewKeyName('');
+    setNewKeyValue('');
+    setEditingKeyId(null);
+  };
+
+  const handleAddKey = () => {
+    if (!keyManagementConnectionId || !newKeyName || !newKeyValue) return;
+    
+    const connection = connections.find(c => c.id === keyManagementConnectionId);
+    if (!connection) return;
+
+    // Check for duplicate key names
+    const hasDuplicate = connection.apiKeys?.some(key => key.name === newKeyName);
+    if (hasDuplicate) {
+      // Show error or handle duplicate
+      return;
+    }
+
+    addApiKeyToConnection(keyManagementConnectionId, newKeyName, newKeyValue);
+
+    setConnections(getConnectionPresets());
+    setNewKeyName('');
+    setNewKeyValue('');
+  };
+
+  const handleEditKey = (keyId: string) => {
+    const connection = connections.find(c => c.id === keyManagementConnectionId);
+    if (!connection) return;
+
+    const key = connection.apiKeys?.find(k => k.id === keyId);
+    if (!key) return;
+
+    setEditingKeyId(keyId);
+    setEditKeyName(key.name);
+    setEditKeyValue(key.value);
+  };
+
+  const handleSaveEditKey = () => {
+    if (!keyManagementConnectionId || !editingKeyId || !editKeyName || !editKeyValue) return;
+
+    updateApiKey(keyManagementConnectionId, editingKeyId, {
+      name: editKeyName,
+      value: editKeyValue,
+    });
+
+    setConnections(getConnectionPresets());
+    setEditingKeyId(null);
+    setEditKeyName('');
+    setEditKeyValue('');
+  };
+
+  const handleDeleteKey = (keyId: string) => {
+    if (!keyManagementConnectionId) return;
+    deleteApiKey(keyManagementConnectionId, keyId);
+    setConnections(getConnectionPresets());
+  };
+
+  const handleSelectKey = (keyId: string) => {
+    if (!keyManagementConnectionId) return;
+    setSelectedApiKey(keyManagementConnectionId, keyId);
+    setConnections(getConnectionPresets());
   };
 
   const handleExport = (connection: ConnectionPreset) => {
@@ -409,6 +490,17 @@ export default function ConnectionsPage() {
                       </p>
                     </div>
                     <div className="flex gap-1 ml-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleKeyManagement(connection.id);
+                        }}
+                      >
+                        🔑
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -599,19 +691,6 @@ export default function ConnectionsPage() {
                 {t.connections.apiUrlHint}
               </p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="apiKey">{t.connections.apiKey}</Label>
-              <Input
-                id="apiKey"
-                type="password"
-                value={formApiKey}
-                onChange={(e) => setFormApiKey(e.target.value)}
-                placeholder="sk-..."
-              />
-              <p className="text-xs text-zinc-500">
-                {t.connections.apiKeyHint}
-              </p>
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
@@ -639,6 +718,154 @@ export default function ConnectionsPage() {
             </Button>
             <Button variant="destructive" onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}>
               {t.common.delete}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Key Management Dialog */}
+      <Dialog open={!!keyManagementConnectionId} onOpenChange={() => setKeyManagementConnectionId(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>API Key Management</DialogTitle>
+          </DialogHeader>
+          {keyManagementConnectionId && (() => {
+            const connection = connections.find(c => c.id === keyManagementConnectionId);
+            if (!connection) return null;
+            const apiKeys = connection.apiKeys || [];
+            const selectedKeyId = connection.selectedKeyId;
+            
+            return (
+              <div className="space-y-6 py-4">
+                {/* Current connection info */}
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
+                      Existing API Keys
+                    </h3>
+                    {apiKeys.length === 0 ? (
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                        No API keys added yet
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {apiKeys.map((key) => (
+                          <div
+                            key={key.id}
+                            className={`flex items-center justify-between p-3 border rounded-lg ${
+                              selectedKeyId === key.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-950' : 'border-zinc-200 dark:border-zinc-700'
+                            }`}
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-sm">{key.name}</span>
+                                {selectedKeyId === key.id && (
+                                  <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-0.5 rounded">
+                                    Selected
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                                {key.value.substring(0, 20)}...
+                              </p>
+                              <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                                Created: {new Date(key.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleSelectKey(key.id)}
+                                disabled={selectedKeyId === key.id}
+                              >
+                                Select
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditKey(key.id)}
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-600 hover:text-red-700"
+                                onClick={() => handleDeleteKey(key.id)}
+                              >
+                                Delete
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Add new key form */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                      {editingKeyId ? 'Edit Key' : 'Add New Key'}
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="keyName">Key Name</Label>
+                        <Input
+                          id="keyName"
+                          value={editingKeyId ? editKeyName : newKeyName}
+                          onChange={(e) => editingKeyId ? setEditKeyName(e.target.value) : setNewKeyName(e.target.value)}
+                          placeholder="e.g., Production Key"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="keyValue">Key Value</Label>
+                        <Input
+                          id="keyValue"
+                          type="password"
+                          value={editingKeyId ? editKeyValue : newKeyValue}
+                          onChange={(e) => editingKeyId ? setEditKeyValue(e.target.value) : setNewKeyValue(e.target.value)}
+                          placeholder="sk-..."
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {editingKeyId ? (
+                        <>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setEditingKeyId(null);
+                              setEditKeyName('');
+                              setEditKeyValue('');
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            onClick={handleSaveEditKey}
+                            disabled={!editKeyName || !editKeyValue}
+                          >
+                            Save Changes
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          onClick={handleAddKey}
+                          disabled={!newKeyName || !newKeyValue}
+                        >
+                          Add Key
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setKeyManagementConnectionId(null)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

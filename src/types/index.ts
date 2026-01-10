@@ -16,6 +16,14 @@ export type PromptPostProcessingMode =
   | 'strict-tools'   // Same as strict but with tools
   | 'single-user';   // Merge all messages from all roles into a single user message
 
+export interface ApiKey {
+  id: string;
+  name: string;
+  value: string; // Encrypted/secure storage
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ConnectionPreset {
   id: string;
   name: string;
@@ -23,7 +31,8 @@ export interface ConnectionPreset {
   baseUrl: string;
   apiKeyRef: ApiKeyRef;
   apiKeyEnvVar?: string;
-  apiKeyLocalEncrypted?: string;
+  apiKeys: ApiKey[]; // Multiple API keys per provider
+  selectedKeyId?: string; // Currently selected key ID
   model: string;
   // SillyTavern-like settings
   promptPostProcessing: PromptPostProcessingMode;

@@ -1,5 +1,6 @@
 import {
   ConnectionPreset,
+  ApiKey,
   PromptPreset,
   SamplerPreset,
   ChatCompletionPreset,
@@ -67,7 +68,7 @@ export function getConnectionPreset(id: string): ConnectionPreset | undefined {
 }
 
 export function addConnectionPreset(
-  preset: Omit<ConnectionPreset, 'id' | 'createdAt' | 'updatedAt' | 'promptPostProcessing' | 'bypassStatusCheck'> & {
+  preset: Omit<ConnectionPreset, 'id' | 'createdAt' | 'updatedAt' | 'promptPostProcessing' | 'bypassStatusCheck' | 'apiKeys'> & {
     promptPostProcessing?: ConnectionPreset['promptPostProcessing'];
     bypassStatusCheck?: boolean;
   }
@@ -77,6 +78,7 @@ export function addConnectionPreset(
     ...preset,
     promptPostProcessing: preset.promptPostProcessing || 'none',
     bypassStatusCheck: preset.bypassStatusCheck || false,
+    apiKeys: [], // Initialize empty API keys array
     id: generateId(),
     createdAt: now,
     updatedAt: now,
@@ -108,6 +110,148 @@ export function deleteConnectionPreset(id: string): boolean {
   if (filtered.length === presets.length) return false;
   saveConnectionPresets(filtered);
   return true;
+}
+
+// ============================================
+// API Key Management Functions
+// ============================================
+
+export function addApiKeyToConnection(connectionId: string, keyName: string, keyValue: string): ApiKey | null {
+  const connection = getConnectionPreset(connectionId);
+  if (!connection) return null;
+
+  // Check for duplicate key names within the same connection
+  const duplicateKey = connection.apiKeys.find(key => key.name === keyName);
+  if (duplicateKey) {
+    throw new Error(`Key with name "${keyName}" already exists in this connection`);
+  }
+
+  const now = new Date().toISOString();
+  const newKey: ApiKey = {
+    id: generateId(),
+    name: keyName,
+    value: keyValue,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const updatedApiKeys = [...connection.apiKeys, newKey];
+  const updatedConnection = updateConnectionPreset(connectionId, {
+    apiKeys: updatedApiKeys,
+    // If this is the first key, select it automatically
+    selectedKeyId: connection.selectedKeyId || newKey.id,
+  });
+
+  return newKey;
+}
+
+export function updateApiKey(connectionId: string, keyId: string, updates: Partial<Omit<ApiKey, 'id' | 'createdAt' | 'updatedAt'>>): ApiKey | null {
+  const connection = getConnectionPreset(connectionId);
+  if (!connection) return null;
+
+  const keyIndex = connection.apiKeys.findIndex(key => key.id === keyId);
+  if (keyIndex === -1) return null;
+
+  // If updating name, check for duplicates
+  if (updates.name) {
+    const duplicateKey = connection.apiKeys.find(key => key.name === updates.name && key.id !== keyId);
+    if (duplicateKey) {
+      throw new Error(`Key with name "${updates.name}" already exists in this connection`);
+    }
+  }
+
+  const updatedApiKeys = [...connection.apiKeys];
+  updatedApiKeys[keyIndex] = {
+    ...updatedApiKeys[keyIndex],
+    ...updates,
+    id: keyId,
+    updatedAt: new Date().toISOString(),
+  };
+
+  updateConnectionPreset(connectionId, { apiKeys: updatedApiKeys });
+  return updatedApiKeys[keyIndex];
+}
+
+export function deleteApiKey(connectionId: string, keyId: string): boolean {
+  const connection = getConnectionPreset(connectionId);
+  if (!connection) return false;
+
+  const updatedApiKeys = connection.apiKeys.filter(key => key.id !== keyId);
+  
+  // If the deleted key was selected, select another key or clear selection
+  let selectedKeyId = connection.selectedKeyId;
+  if (selectedKeyId === keyId) {
+    selectedKeyId = updatedApiKeys.length > 0 ? updatedApiKeys[0].id : undefined;
+  }
+
+  updateConnectionPreset(connectionId, {
+    apiKeys: updatedApiKeys,
+    selectedKeyId,
+  });
+
+  return true;
+}
+
+export function setSelectedApiKey(connectionId: string, keyId: string | undefined): boolean {
+  const connection = getConnectionPreset(connectionId);
+  if (!connection) return false;
+
+  // If keyId is provided, verify it exists
+  if (keyId !== undefined) {
+    const keyExists = connection.apiKeys.some(key => key.id === keyId);
+    if (!keyExists) return false;
+  }
+
+  updateConnectionPreset(connectionId, { selectedKeyId: keyId });
+  return true;
+}
+
+export function getSelectedApiKey(connectionId: string): ApiKey | undefined {
+  const connection = getConnectionPreset(connectionId);
+  if (!connection || !connection.selectedKeyId) return undefined;
+  
+  return connection.apiKeys.find(key => key.id === connection.selectedKeyId);
+}
+
+/**
+ * Migrates existing connection presets from single apiKeyLocalEncrypted to multiple apiKeys
+ * This should be called once when the app starts to ensure backward compatibility
+ */
+export function migrateConnectionPresetsToMultiKey(): void {
+  const presets = getConnectionPresets();
+  const needsMigration = presets.some(preset =>
+    (preset as any).apiKeyLocalEncrypted !== undefined &&
+    (!preset.apiKeys || preset.apiKeys.length === 0)
+  );
+
+  if (needsMigration) {
+    const updatedPresets = presets.map(preset => {
+      // Skip if already migrated
+      if (preset.apiKeys && preset.apiKeys.length > 0) return preset;
+
+      const legacyKey = (preset as any).apiKeyLocalEncrypted;
+      if (!legacyKey) return preset;
+
+      const now = new Date().toISOString();
+      const migratedKey: ApiKey = {
+        id: generateId(),
+        name: 'Default Key',
+        value: legacyKey,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      return {
+        ...preset,
+        apiKeys: [migratedKey],
+        selectedKeyId: migratedKey.id,
+        // Remove legacy field
+        apiKeyLocalEncrypted: undefined,
+      };
+    });
+
+    saveConnectionPresets(updatedPresets);
+  }
 }
 
 // ============================================

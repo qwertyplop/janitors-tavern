@@ -296,12 +296,26 @@ export async function POST(request: NextRequest) {
       return errorWithCors('Connection preset is required', 400);
     }
 
-    // Get API key
+    // Get API key from the new multi-key system
     let apiKey = '';
+    
     if (connectionPreset.apiKeyRef === 'env' && connectionPreset.apiKeyEnvVar) {
+      // Environment variable reference
       apiKey = process.env[connectionPreset.apiKeyEnvVar] || '';
-    } else if (connectionPreset.apiKeyLocalEncrypted) {
-      apiKey = connectionPreset.apiKeyLocalEncrypted;
+    } else {
+      // Get selected API key from the connection preset
+      const selectedKeyId = connectionPreset.selectedKeyId;
+      if (selectedKeyId) {
+        const selectedKey = connectionPreset.apiKeys?.find(key => key.id === selectedKeyId);
+        if (selectedKey) {
+          apiKey = selectedKey.value;
+        }
+      }
+      
+      // Fallback: if no selected key but there are keys, use the first one
+      if (!apiKey && connectionPreset.apiKeys && connectionPreset.apiKeys.length > 0) {
+        apiKey = connectionPreset.apiKeys[0].value;
+      }
     }
 
     if (!apiKey) {

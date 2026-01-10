@@ -120,8 +120,11 @@ export function addApiKeyToConnection(connectionId: string, keyName: string, key
   const connection = getConnectionPreset(connectionId);
   if (!connection) return null;
 
+  // Ensure apiKeys is always an array (for backward compatibility)
+  const apiKeys = connection.apiKeys || [];
+
   // Check for duplicate key names within the same connection
-  const duplicateKey = connection.apiKeys.find(key => key.name === keyName);
+  const duplicateKey = apiKeys.find(key => key.name === keyName);
   if (duplicateKey) {
     throw new Error(`Key with name "${keyName}" already exists in this connection`);
   }
@@ -135,7 +138,7 @@ export function addApiKeyToConnection(connectionId: string, keyName: string, key
     updatedAt: now,
   };
 
-  const updatedApiKeys = [...connection.apiKeys, newKey];
+  const updatedApiKeys = [...apiKeys, newKey];
   const updatedConnection = updateConnectionPreset(connectionId, {
     apiKeys: updatedApiKeys,
     // If this is the first key, select it automatically
@@ -149,18 +152,21 @@ export function updateApiKey(connectionId: string, keyId: string, updates: Parti
   const connection = getConnectionPreset(connectionId);
   if (!connection) return null;
 
-  const keyIndex = connection.apiKeys.findIndex(key => key.id === keyId);
+  // Ensure apiKeys is always an array (for backward compatibility)
+  const apiKeys = connection.apiKeys || [];
+
+  const keyIndex = apiKeys.findIndex(key => key.id === keyId);
   if (keyIndex === -1) return null;
 
   // If updating name, check for duplicates
   if (updates.name) {
-    const duplicateKey = connection.apiKeys.find(key => key.name === updates.name && key.id !== keyId);
+    const duplicateKey = apiKeys.find(key => key.name === updates.name && key.id !== keyId);
     if (duplicateKey) {
       throw new Error(`Key with name "${updates.name}" already exists in this connection`);
     }
   }
 
-  const updatedApiKeys = [...connection.apiKeys];
+  const updatedApiKeys = [...apiKeys];
   updatedApiKeys[keyIndex] = {
     ...updatedApiKeys[keyIndex],
     ...updates,
@@ -176,7 +182,10 @@ export function deleteApiKey(connectionId: string, keyId: string): boolean {
   const connection = getConnectionPreset(connectionId);
   if (!connection) return false;
 
-  const updatedApiKeys = connection.apiKeys.filter(key => key.id !== keyId);
+  // Ensure apiKeys is always an array (for backward compatibility)
+  const apiKeys = connection.apiKeys || [];
+
+  const updatedApiKeys = apiKeys.filter(key => key.id !== keyId);
   
   // If the deleted key was selected, select another key or clear selection
   let selectedKeyId = connection.selectedKeyId;
@@ -196,9 +205,12 @@ export function setSelectedApiKey(connectionId: string, keyId: string | undefine
   const connection = getConnectionPreset(connectionId);
   if (!connection) return false;
 
+  // Ensure apiKeys is always an array (for backward compatibility)
+  const apiKeys = connection.apiKeys || [];
+
   // If keyId is provided, verify it exists
   if (keyId !== undefined) {
-    const keyExists = connection.apiKeys.some(key => key.id === keyId);
+    const keyExists = apiKeys.some(key => key.id === keyId);
     if (!keyExists) return false;
   }
 
@@ -210,7 +222,10 @@ export function getSelectedApiKey(connectionId: string): ApiKey | undefined {
   const connection = getConnectionPreset(connectionId);
   if (!connection || !connection.selectedKeyId) return undefined;
   
-  return connection.apiKeys.find(key => key.id === connection.selectedKeyId);
+  // Ensure apiKeys is always an array (for backward compatibility)
+  const apiKeys = connection.apiKeys || [];
+  
+  return apiKeys.find(key => key.id === connection.selectedKeyId);
 }
 
 /**

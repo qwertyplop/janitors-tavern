@@ -19,7 +19,7 @@ interface ChatCompletionPresetEditorProps {
   onCancel: () => void;
 }
 
-type TabId = 'prompts' | 'sampler' | 'utility' | 'advanced';
+type TabId = 'prompts' | 'sampler' | 'advanced';
 
 interface Tab {
   id: TabId;
@@ -29,7 +29,6 @@ interface Tab {
 const TABS: Tab[] = [
   { id: 'prompts', label: 'Prompt Blocks' },
   { id: 'sampler', label: 'Sampler Settings' },
-  { id: 'utility', label: 'Utility Prompts' },
   { id: 'advanced', label: 'Advanced' },
 ];
 
@@ -219,121 +218,6 @@ export function ChatCompletionPresetEditor({
         )}
 
 
-        {activeTab === 'utility' && (
-          <div className="space-y-6">
-            <Card className="p-4">
-              <h3 className="text-lg font-semibold mb-4">Format Templates</h3>
-              <p className="text-sm text-zinc-500 mb-4">
-                Templates used to wrap information from World Info and Character Cards. If not set, information is sent as-is.
-              </p>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="worldInfo">World Info Format</Label>
-                  <Input
-                    id="worldInfo"
-                    value={preset.formatStrings.worldInfo}
-                    onChange={(e) => handleFormatStringsChange('worldInfo', e.target.value)}
-                    className="font-mono"
-                    placeholder="{0}"
-                  />
-                  <p className="text-xs text-zinc-500 mt-1">
-                    Use {'{0}'} as the placeholder for World Info content
-                  </p>
-                </div>
-                <div>
-                  <Label htmlFor="scenario">Scenario Format</Label>
-                  <Input
-                    id="scenario"
-                    value={preset.formatStrings.scenario}
-                    onChange={(e) => handleFormatStringsChange('scenario', e.target.value)}
-                    className="font-mono"
-                    placeholder="{{scenario}}"
-                  />
-                  <p className="text-xs text-zinc-500 mt-1">
-                    Use {'{{scenario}}'} as the placeholder
-                  </p>
-                </div>
-                <div>
-                  <Label htmlFor="personality">Personality Format</Label>
-                  <Input
-                    id="personality"
-                    value={preset.formatStrings.personality}
-                    onChange={(e) => handleFormatStringsChange('personality', e.target.value)}
-                    className="font-mono"
-                    placeholder="[{{char}}'s personality: {{personality}}]"
-                  />
-                  <p className="text-xs text-zinc-500 mt-1">
-                    Use {'{{personality}}'} as the placeholder
-                  </p>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-4">
-              <h3 className="text-lg font-semibold mb-4">Message Handling</h3>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="sendIfEmpty">Replace Empty Message</Label>
-                  <Input
-                    id="sendIfEmpty"
-                    value={preset.advancedSettings.sendIfEmpty}
-                    onChange={(e) => handleAdvancedSettingsChange('sendIfEmpty', e.target.value)}
-                    placeholder="Message to send when text box is empty..."
-                  />
-                  <p className="text-xs text-zinc-500 mt-1">
-                    Sends this message instead of a blank when the text box is empty
-                  </p>
-                </div>
-                <div>
-                  <Label htmlFor="namesBehavior">Character Names Behavior</Label>
-                  <Select
-                    id="namesBehavior"
-                    value={String(preset.advancedSettings.namesBehavior)}
-                    onChange={(e) => handleAdvancedSettingsChange('namesBehavior', parseInt(e.target.value))}
-                  >
-                    {NAMES_BEHAVIOR_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
-                  <p className="text-xs text-zinc-500 mt-1">
-                    Strategy for instructing the model on how to associate messages with characters
-                  </p>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-4">
-              <h3 className="text-lg font-semibold mb-4">Assistant Settings</h3>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="assistantPrefill">Assistant Prefill</Label>
-                  <Textarea
-                    id="assistantPrefill"
-                    value={preset.assistantPrefill}
-                    onChange={(e) => onChange({ ...preset, assistantPrefill: e.target.value })}
-                    className="h-20 font-mono text-sm"
-                    placeholder="Text to prefill the assistant's response..."
-                  />
-                  <p className="text-xs text-zinc-500 mt-1">
-                    Pre-fill the beginning of the assistant&apos;s response
-                  </p>
-                </div>
-                <div>
-                  <Label htmlFor="assistantImpersonation">Assistant Impersonation</Label>
-                  <Textarea
-                    id="assistantImpersonation"
-                    value={preset.assistantImpersonation}
-                    onChange={(e) => onChange({ ...preset, assistantImpersonation: e.target.value })}
-                    className="h-20 font-mono text-sm"
-                    placeholder="Text for impersonation mode..."
-                  />
-                </div>
-              </div>
-            </Card>
-          </div>
-        )}
 
         {activeTab === 'advanced' && (
           <div className="space-y-6">

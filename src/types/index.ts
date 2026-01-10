@@ -264,7 +264,7 @@ export interface ChatCompletionPreset {
 // Legacy Prompt Preset Types (for backward compat)
 // ============================================
 
-export type PromptPresetType = 'sillytavern-chat-completion' | 'system' | 'utility';
+export type PromptPresetType = 'sillytavern-chat-completion' | 'system';
 
 export interface STMetadata {
   version?: string;

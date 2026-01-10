@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Select } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { ChatCompletionPresetEditor } from '@/components/presets';
 import {
@@ -26,6 +27,8 @@ export default function PresetsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editingPreset, setEditingPreset] = useState<ChatCompletionPreset | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [sortMethod, setSortMethod] = useState<'alphabetical' | 'blockCount'>('alphabetical');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { t } = useI18n();
 
@@ -38,6 +41,28 @@ export default function PresetsPage() {
   }, []);
 
   const selectedPreset = presets.find(p => p.id === selectedId);
+
+  // Sort presets based on selected method and direction
+  const sortedPresets = useMemo(() => {
+    const presetsCopy = [...presets];
+    
+    const multiplier = sortDirection === 'asc' ? 1 : -1;
+    
+    switch (sortMethod) {
+      case 'alphabetical':
+        return presetsCopy.sort((a, b) =>
+          multiplier * a.name.localeCompare(b.name)
+        );
+      
+      case 'blockCount':
+        return presetsCopy.sort((a, b) =>
+          multiplier * (a.promptBlocks.length - b.promptBlocks.length)
+        );
+      
+      default:
+        return presetsCopy;
+    }
+  }, [presets, sortMethod, sortDirection]);
 
   // Set selected preset as default
   const selectAndSetDefault = (id: string) => {
@@ -166,10 +191,31 @@ export default function PresetsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Panel - Preset List */}
         <div className="lg:col-span-1 space-y-2">
-          <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">
-            {t.presets.savedPresets}
-          </h2>
-          {presets.length === 0 ? (
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+              {t.presets.savedPresets}
+            </h2>
+            <div className="flex items-center gap-2">
+              <Select
+                value={sortMethod}
+                onChange={(e) => setSortMethod(e.target.value as 'alphabetical' | 'blockCount')}
+                className="h-8 text-xs w-32"
+              >
+                <option value="alphabetical">Alphabetical</option>
+                <option value="blockCount">Block Count</option>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+              >
+                {sortDirection === 'asc' ? '↑' : '↓'}
+              </Button>
+            </div>
+          </div>
+          {sortedPresets.length === 0 ? (
             <Card className="p-4">
               <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
                 {t.presets.noPresetsYet}
@@ -177,7 +223,7 @@ export default function PresetsPage() {
             </Card>
           ) : (
             <div className="space-y-2">
-              {presets.map((preset) => (
+              {sortedPresets.map((preset) => (
                 <Card
                   key={preset.id}
                   className={cn(

@@ -197,12 +197,23 @@ export function PromptBlockList({
     const enabledMap = new Map(currentOrder.map((item) => [item.identifier, item.enabled]));
     
     // Determine which blocks should be in the active section
-    // If dragging from inactive to active, include the dragged block
-    // Otherwise, only include originally active blocks
-    const shouldIncludeDragged = isDraggingFromInactive && isDroppingInActive;
+    // Calculate how many blocks should be active after the drag
+    let activeCount = activeBlocks.length;
+    
+    if (isDraggingFromInactive && isDroppingInActive) {
+      // Dragging inactive block INTO active section: add 1 to active count
+      activeCount += 1;
+    } else if (!isDraggingFromInactive && !isDroppingInActive) {
+      // Dragging active block INTO inactive section: subtract 1 from active count
+      activeCount -= 1;
+    }
+    // Other cases (active→active, inactive→inactive): keep same count
+    
+    // Ensure activeCount doesn't go below 0
+    activeCount = Math.max(0, activeCount);
     
     // Get the identifiers that should be in the active section
-    const activeSectionIds = reorderedIds.slice(0, activeBlocks.length + (shouldIncludeDragged ? 1 : 0));
+    const activeSectionIds = reorderedIds.slice(0, activeCount);
     
     const newOrderItems: STPromptOrderItem[] = activeSectionIds.map((id) => {
       const wasPreviouslyActive = enabledMap.has(id);

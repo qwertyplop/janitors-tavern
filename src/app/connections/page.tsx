@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
@@ -460,19 +461,6 @@ export default function ConnectionsPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            onChange={handleImport}
-            className="hidden"
-          />
-          <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-            {t.common.import}
-          </Button>
-          <Button variant="outline" onClick={handleExportAll} disabled={connections.length === 0}>
-            {t.common.exportAll}
-          </Button>
           <Button onClick={handleCreate}>{t.connections.newConnection}</Button>
         </div>
       </div>
@@ -653,18 +641,17 @@ export default function ConnectionsPage() {
                   </h3>
                   <div className="flex items-center gap-3">
                     {availableModels.length > 0 ? (
-                      <Select
+                      <SearchableSelect
                         value={selectedModel}
-                        onChange={(e) => setSelectedModel(e.target.value)}
+                        onChange={setSelectedModel}
+                        options={availableModels.map(model => ({
+                          value: model.id,
+                          label: model.id
+                        }))}
+                        placeholder={t.connections.selectModel}
+                        searchPlaceholder="Search models..."
                         className="flex-1"
-                      >
-                        <option value="">{t.connections.selectModel}</option>
-                        {availableModels.map((model) => (
-                          <option key={model.id} value={model.id}>
-                            {model.id}
-                          </option>
-                        ))}
-                      </Select>
+                      />
                     ) : (
                       <Input
                         value={selectedModel}
@@ -720,13 +707,6 @@ export default function ConnectionsPage() {
                     onClick={() => handleEdit(selectedConnection)}
                   >
                     {t.connections.editConnection}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleExport(selectedConnection)}
-                  >
-                    {t.common.export}
                   </Button>
                 </div>
               </CardContent>

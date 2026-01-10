@@ -3,6 +3,7 @@ export * from './input';
 export * from './textarea';
 export * from './label';
 export * from './select';
+export * from './searchable-select';
 export * from './card';
 export * from './badge';
 export * from './dialog';

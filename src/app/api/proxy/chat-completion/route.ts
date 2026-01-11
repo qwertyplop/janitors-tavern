@@ -24,7 +24,7 @@ import {
   getServerSettings,
   getServerRegexScripts,
 } from '@/lib/server-storage';
-import { recordUsage, calculateMessageTokens } from '@/lib/stats';
+import { recordUsage, calculateMessageTokens, extractTokenCountsFromResponse, extractTokenCountsFromStreamChunk } from '@/lib/stats';
 import { applyRegexScripts } from '@/lib/regex-processor';
 
 // ============================================
@@ -545,36 +545,30 @@ export async function POST(request: NextRequest) {
         }, Date.now() - startTime).catch(() => {});
       }
 
-      recordUsage(inputTokensEstimate, 0).catch(() => {});
-
-      // If startReplyWith is enabled, create a transform stream to prepend content
-      if (startReplyContent) {
-        let prefixSent = false;
-        const encoder = new TextEncoder();
-        const decoder = new TextDecoder();
-
-        const transformStream = new TransformStream({
-          transform(chunk, controller) {
-            // Log raw chunk before any processing
-            if (shouldLogResponse()) {
-              const rawText = decoder.decode(chunk, { stream: true });
-              console.log(`[JT] [${requestId}] RAW STREAM CHUNK:`, rawText);
-            }
-
-            // If prefix already sent, pass through as-is
-            if (prefixSent) {
-              controller.enqueue(chunk);
-              return;
-            }
-
-            // Decode chunk to inspect it
-            const text = decoder.decode(chunk, { stream: true });
-
+      // For streaming, we need to process chunks for token counting and startReplyWith
+      let outputTokens = 0;
+      const encoder = new TextEncoder();
+      const decoder = new TextDecoder();
+      
+      const streamingTransform = new TransformStream({
+        transform(chunk, controller) {
+          const text = decoder.decode(chunk, { stream: true });
+          
+          // Try to extract token counts from this chunk
+          const tokenCounts = extractTokenCountsFromStreamChunk(text);
+          if (tokenCounts) {
+            outputTokens = tokenCounts.completionTokens;
+            // Record usage with actual output tokens
+            recordUsage(inputTokensEstimate, outputTokens).catch(() => {});
+          }
+          
+          // Process startReplyWith and regex scripts if enabled
+          let processedChunk = chunk;
+          if (startReplyContent) {
             // Check if this chunk contains content delta
             if (text.includes('"delta"') && text.includes('"content"')) {
               // Extract the content string, apply startReplyWith and regex scripts
               const contentMatch = text.match(/("content":\s*")([^"]*)(")/);
-              let newContent = '';
               if (contentMatch) {
                 const original = contentMatch[2];
                 // Apply startReplyWith prefix
@@ -582,6 +576,7 @@ export async function POST(request: NextRequest) {
                 // Apply regex scripts (placement 2) to the content
                 // For streaming, we assume it's assistant output (role: 'assistant')
                 const outputScripts = enabledScripts.filter(s => s.placement.includes(2));
+                let newContent = withPrefix;
                 if (outputScripts.length > 0) {
                   if (shouldLogResponse()) {
                     console.log(`[JT] [${requestId}] Applying ${outputScripts.length} regex script(s) to streaming AI output (placement 2)`);
@@ -594,8 +589,6 @@ export async function POST(request: NextRequest) {
                     undefined,
                     'assistant'
                   );
-                } else {
-                  newContent = withPrefix;
                 }
                 // Escape any double quotes in the new content for JSON safety
                 const escaped = newContent.replace(/"/g, '\\"').replace(/\n/g, '\\n');
@@ -604,28 +597,24 @@ export async function POST(request: NextRequest) {
                   /("content":\s*")([^"]*)(")/,
                   `$1${escaped}$3`
                 );
-                controller.enqueue(encoder.encode(modifiedText));
-              } else {
-                // Fallback: no content field found, just pass through
-                controller.enqueue(chunk);
+                processedChunk = encoder.encode(modifiedText);
               }
-              prefixSent = true;
-            } else {
-              controller.enqueue(chunk);
             }
-          },
-        });
+          }
+          
+          controller.enqueue(processedChunk);
+        },
+        flush(controller) {
+          // If no token counts were found in any chunk, record with 0 output tokens
+          if (outputTokens === 0) {
+            recordUsage(inputTokensEstimate, 0).catch(() => {});
+          }
+        }
+      });
 
-        const modifiedStream = streamResult.stream.pipeThrough(transformStream);
-
-        return new Response(modifiedStream, {
-          status: streamResult.status,
-          headers: responseHeaders,
-        });
-      }
-
-      // Return SSE stream response immediately - pure passthrough like Python proxy
-      return new Response(streamResult.stream, {
+      const processedStream = streamResult.stream.pipeThrough(streamingTransform);
+      
+      return new Response(processedStream, {
         status: streamResult.status,
         headers: responseHeaders,
       });

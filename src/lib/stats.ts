@@ -108,6 +108,76 @@ export function calculateMessageTokens(messages: Array<{ content?: string; role?
   return total;
 }
 
+/**
+ * Extract token counts from OpenAI-compatible response body
+ * Returns { promptTokens: number, completionTokens: number } or null if not found
+ */
+export function extractTokenCountsFromResponse(responseBody: string): { promptTokens: number; completionTokens: number } | null {
+  try {
+    const data = JSON.parse(responseBody);
+    
+    // Check for OpenAI-compatible usage field
+    if (data.usage && typeof data.usage === 'object') {
+      const usage = data.usage;
+      const promptTokens = typeof usage.prompt_tokens === 'number' ? usage.prompt_tokens : 0;
+      const completionTokens = typeof usage.completion_tokens === 'number' ? usage.completion_tokens : 0;
+      
+      if (promptTokens > 0 || completionTokens > 0) {
+        return { promptTokens, completionTokens };
+      }
+    }
+    
+    // Check for alternative field names (some providers might use different names)
+    if (data.prompt_tokens !== undefined || data.completion_tokens !== undefined) {
+      const promptTokens = typeof data.prompt_tokens === 'number' ? data.prompt_tokens : 0;
+      const completionTokens = typeof data.completion_tokens === 'number' ? data.completion_tokens : 0;
+      
+      if (promptTokens > 0 || completionTokens > 0) {
+        return { promptTokens, completionTokens };
+      }
+    }
+    
+    return null;
+  } catch {
+    // If parsing fails, return null
+    return null;
+  }
+}
+
+/**
+ * Extract token counts from streaming response chunk
+ * Streaming responses might have usage in the final chunk
+ */
+export function extractTokenCountsFromStreamChunk(chunkText: string): { promptTokens: number; completionTokens: number } | null {
+  try {
+    // Remove "data: " prefix if present
+    const cleanText = chunkText.startsWith('data: ') ? chunkText.substring(6) : chunkText;
+    
+    // Skip empty chunks or [DONE] marker
+    if (cleanText.trim() === '' || cleanText.trim() === '[DONE]') {
+      return null;
+    }
+    
+    const data = JSON.parse(cleanText);
+    
+    // Check for usage field in streaming chunk
+    if (data.usage && typeof data.usage === 'object') {
+      const usage = data.usage;
+      const promptTokens = typeof usage.prompt_tokens === 'number' ? usage.prompt_tokens : 0;
+      const completionTokens = typeof usage.completion_tokens === 'number' ? usage.completion_tokens : 0;
+      
+      if (promptTokens > 0 || completionTokens > 0) {
+        return { promptTokens, completionTokens };
+      }
+    }
+    
+    return null;
+  } catch {
+    // If parsing fails, return null
+    return null;
+  }
+}
+
 // ============================================
 // Firebase Storage Functions (Optimized)
 // ============================================

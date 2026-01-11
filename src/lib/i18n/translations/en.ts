@@ -263,6 +263,11 @@ export const en = {
     themeLight: 'Light',
     themeDark: 'Dark',
     showAdvancedOptions: 'Show advanced options',
+    // Post-Processing Settings
+    postProcessingSettings: 'Post-Processing Settings',
+    postProcessingDescription: 'Configure message post-processing behavior',
+    strictPlaceholderMessage: 'Strict Mode Placeholder Message',
+    strictPlaceholderHint: 'This message is inserted as a user placeholder when using Strict post-processing mode.',
     // Default Presets
     defaultPresets: 'Default Presets',
     defaultPresetsHint: 'Default presets used when no specific preset is specified in requests',

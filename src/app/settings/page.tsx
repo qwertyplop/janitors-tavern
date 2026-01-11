@@ -74,10 +74,11 @@ export default function SettingsPage() {
       const response = await fetch('/api/settings');
       if (response.ok) {
         const serverSettings = await response.json();
-        // Merge server settings with local settings, preferring server settings for logging
+        // Merge server settings with local settings, preferring server settings for logging and strictPlaceholderMessage
         setSettings({
           ...localSettings,
           logging: serverSettings.logging || localSettings.logging,
+          strictPlaceholderMessage: serverSettings.strictPlaceholderMessage || localSettings.strictPlaceholderMessage,
         });
       }
     } catch (error) {
@@ -91,12 +92,15 @@ export default function SettingsPage() {
     // Save local settings
     updateSettings(settings);
     
-    // Save server settings (logging) to API
+    // Save server settings (logging and strictPlaceholderMessage) to API
     try {
       const response = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ logging: settings.logging }),
+        body: JSON.stringify({
+          logging: settings.logging,
+          strictPlaceholderMessage: settings.strictPlaceholderMessage,
+        }),
       });
 
       if (response.ok) {
@@ -435,6 +439,27 @@ export default function SettingsPage() {
               className="h-4 w-4 rounded border-zinc-300"
             />
             <Label htmlFor="showAdvanced">{t.settings.showAdvancedOptions}</Label>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t.settings.postProcessingSettings}</CardTitle>
+          <CardDescription>{t.settings.postProcessingDescription}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="strictPlaceholderMessage">{t.settings.strictPlaceholderMessage}</Label>
+            <Input
+              id="strictPlaceholderMessage"
+              value={settings.strictPlaceholderMessage || '[Start a new chat]'}
+              onChange={(e) => handleChange('strictPlaceholderMessage', e.target.value)}
+              placeholder="[Start a new chat]"
+            />
+            <p className="text-xs text-zinc-500">
+              {t.settings.strictPlaceholderHint}
+            </p>
           </div>
         </CardContent>
       </Card>

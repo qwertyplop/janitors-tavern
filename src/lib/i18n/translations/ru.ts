@@ -265,6 +265,11 @@ export const ru: TranslationKeys = {
     themeLight: 'Светлая',
     themeDark: 'Тёмная',
     showAdvancedOptions: 'Показывать расширенные настройки',
+    // Post-Processing Settings
+    postProcessingSettings: 'Настройки пост-обработки',
+    postProcessingDescription: 'Настройка поведения пост-обработки сообщений',
+    strictPlaceholderMessage: 'Заглушка для строгого режима',
+    strictPlaceholderHint: 'Это сообщение вставляется как заглушка пользователя при использовании строгого режима пост-обработки.',
     // Default Presets
     defaultPresets: 'Пресеты по умолчанию',
     defaultPresetsHint: 'Пресеты, используемые когда конкретный пресет не указан в запросе',

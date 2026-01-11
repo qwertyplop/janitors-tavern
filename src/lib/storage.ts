@@ -632,9 +632,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   showAdvancedOptions: false,
   defaultPostProcessing: 'none',
   logging: {
-    enabled: false,
-    logRequests: true,
-    logResponses: true,
+    enabled: true, // Keep for backward compatibility, not used in UI anymore
+    logRequests: false, // Default disabled as requested
+    logResponses: false, // Default disabled as requested
     logFilePath: 'logs/proxy.log',
   },
 };

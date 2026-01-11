@@ -245,13 +245,8 @@ export default function SettingsPage() {
       {/* Logging Settings */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle>
             {t.settings.requestResponseLogging}
-            {settings?.logging.enabled && (
-              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                {t.common.enabled}
-              </Badge>
-            )}
           </CardTitle>
           <CardDescription>
             {t.settings.loggingDescription}
@@ -263,21 +258,9 @@ export default function SettingsPage() {
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
-                  id="loggingEnabled"
-                  checked={settings.logging.enabled}
-                  onChange={(e) => handleLoggingChange('enabled', e.target.checked)}
-                  className="h-4 w-4 rounded border-zinc-300"
-                />
-                <Label htmlFor="loggingEnabled">{t.settings.enableLogging}</Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
                   id="logRequests"
                   checked={settings.logging.logRequests}
                   onChange={(e) => handleLoggingChange('logRequests', e.target.checked)}
-                  disabled={!settings.logging.enabled}
                   className="h-4 w-4 rounded border-zinc-300"
                 />
                 <Label htmlFor="logRequests">{t.settings.logRequests}</Label>
@@ -289,7 +272,6 @@ export default function SettingsPage() {
                   id="logResponses"
                   checked={settings.logging.logResponses}
                   onChange={(e) => handleLoggingChange('logResponses', e.target.checked)}
-                  disabled={!settings.logging.enabled}
                   className="h-4 w-4 rounded border-zinc-300"
                 />
                 <Label htmlFor="logResponses">{t.settings.logResponses}</Label>
@@ -302,7 +284,6 @@ export default function SettingsPage() {
                   value={settings.logging.logFilePath}
                   onChange={(e) => handleLoggingChange('logFilePath', e.target.value)}
                   placeholder="logs/proxy.log"
-                  disabled={!settings.logging.enabled}
                 />
                 <p className="text-xs text-zinc-500">{t.settings.logFilePathHint}</p>
               </div>
@@ -394,10 +375,6 @@ export default function SettingsPage() {
                 <div className="space-y-2 border-t pt-4 mt-4">
                   <h5 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{t.settings.loggingStatus}</h5>
                   <div className="space-y-1 text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className={`inline-block w-2 h-2 rounded-full ${settings.logging.enabled ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                      <span>{t.settings.enableLoggingStatus}: {settings.logging.enabled ? t.common.enabled : t.common.disabled}</span>
-                    </div>
                     <div className="flex items-center gap-2">
                       <span className={`inline-block w-2 h-2 rounded-full ${settings.logging.logRequests ? 'bg-green-500' : 'bg-red-500'}`}></span>
                       <span>{t.settings.logRequestsStatus}: {settings.logging.logRequests ? t.common.enabled : t.common.disabled}</span>

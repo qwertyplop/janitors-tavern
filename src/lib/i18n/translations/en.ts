@@ -219,7 +219,6 @@ export const en = {
     loadingServerSettings: 'Loading server settings...',
     // Logging Status
     loggingStatus: 'Logging Status',
-    enableLoggingStatus: 'Enable logging',
     logRequestsStatus: 'Log requests',
     logResponsesStatus: 'Log responses',
     enabled: 'Enabled',

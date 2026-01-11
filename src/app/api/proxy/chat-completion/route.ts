@@ -233,8 +233,8 @@ export async function POST(request: NextRequest) {
   const settings = await getServerSettings();
 
   // Helper function to check if logging is enabled
-  const shouldLogRequest = () => settings.logging?.enabled && settings.logging?.logRequests;
-  const shouldLogResponse = () => settings.logging?.enabled && settings.logging?.logResponses;
+  const shouldLogRequest = () => settings.logging?.logRequests;
+  const shouldLogResponse = () => settings.logging?.logResponses;
   const shouldLogError = () => true; // Always log errors for debugging
 
   try {

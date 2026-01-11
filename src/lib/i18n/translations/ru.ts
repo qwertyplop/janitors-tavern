@@ -221,7 +221,6 @@ export const ru: TranslationKeys = {
     loadingServerSettings: 'Загрузка настроек сервера...',
     // Logging Status
     loggingStatus: 'Logging Status',
-    enableLoggingStatus: 'Enable logging',
     logRequestsStatus: 'Log requests',
     logResponsesStatus: 'Log responses',
     enabled: 'Enabled',

@@ -33,15 +33,11 @@ export interface UsageStats {
 const STATS_KEY = 'stats';
 const RESET_HOUR_UTC = 7; // 10 AM GMT+3 = 7 AM UTC
 
-// Save to Firebase every N requests (reduces operations drastically)
-const SAVE_INTERVAL = 10;
-
 // ============================================
 // In-Memory Cache
 // ============================================
 
 let cachedStats: UsageStats | null = null;
-let pendingChanges = 0;
 let lastLoadTime = 0;
 const CACHE_TTL = 60000; // 1 minute cache for reads
 
@@ -256,7 +252,7 @@ export async function getStats(): Promise<UsageStats> {
 
 /**
  * Increment request count and add tokens
- * Batches writes to Firebase - only saves every SAVE_INTERVAL requests
+ * Saves to Firebase on every request for reliability
  */
 export async function recordUsage(inputTokens: number, outputTokens: number): Promise<UsageStats> {
   try {
@@ -285,13 +281,17 @@ export async function recordUsage(inputTokens: number, outputTokens: number): Pr
 
     // Update cache
     cachedStats = stats;
-    pendingChanges++;
-
-    // Only save to Firebase every N requests (reduces operations by ~90%)
-    if (pendingChanges >= SAVE_INTERVAL) {
-      pendingChanges = 0;
-      saveStats(stats).catch(() => {}); // Fire and forget
-    }
+    
+    // Save to Firebase immediately for reliability
+    console.log(`[Stats] Saving stats to Firebase:`, {
+      totalRequests: stats.totalRequests,
+      totalTokens: stats.totalTokens,
+      dailyRequests: stats.dailyRequests,
+      dailyTokens: stats.dailyTokens,
+      lastDailyReset: stats.lastDailyReset,
+    });
+    
+    await saveStats(stats);
 
     return stats;
   } catch (error) {
@@ -301,11 +301,11 @@ export async function recordUsage(inputTokens: number, outputTokens: number): Pr
 }
 
 /**
- * Force save pending stats (call on shutdown or periodically)
+ * Force save stats (call on shutdown or periodically)
  */
 export async function flushStats(): Promise<void> {
-  if (cachedStats && pendingChanges > 0) {
-    pendingChanges = 0;
+  if (cachedStats) {
+    console.log(`[Stats] Flushing stats to Firebase`);
     await saveStats(cachedStats);
   }
 }

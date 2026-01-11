@@ -22,6 +22,8 @@ import {
   getPresetRegexScripts,
   updatePresetRegexScript,
   togglePresetRegexScriptDisabled,
+  getChatCompletionPreset,
+  updateChatCompletionPreset,
 } from '@/lib/storage';
 import { RegexScript } from '@/types';
 import { applyRegexScript, applyRegexScripts } from '@/lib/regex-processor';
@@ -42,6 +44,7 @@ export default function RegexScriptManager() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [expandedPresets, setExpandedPresets] = useState<Set<string>>(new Set());
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { t } = useI18n();
   
@@ -116,10 +119,7 @@ export default function RegexScriptManager() {
 
     setScripts(updatedScripts);
     setDraggedIndex(index);
-
-    // Save the new order
-    const scriptIdsInOrder = updatedScripts.map(s => s.id);
-    updateRegexScriptsOrder(scriptIdsInOrder);
+    setHasUnsavedChanges(true);
   }, [scripts, draggedIndex]);
 
   const handleDragEnd = useCallback(() => {
@@ -303,33 +303,71 @@ export default function RegexScriptManager() {
     };
 
     if (editingId && presetScriptInfo) {
-      // Update preset script
-      updatePresetRegexScript(presetScriptInfo.presetId, editingId, scriptData);
+      // Update preset script - we need to update presetScriptGroups state
+      const updatedGroups = presetScriptGroups.map(group => {
+        if (group.presetId === presetScriptInfo.presetId) {
+          const updatedScripts = group.scripts.map(script =>
+            script.id === editingId ? {
+              ...script,
+              ...scriptData,
+              findRegex: normalizeRegexPattern(scriptData.findRegex),
+              updatedAt: new Date().toISOString(),
+            } : script
+          );
+          return { ...group, scripts: updatedScripts };
+        }
+        return group;
+      });
+      setPresetScriptGroups(updatedGroups);
       // Clear the preset script info
       delete (window as any)._editingPresetScript;
-      // Refresh preset scripts
-      setPresetScriptGroups(getPresetRegexScripts());
+      setHasUnsavedChanges(true);
     } else if (editingId) {
-      // Regular standalone script
-      updateRegexScript(editingId, scriptData);
-      setScripts(getRegexScripts());
+      // Regular standalone script - update local state
+      const updatedScripts = scripts.map(script =>
+        script.id === editingId ? {
+          ...script,
+          ...scriptData,
+          findRegex: normalizeRegexPattern(scriptData.findRegex),
+          updatedAt: new Date().toISOString(),
+        } : script
+      );
+      setScripts(updatedScripts);
+      setHasUnsavedChanges(true);
     } else {
-      // New standalone script
-      addRegexScript(scriptData);
-      setScripts(getRegexScripts());
+      // New standalone script - add to local state
+      const now = new Date().toISOString();
+      const nextOrder = scripts.length > 0 ? Math.max(...scripts.map(s => s.order)) + 1 : 0;
+      const newScript: RegexScript = {
+        ...scriptData,
+        findRegex: normalizeRegexPattern(scriptData.findRegex),
+        roles: scriptData.roles || ['assistant', 'user'],
+        disabled: scriptData.disabled ?? false,
+        markdownOnly: scriptData.markdownOnly ?? false,
+        runOnEdit: scriptData.runOnEdit ?? false,
+        substituteRegex: scriptData.substituteRegex ?? 0,
+        minDepth: scriptData.minDepth ?? null,
+        maxDepth: scriptData.maxDepth ?? null,
+        id: generateId(),
+        createdAt: now,
+        updatedAt: now,
+        order: nextOrder,
+      };
+      setScripts([...scripts, newScript]);
+      setHasUnsavedChanges(true);
     }
 
     setIsDialogOpen(false);
   };
 
   const handleDelete = (id: string) => {
-    deleteRegexScript(id);
-    const updated = getRegexScripts();
+    const updated = scripts.filter(s => s.id !== id);
     setScripts(updated);
     if (selectedId === id) {
       setSelectedId(updated.length > 0 ? updated[0].id : null);
     }
     setDeleteConfirmId(null);
+    setHasUnsavedChanges(true);
     // Reset test mode when dialog closes
     if (!isDialogOpen) {
       setShowTestMode(false);
@@ -339,6 +377,34 @@ export default function RegexScriptManager() {
   };
 
   // Export functionality removed as requested
+
+  const handleSaveChanges = () => {
+    // Save standalone scripts
+    saveRegexScripts(scripts);
+    
+    // Save preset script changes
+    presetScriptGroups.forEach(group => {
+      // Get the current preset
+      const preset = getChatCompletionPreset(group.presetId);
+      if (preset) {
+        // Update the preset with the modified scripts
+        updateChatCompletionPreset(group.presetId, {
+          regexScripts: group.scripts.map(script => ({
+            ...script,
+            // Remove the _presetId and _presetName fields that were added for UI
+            _presetId: undefined,
+            _presetName: undefined,
+          }))
+        });
+      }
+    });
+    
+    setHasUnsavedChanges(false);
+    
+    // Refresh from storage to ensure consistency
+    setScripts(getRegexScripts());
+    setPresetScriptGroups(getPresetRegexScripts());
+  };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -374,8 +440,11 @@ export default function RegexScriptManager() {
   const toggleEnabled = (id: string) => {
     const script = scripts.find(s => s.id === id);
     if (script) {
-      updateRegexScript(id, { disabled: !script.disabled });
-      setScripts(getRegexScripts());
+      const updatedScripts = scripts.map(s =>
+        s.id === id ? { ...s, disabled: !s.disabled, updatedAt: new Date().toISOString() } : s
+      );
+      setScripts(updatedScripts);
+      setHasUnsavedChanges(true);
     }
   };
 
@@ -387,6 +456,11 @@ export default function RegexScriptManager() {
           <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">Regex Scripts</h2>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
             Manage regex scripts for pre/post-processing of messages.
+            {hasUnsavedChanges && (
+              <span className="ml-2 text-amber-600 dark:text-amber-400 font-medium">
+                • Unsaved changes
+              </span>
+            )}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -401,6 +475,13 @@ export default function RegexScriptManager() {
             Import
           </Button>
           <Button onClick={handleCreate}>New Script</Button>
+          <Button
+            onClick={handleSaveChanges}
+            disabled={!hasUnsavedChanges}
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            Save Changes
+          </Button>
         </div>
       </div>
 
@@ -582,10 +663,18 @@ export default function RegexScriptManager() {
                                   className="h-6 w-6 p-0 hover:bg-zinc-300 dark:hover:bg-zinc-600"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    // Toggle enabled for preset script using storage function
-                                    togglePresetRegexScriptDisabled(group.presetId, script.id);
-                                    // Refresh preset scripts
-                                    setPresetScriptGroups(getPresetRegexScripts());
+                                    // Toggle enabled for preset script locally
+                                    const updatedGroups = presetScriptGroups.map(g => {
+                                      if (g.presetId === group.presetId) {
+                                        const updatedScripts = g.scripts.map(s =>
+                                          s.id === script.id ? { ...s, disabled: !s.disabled, updatedAt: new Date().toISOString() } : s
+                                        );
+                                        return { ...g, scripts: updatedScripts };
+                                      }
+                                      return g;
+                                    });
+                                    setPresetScriptGroups(updatedGroups);
+                                    setHasUnsavedChanges(true);
                                   }}
                                 >
                                   {script.disabled ? '🔴' : '🟢'}

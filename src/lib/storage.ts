@@ -716,7 +716,7 @@ export function deleteChatCompletionPreset(id: string): boolean {
 // ST Preset Import/Export Utilities
 // ============================================
 
-const DEFAULT_SAMPLER_SETTINGS: STSamplerSettings = {
+export const DEFAULT_SAMPLER_SETTINGS: STSamplerSettings = {
   temperature: 1,
   top_p: 1,
   top_k: 0,
@@ -796,18 +796,19 @@ export function importSTPreset(
   const now = new Date().toISOString();
   const presetName = fileName?.replace(/\.json$/i, '') || 'Imported Preset';
 
-  // All sampler settings default to disabled (false) except max tokens which is enabled by default
+  // Determine which sampler settings are enabled based on whether they differ from defaults
+  // Max tokens is always enabled by default regardless of value
   const samplerEnabled: Partial<Record<SamplerSettingKey, boolean>> = {
-    temperature: false,
-    top_p: false,
-    top_k: false,
-    top_a: false,
-    min_p: false,
-    frequency_penalty: false,
-    presence_penalty: false,
-    repetition_penalty: false,
-    openai_max_tokens: true, // Enabled by default
-    seed: false,
+    temperature: sampler.temperature !== DEFAULT_SAMPLER_SETTINGS.temperature,
+    top_p: sampler.top_p !== DEFAULT_SAMPLER_SETTINGS.top_p,
+    top_k: sampler.top_k !== DEFAULT_SAMPLER_SETTINGS.top_k,
+    top_a: sampler.top_a !== DEFAULT_SAMPLER_SETTINGS.top_a,
+    min_p: sampler.min_p !== DEFAULT_SAMPLER_SETTINGS.min_p,
+    frequency_penalty: sampler.frequency_penalty !== DEFAULT_SAMPLER_SETTINGS.frequency_penalty,
+    presence_penalty: sampler.presence_penalty !== DEFAULT_SAMPLER_SETTINGS.presence_penalty,
+    repetition_penalty: sampler.repetition_penalty !== DEFAULT_SAMPLER_SETTINGS.repetition_penalty,
+    openai_max_tokens: true, // Always enabled by default
+    seed: sampler.seed !== DEFAULT_SAMPLER_SETTINGS.seed,
   };
 
   return {
@@ -1034,25 +1035,28 @@ export function togglePresetRegexScriptDisabled(
 
 // Create a default/empty chat completion preset
 export function createDefaultChatCompletionPreset(): Omit<ChatCompletionPreset, 'id' | 'createdAt' | 'updatedAt'> {
-  // All sampler settings default to disabled (false) except max tokens which is enabled by default
+  const sampler = { ...DEFAULT_SAMPLER_SETTINGS };
+  
+  // Determine which sampler settings are enabled based on whether they differ from defaults
+  // Max tokens is always enabled by default regardless of value
   const samplerEnabled: Partial<Record<SamplerSettingKey, boolean>> = {
-    temperature: false,
-    top_p: false,
-    top_k: false,
-    top_a: false,
-    min_p: false,
-    frequency_penalty: false,
-    presence_penalty: false,
-    repetition_penalty: false,
-    openai_max_tokens: true, // Enabled by default
-    seed: false,
+    temperature: sampler.temperature !== DEFAULT_SAMPLER_SETTINGS.temperature,
+    top_p: sampler.top_p !== DEFAULT_SAMPLER_SETTINGS.top_p,
+    top_k: sampler.top_k !== DEFAULT_SAMPLER_SETTINGS.top_k,
+    top_a: sampler.top_a !== DEFAULT_SAMPLER_SETTINGS.top_a,
+    min_p: sampler.min_p !== DEFAULT_SAMPLER_SETTINGS.min_p,
+    frequency_penalty: sampler.frequency_penalty !== DEFAULT_SAMPLER_SETTINGS.frequency_penalty,
+    presence_penalty: sampler.presence_penalty !== DEFAULT_SAMPLER_SETTINGS.presence_penalty,
+    repetition_penalty: sampler.repetition_penalty !== DEFAULT_SAMPLER_SETTINGS.repetition_penalty,
+    openai_max_tokens: true, // Always enabled by default
+    seed: sampler.seed !== DEFAULT_SAMPLER_SETTINGS.seed,
   };
 
   return {
     name: 'New Preset',
     description: '',
     tags: [],
-    sampler: { ...DEFAULT_SAMPLER_SETTINGS },
+    sampler,
     samplerEnabled,
     promptBlocks: [],
     promptOrder: [],

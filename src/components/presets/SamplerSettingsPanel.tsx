@@ -4,6 +4,7 @@ import { STSamplerSettings, SamplerSettingKey } from '@/types';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import { DEFAULT_SAMPLER_SETTINGS } from '@/lib/storage';
 
 interface SamplerSettingsPanelProps {
   settings: STSamplerSettings;
@@ -91,10 +92,26 @@ export function SamplerSettingsPanel({
     onChange({ ...settings, [key]: value });
   };
 
-  // Helper to check if a setting is enabled (default: false)
+  // Helper to check if a setting is enabled following hierarchy:
+  // 1. User setting (enabledSettings[key]) if defined
+  // 2. If value differs from default → enabled (except max tokens which is always enabled by default)
+  // 3. Otherwise disabled
   const isEnabled = (key: SamplerSettingKey): boolean => {
-    if (!enabledSettings) return false;
-    return enabledSettings[key] === true;
+    // User setting takes precedence
+    if (enabledSettings && enabledSettings[key] !== undefined) {
+      return enabledSettings[key] === true;
+    }
+    
+    // Max tokens is always enabled by default unless explicitly disabled
+    if (key === 'openai_max_tokens') {
+      return true;
+    }
+    
+    // Compare value with default
+    const value = settings[key];
+    const defaultValue = DEFAULT_SAMPLER_SETTINGS[key];
+    // Use loose equality for numbers (including NaN handling)
+    return value !== defaultValue;
   };
 
   // Helper to toggle a setting's enabled state

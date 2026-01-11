@@ -441,63 +441,6 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{t.settings.defaultPresets}</CardTitle>
-          <CardDescription>
-            {t.settings.defaultPresetsHint}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="defaultProfile">{t.settings.defaultProfile}</Label>
-            <Select
-              id="defaultProfile"
-              value={settings.defaultProfileId || ''}
-              onChange={(e) => handleChange('defaultProfileId', e.target.value || undefined)}
-            >
-              <option value="">{t.common.none}</option>
-              {profiles.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="defaultConnection">{t.settings.defaultConnection}</Label>
-            <Select
-              id="defaultConnection"
-              value={settings.defaultConnectionId || ''}
-              onChange={(e) => handleChange('defaultConnectionId', e.target.value || undefined)}
-            >
-              <option value="">{t.common.none}</option>
-              {connections.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="defaultChatCompletion">{t.settings.defaultChatCompletion}</Label>
-            <Select
-              id="defaultChatCompletion"
-              value={settings.defaultChatCompletionPresetId || ''}
-              onChange={(e) => handleChange('defaultChatCompletionPresetId', e.target.value || undefined)}
-            >
-              <option value="">{t.common.none}</option>
-              {chatCompletionPresets.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </Select>
-            <p className="text-xs text-zinc-500">{t.settings.usedWhenNoPreset}</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
           <CardTitle>{t.settings.proxyInformation}</CardTitle>
           <CardDescription>{t.settings.apiEndpointDetails}</CardDescription>
         </CardHeader>

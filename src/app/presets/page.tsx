@@ -64,11 +64,9 @@ export default function PresetsPage() {
     }
   }, [presets, sortMethod, sortDirection]);
 
-  // Set selected preset as default
-  const selectAndSetDefault = (id: string) => {
+  // Select preset for viewing (does not set as default)
+  const selectPreset = (id: string) => {
     setSelectedId(id);
-    // Also update settings to make this the default chat completion preset
-    updateSettings({ defaultChatCompletionPresetId: id });
   };
 
   const handleCreate = () => {
@@ -91,7 +89,7 @@ export default function PresetsPage() {
   const handleSave = (preset: ChatCompletionPreset) => {
     if (!preset.id) {
       const added = addChatCompletionPreset(preset);
-      selectAndSetDefault(added.id);
+      selectPreset(added.id);
     } else {
       updateChatCompletionPreset(preset.id, preset);
     }
@@ -120,7 +118,7 @@ export default function PresetsPage() {
         if (data && typeof data === 'object' && 'prompts' in data) {
           const imported = importSTPreset(data, file.name);
           const added = addChatCompletionPreset(imported);
-          selectAndSetDefault(added.id);
+          selectPreset(added.id);
         }
       }
       setPresets(getChatCompletionPresets());
@@ -140,7 +138,7 @@ export default function PresetsPage() {
     };
     const added = addChatCompletionPreset(duplicated);
     setPresets(getChatCompletionPresets());
-    selectAndSetDefault(added.id);
+    selectPreset(added.id);
   };
 
   // If editing, show the editor full-screen
@@ -232,7 +230,7 @@ export default function PresetsPage() {
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
                       : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'
                   )}
-                  onClick={() => selectAndSetDefault(preset.id)}
+                  onClick={() => selectPreset(preset.id)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">

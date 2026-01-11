@@ -130,11 +130,9 @@ export default function ConnectionsPage() {
 
   const selectedConnection = connections.find(c => c.id === selectedId);
 
-  // Set selected connection as default
-  const selectAndSetDefault = (id: string) => {
+  // Select connection for viewing (does not set as default)
+  const selectConnection = (id: string) => {
     setSelectedId(id);
-    // Also update settings to make this the default connection
-    updateSettings({ defaultConnectionId: id });
   };
 
   // Reset connection state when selection changes
@@ -314,7 +312,7 @@ export default function ConnectionsPage() {
         providerType: 'openai-compatible',
         model: '',
       });
-      selectAndSetDefault(newPreset.id);
+      selectConnection(newPreset.id);
     }
 
     setConnections(getSortedConnections());
@@ -488,7 +486,7 @@ export default function ConnectionsPage() {
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
                       : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'
                   )}
-                  onClick={() => selectAndSetDefault(connection.id)}
+                  onClick={() => selectConnection(connection.id)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">

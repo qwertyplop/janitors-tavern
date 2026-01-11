@@ -637,7 +637,22 @@ export async function POST(request: NextRequest) {
         }, Date.now() - startTime).catch(() => {});
       }
 
-      recordUsage(inputTokensEstimate, 0).catch(() => {});
+      // Extract token counts from response body
+      let outputTokens = 0;
+      try {
+        const responseJson = JSON.parse(rawResult.body);
+        const tokenCounts = extractTokenCountsFromResponse(responseJson);
+        if (tokenCounts) {
+          outputTokens = tokenCounts.completionTokens;
+        }
+      } catch (parseError) {
+        // If parsing fails, we'll use 0 output tokens
+        if (shouldLogError()) {
+          console.log(`[JT] [${requestId}] Failed to parse JSON response for token counting:`, parseError);
+        }
+      }
+      
+      recordUsage(inputTokensEstimate, outputTokens).catch(() => {});
 
       // Build response headers - pass through provider headers except excluded ones
       const excludedHeaders = ['content-encoding', 'content-length', 'transfer-encoding', 'connection'];
@@ -753,7 +768,17 @@ export async function POST(request: NextRequest) {
       ],
     };
 
-    recordUsage(inputTokensEstimate, 0).catch(() => {});
+    // Extract token counts from result (fallback providers may not have usage data)
+    let outputTokens = 0;
+    if (result.usage) {
+      // Try to extract from usage field if available
+      const tokenCounts = extractTokenCountsFromResponse(JSON.stringify(result));
+      if (tokenCounts) {
+        outputTokens = tokenCounts.completionTokens;
+      }
+    }
+    
+    recordUsage(inputTokensEstimate, outputTokens).catch(() => {});
     return new Response(JSON.stringify(successResponse), {
       status: 200,
       headers: {

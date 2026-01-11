@@ -158,8 +158,12 @@ export async function getServerRegexScripts(): Promise<RegexScript[]> {
   
   // Combine standalone and preset scripts
   const allScripts = [...standaloneScripts, ...presetScripts];
-  console.log(`[ServerStorage] getServerRegexScripts() returned ${allScripts.length} scripts (${standaloneScripts.length} standalone, ${presetScripts.length} preset)`);
-  return allScripts;
+  
+  // Filter out disabled scripts
+  const enabledScripts = allScripts.filter(script => !script.disabled);
+  
+  console.log(`[ServerStorage] getServerRegexScripts() returned ${enabledScripts.length} enabled scripts (${allScripts.length} total, ${standaloneScripts.length} standalone, ${presetScripts.length} preset)`);
+  return enabledScripts;
 }
 
 // ============================================

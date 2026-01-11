@@ -371,14 +371,18 @@ export async function POST(request: NextRequest) {
 
     // Load regex scripts for processing
     const regexScripts = await getServerRegexScripts();
+    
+    // Filter out disabled scripts (extra safety measure)
+    const enabledScripts = regexScripts.filter(script => !script.disabled);
+    
     if (shouldLogRequest() || shouldLogResponse()) {
-      console.log(`[JT] [${requestId}] Regex scripts loaded: Found ${regexScripts.length} scripts`);
-      if (regexScripts.length > 0) {
-        regexScripts.forEach((script, index) => {
+      console.log(`[JT] [${requestId}] Regex scripts loaded: Found ${enabledScripts.length} enabled scripts (${regexScripts.length} total)`);
+      if (enabledScripts.length > 0) {
+        enabledScripts.forEach((script, index) => {
           console.log(`[JT] [${requestId}] Script ${index + 1}: "${script.scriptName}" - Affects: ${script.placement.map(p => p === 1 ? 'Input' : 'Output').join(', ')}`);
         });
       } else {
-        console.log(`[JT] [${requestId}] No regex scripts found or loaded`);
+        console.log(`[JT] [${requestId}] No enabled regex scripts found`);
       }
     }
 
@@ -398,8 +402,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Apply regex scripts (placement 1) to each message
-    if (regexScripts.length > 0) {
-      const inputScripts = regexScripts.filter(s => s.placement.includes(1));
+    if (enabledScripts.length > 0) {
+      const inputScripts = enabledScripts.filter(s => s.placement.includes(1));
       if (inputScripts.length > 0) {
         if (shouldLogRequest() || shouldLogResponse()) {
           console.log(`[JT] [${requestId}] Applying ${inputScripts.length} regex script(s) to input messages (placement 1)`);
@@ -577,7 +581,7 @@ export async function POST(request: NextRequest) {
                 const withPrefix = startReplyContent + original;
                 // Apply regex scripts (placement 2) to the content
                 // For streaming, we assume it's assistant output (role: 'assistant')
-                const outputScripts = regexScripts.filter(s => s.placement.includes(2));
+                const outputScripts = enabledScripts.filter(s => s.placement.includes(2));
                 if (outputScripts.length > 0) {
                   if (shouldLogResponse()) {
                     console.log(`[JT] [${requestId}] Applying ${outputScripts.length} regex script(s) to streaming AI output (placement 2)`);
@@ -676,8 +680,8 @@ export async function POST(request: NextRequest) {
             content = startReplyContent + content;
           }
           // Apply regex scripts (placement 2)
-          if (regexScripts.length > 0) {
-            const outputScripts = regexScripts.filter(s => s.placement.includes(2));
+          if (enabledScripts.length > 0) {
+            const outputScripts = enabledScripts.filter(s => s.placement.includes(2));
             if (outputScripts.length > 0) {
               if (shouldLogResponse()) {
                 console.log(`[JT] [${requestId}] Applying ${outputScripts.length} regex script(s) to AI output (placement 2)`);
@@ -733,8 +737,8 @@ export async function POST(request: NextRequest) {
     if (startReplyContent) {
       aiContent = startReplyContent + aiContent;
     }
-    if (regexScripts.length > 0) {
-      const outputScripts = regexScripts.filter(s => s.placement.includes(2));
+    if (enabledScripts.length > 0) {
+      const outputScripts = enabledScripts.filter(s => s.placement.includes(2));
       if (outputScripts.length > 0) {
         if (shouldLogResponse()) {
           console.log(`[JT] [${requestId}] Applying ${outputScripts.length} regex script(s) to AI output (placement 2)`);

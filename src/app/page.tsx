@@ -13,7 +13,6 @@ import {
   getSettings,
   updateSettings,
 } from '@/lib/storage';
-import { forceSync } from '@/lib/storage-sync';
 import { ConnectionPreset, ChatCompletionPreset, AppSettings, PromptPostProcessingMode } from '@/types';
 import { useSync } from '@/components/providers/SyncProvider';
 import { useI18n } from '@/components/providers/I18nProvider';
@@ -49,7 +48,7 @@ export default function DashboardPage() {
   const [confirming, setConfirming] = useState(false);
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const { initialized } = useSync();
+  const { initialized, forcePush } = useSync();
   const { t } = useI18n();
 
   // Pending selections (not yet saved to settings)
@@ -153,7 +152,8 @@ export default function DashboardPage() {
       setSettings(newSettings);
       
       // Force push to Firebase to ensure proxy has latest settings
-      await forceSync('push').catch(() => {});
+      // Use forcePush from useSync to trigger syncing status
+      await forcePush().catch(() => {});
       setConfirmed(true);
       // Auto-hide after 3 seconds
       setTimeout(() => setConfirmed(false), 3000);

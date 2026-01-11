@@ -52,6 +52,11 @@ export default function DashboardPage() {
   const { initialized } = useSync();
   const { t } = useI18n();
 
+  // Pending selections (not yet saved to settings)
+  const [pendingConnectionId, setPendingConnectionId] = useState<string>('');
+  const [pendingPresetId, setPendingPresetId] = useState<string>('');
+  const [pendingPostProcessing, setPendingPostProcessing] = useState<PromptPostProcessingMode>('none');
+
   const fetchStats = useCallback(async () => {
     try {
       const response = await fetch('/api/storage/stats');
@@ -89,9 +94,15 @@ export default function DashboardPage() {
   }, [fetchStats]);
 
   const loadData = () => {
+    const currentSettings = getSettings();
     setConnections(getConnectionPresets());
     setPresets(getChatCompletionPresets());
-    setSettings(getSettings());
+    setSettings(currentSettings);
+    
+    // Initialize pending selections with current settings
+    setPendingConnectionId(currentSettings.defaultConnectionId || '');
+    setPendingPresetId(currentSettings.defaultChatCompletionPresetId || '');
+    setPendingPostProcessing(currentSettings.defaultPostProcessing || 'none');
   };
 
   const fetchApiKey = async () => {
@@ -113,23 +124,18 @@ export default function DashboardPage() {
   };
 
   const handleConnectionChange = (connectionId: string) => {
-    const newSettings = updateSettings({ defaultConnectionId: connectionId || undefined });
-    setSettings(newSettings);
+    setPendingConnectionId(connectionId || '');
     setConfirmed(false);
   };
 
   const handlePresetChange = (presetId: string) => {
-    const newSettings = updateSettings({ defaultChatCompletionPresetId: presetId || undefined });
-    setSettings(newSettings);
+    setPendingPresetId(presetId || '');
     setConfirmed(false);
   };
 
   const handlePostProcessingChange = (mode: string) => {
-    const newSettings = updateSettings({
-      defaultPostProcessing: (mode || 'none') as PromptPostProcessingMode
-    });
-    console.log('[Dashboard] Post-processing changed to:', mode, 'New settings:', newSettings);
-    setSettings(newSettings);
+    setPendingPostProcessing((mode || 'none') as PromptPostProcessingMode);
+    console.log('[Dashboard] Post-processing changed to:', mode, 'Pending update');
     setConfirmed(false);
   };
 
@@ -138,6 +144,14 @@ export default function DashboardPage() {
     setConfirmed(false);
 
     try {
+      // Apply pending selections to actual settings
+      const newSettings = updateSettings({
+        defaultConnectionId: pendingConnectionId || undefined,
+        defaultChatCompletionPresetId: pendingPresetId || undefined,
+        defaultPostProcessing: pendingPostProcessing || 'none'
+      });
+      setSettings(newSettings);
+      
       // Force push to Firebase to ensure proxy has latest settings
       await forceSync('push').catch(() => {});
       setConfirmed(true);
@@ -150,8 +164,17 @@ export default function DashboardPage() {
     }
   };
 
-  const defaultConnection = connections.find((c) => c.id === settings?.defaultConnectionId);
-  const defaultPreset = presets.find((p) => p.id === settings?.defaultChatCompletionPresetId);
+  // Helper to get connection/preset details for pending selections
+  const pendingConnection = connections.find((c) => c.id === pendingConnectionId);
+  const pendingPreset = presets.find((p) => p.id === pendingPresetId);
+  const confirmedConnection = connections.find((c) => c.id === settings?.defaultConnectionId);
+  const confirmedPreset = presets.find((p) => p.id === settings?.defaultChatCompletionPresetId);
+
+  // Check if there are any pending changes that need confirmation
+  const hasPendingChanges =
+    pendingConnectionId !== settings?.defaultConnectionId ||
+    pendingPresetId !== settings?.defaultChatCompletionPresetId ||
+    pendingPostProcessing !== settings?.defaultPostProcessing;
 
   const postProcessingOptions: { value: PromptPostProcessingMode; label: string }[] = [
     { value: 'none', label: t.dashboard.postProcessingNone },
@@ -260,7 +283,7 @@ export default function DashboardPage() {
               <Label htmlFor="dashboardConnection">{t.dashboard.connection}</Label>
               <Select
                 id="dashboardConnection"
-                value={settings?.defaultConnectionId || ''}
+                value={pendingConnectionId || ''}
                 onChange={(e) => handleConnectionChange(e.target.value)}
               >
                 <option value="">{t.dashboard.selectConnection}</option>
@@ -270,9 +293,12 @@ export default function DashboardPage() {
                   </option>
                 ))}
               </Select>
-              {defaultConnection && (
+              {pendingConnection && (
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {defaultConnection.baseUrl}
+                  {pendingConnection.baseUrl}
+                  {pendingConnectionId !== settings?.defaultConnectionId && (
+                    <span className="ml-2 text-amber-600 dark:text-amber-400">(pending)</span>
+                  )}
                 </p>
               )}
             </div>
@@ -280,7 +306,7 @@ export default function DashboardPage() {
               <Label htmlFor="dashboardPreset">{t.dashboard.chatCompletionPreset}</Label>
               <Select
                 id="dashboardPreset"
-                value={settings?.defaultChatCompletionPresetId || ''}
+                value={pendingPresetId || ''}
                 onChange={(e) => handlePresetChange(e.target.value)}
               >
                 <option value="">{t.dashboard.selectPreset}</option>
@@ -290,9 +316,12 @@ export default function DashboardPage() {
                   </option>
                 ))}
               </Select>
-              {defaultPreset && (
+              {pendingPreset && (
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {defaultPreset.promptBlocks.length} {t.dashboard.blocksTemp} {defaultPreset.sampler.temperature}
+                  {pendingPreset.promptBlocks.length} {t.dashboard.blocksTemp} {pendingPreset.sampler.temperature}
+                  {pendingPresetId !== settings?.defaultChatCompletionPresetId && (
+                    <span className="ml-2 text-amber-600 dark:text-amber-400">(pending)</span>
+                  )}
                 </p>
               )}
             </div>
@@ -301,7 +330,7 @@ export default function DashboardPage() {
             <Label htmlFor="dashboardPostProcessing">{t.dashboard.postProcessing}</Label>
             <Select
               id="dashboardPostProcessing"
-              value={settings?.defaultPostProcessing || 'none'}
+              value={pendingPostProcessing || 'none'}
               onChange={(e) => handlePostProcessingChange(e.target.value)}
             >
               {postProcessingOptions.map((opt) => (
@@ -311,13 +340,16 @@ export default function DashboardPage() {
               ))}
             </Select>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              {t.dashboard.postProcessingTips[settings?.defaultPostProcessing || 'none']}
+              {t.dashboard.postProcessingTips[pendingPostProcessing || 'none']}
+              {pendingPostProcessing !== settings?.defaultPostProcessing && (
+                <span className="ml-2 text-amber-600 dark:text-amber-400">(pending)</span>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-3">
             <Button
               onClick={handleConfirmChoice}
-              disabled={!settings?.defaultConnectionId || !settings?.defaultChatCompletionPresetId || confirming}
+              disabled={!pendingConnectionId || !pendingPresetId || !hasPendingChanges || confirming}
             >
               {confirming ? t.common.loading : t.dashboard.confirmChoice}
             </Button>
@@ -327,17 +359,24 @@ export default function DashboardPage() {
               </span>
             )}
           </div>
-          {(!settings?.defaultConnectionId || !settings?.defaultChatCompletionPresetId) && (
+          {(!pendingConnectionId || !pendingPresetId) && (
             <div className="rounded-md bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-3">
               <p className="text-sm text-amber-800 dark:text-amber-200">
                 {t.dashboard.selectBothWarning}
               </p>
             </div>
           )}
-          {settings?.defaultConnectionId && settings?.defaultChatCompletionPresetId && (
+          {pendingConnectionId && pendingPresetId && (
             <div className="rounded-md bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 p-3">
               <p className="text-sm text-green-800 dark:text-green-200">
                 {t.dashboard.readyToReceive}
+                {(pendingConnectionId !== settings?.defaultConnectionId ||
+                 pendingPresetId !== settings?.defaultChatCompletionPresetId ||
+                 pendingPostProcessing !== settings?.defaultPostProcessing) ? (
+                  <span className="ml-2 text-amber-600 dark:text-amber-400">(pending confirmation)</span>
+                ) : (
+                  <span className="ml-2 text-green-600 dark:text-green-400">(confirmed)</span>
+                )}
               </p>
             </div>
           )}

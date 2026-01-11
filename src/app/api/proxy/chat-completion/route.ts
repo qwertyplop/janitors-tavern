@@ -348,9 +348,11 @@ export async function POST(request: NextRequest) {
     const macroContext = janitorDataToMacroContext(janitorData);
 
     // Use settings already retrieved for post-processing mode
-    console.log(`[JT] [${requestId}] Settings retrieved:`, JSON.stringify(settings, null, 2));
-    console.log(`[JT] [${requestId}] Connection preset promptPostProcessing:`, connectionPreset.promptPostProcessing);
-    console.log(`[JT] [${requestId}] Settings defaultPostProcessing:`, settings.defaultPostProcessing);
+    if (shouldLogRequest() || shouldLogResponse()) {
+      console.log(`[JT] [${requestId}] Settings retrieved:`, JSON.stringify(settings, null, 2));
+      console.log(`[JT] [${requestId}] Connection preset promptPostProcessing:`, connectionPreset.promptPostProcessing);
+      console.log(`[JT] [${requestId}] Settings defaultPostProcessing:`, settings.defaultPostProcessing);
+    }
 
     // Priority: connection preset (if not 'none') → app settings → default 'none'
     // 'none' in connection preset means "use app default", not "force no processing"
@@ -363,17 +365,21 @@ export async function POST(request: NextRequest) {
       postProcessingMode = 'none';
     }
 
-    console.log(`[JT] [${requestId}] Final postProcessingMode:`, postProcessingMode);
+    if (shouldLogRequest() || shouldLogResponse()) {
+      console.log(`[JT] [${requestId}] Final postProcessingMode:`, postProcessingMode);
+    }
 
     // Load regex scripts for processing
     const regexScripts = await getServerRegexScripts();
-    console.log(`[JT] [${requestId}] Regex scripts loaded: Found ${regexScripts.length} scripts`);
-    if (regexScripts.length > 0) {
-      regexScripts.forEach((script, index) => {
-        console.log(`[JT] [${requestId}] Script ${index + 1}: "${script.scriptName}" - Affects: ${script.placement.map(p => p === 1 ? 'Input' : 'Output').join(', ')}`);
-      });
-    } else {
-      console.log(`[JT] [${requestId}] No regex scripts found or loaded`);
+    if (shouldLogRequest() || shouldLogResponse()) {
+      console.log(`[JT] [${requestId}] Regex scripts loaded: Found ${regexScripts.length} scripts`);
+      if (regexScripts.length > 0) {
+        regexScripts.forEach((script, index) => {
+          console.log(`[JT] [${requestId}] Script ${index + 1}: "${script.scriptName}" - Affects: ${script.placement.map(p => p === 1 ? 'Input' : 'Output').join(', ')}`);
+        });
+      } else {
+        console.log(`[JT] [${requestId}] No regex scripts found or loaded`);
+      }
     }
 
     // Build messages
@@ -395,7 +401,9 @@ export async function POST(request: NextRequest) {
     if (regexScripts.length > 0) {
       const inputScripts = regexScripts.filter(s => s.placement.includes(1));
       if (inputScripts.length > 0) {
-        console.log(`[JT] [${requestId}] Applying ${inputScripts.length} regex script(s) to input messages (placement 1)`);
+        if (shouldLogRequest() || shouldLogResponse()) {
+          console.log(`[JT] [${requestId}] Applying ${inputScripts.length} regex script(s) to input messages (placement 1)`);
+        }
         processedMessages = processedMessages.map(msg => ({
           ...msg,
           content: applyRegexScripts(msg.content, inputScripts, macroContext, 1, undefined, msg.role)
@@ -520,7 +528,9 @@ export async function POST(request: NextRequest) {
       });
 
       // Log streaming response initiation
-      console.log(`[JT] [${requestId}] STREAMING RESPONSE initiated (status: ${streamResult.status})`);
+      if (shouldLogResponse()) {
+        console.log(`[JT] [${requestId}] STREAMING RESPONSE initiated (status: ${streamResult.status})`);
+      }
 
       // Fire-and-forget: Log and record stats without blocking the stream
       // This is critical - awaiting these would delay/break the stream response
@@ -542,8 +552,10 @@ export async function POST(request: NextRequest) {
         const transformStream = new TransformStream({
           transform(chunk, controller) {
             // Log raw chunk before any processing
-            const rawText = decoder.decode(chunk, { stream: true });
-            console.log(`[JT] [${requestId}] RAW STREAM CHUNK:`, rawText);
+            if (shouldLogResponse()) {
+              const rawText = decoder.decode(chunk, { stream: true });
+              console.log(`[JT] [${requestId}] RAW STREAM CHUNK:`, rawText);
+            }
 
             // If prefix already sent, pass through as-is
             if (prefixSent) {
@@ -567,7 +579,9 @@ export async function POST(request: NextRequest) {
                 // For streaming, we assume it's assistant output (role: 'assistant')
                 const outputScripts = regexScripts.filter(s => s.placement.includes(2));
                 if (outputScripts.length > 0) {
-                  console.log(`[JT] [${requestId}] Applying ${outputScripts.length} regex script(s) to streaming AI output (placement 2)`);
+                  if (shouldLogResponse()) {
+                    console.log(`[JT] [${requestId}] Applying ${outputScripts.length} regex script(s) to streaming AI output (placement 2)`);
+                  }
                   newContent = applyRegexScripts(
                     withPrefix,
                     outputScripts,
@@ -618,7 +632,9 @@ export async function POST(request: NextRequest) {
       const rawResult = await provider.sendChatCompletionRaw(providerRequest);
 
       // Log the FULL raw response body before any processing
-      console.log(`[JT] [${requestId}] RAW RESPONSE BODY (before processing):`, rawResult.body);
+      if (shouldLogResponse()) {
+        console.log(`[JT] [${requestId}] RAW RESPONSE BODY (before processing):`, rawResult.body);
+      }
 
       // Fire-and-forget logging
       if (shouldLogResponse()) {
@@ -648,7 +664,9 @@ export async function POST(request: NextRequest) {
       // Apply regex scripts (placement 2) and startReplyWith to AI output
       try {
         // Log the raw response body before JSON parsing
-        console.log(`[JT] [${requestId}] RAW RESPONSE BODY (before JSON parsing):`, rawResult.body);
+        if (shouldLogResponse()) {
+          console.log(`[JT] [${requestId}] RAW RESPONSE BODY (before JSON parsing):`, rawResult.body);
+        }
         
         const responseJson = JSON.parse(rawResult.body);
         if (responseJson.choices?.[0]?.message?.content) {
@@ -661,7 +679,9 @@ export async function POST(request: NextRequest) {
           if (regexScripts.length > 0) {
             const outputScripts = regexScripts.filter(s => s.placement.includes(2));
             if (outputScripts.length > 0) {
-              console.log(`[JT] [${requestId}] Applying ${outputScripts.length} regex script(s) to AI output (placement 2)`);
+              if (shouldLogResponse()) {
+                console.log(`[JT] [${requestId}] Applying ${outputScripts.length} regex script(s) to AI output (placement 2)`);
+              }
               content = applyRegexScripts(content, outputScripts, macroContext, 2, undefined, 'assistant');
             }
           }
@@ -673,7 +693,9 @@ export async function POST(request: NextRequest) {
         });
       } catch (parseError) {
         // If parsing fails, log the error and return as-is (no regex processing)
-        console.log(`[JT] [${requestId}] Failed to parse JSON response:`, parseError);
+        if (shouldLogError()) {
+          console.log(`[JT] [${requestId}] Failed to parse JSON response:`, parseError);
+        }
       }
 
       // Pure passthrough - return provider's response as-is
@@ -702,7 +724,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Log the raw response before processing
-    console.log(`[JT] [${requestId}] RAW RESPONSE (fallback provider):`, JSON.stringify(result, null, 2));
+    if (shouldLogResponse()) {
+      console.log(`[JT] [${requestId}] RAW RESPONSE (fallback provider):`, JSON.stringify(result, null, 2));
+    }
 
     // Process AI output content with startReplyWith and regex scripts
     let aiContent = result.message?.content || '';
@@ -712,7 +736,9 @@ export async function POST(request: NextRequest) {
     if (regexScripts.length > 0) {
       const outputScripts = regexScripts.filter(s => s.placement.includes(2));
       if (outputScripts.length > 0) {
-        console.log(`[JT] [${requestId}] Applying ${outputScripts.length} regex script(s) to AI output (placement 2)`);
+        if (shouldLogResponse()) {
+          console.log(`[JT] [${requestId}] Applying ${outputScripts.length} regex script(s) to AI output (placement 2)`);
+        }
         aiContent = applyRegexScripts(aiContent, outputScripts, macroContext, 2, undefined, 'assistant');
       }
     }

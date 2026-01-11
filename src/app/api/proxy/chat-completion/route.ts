@@ -122,58 +122,111 @@ function mergeConsecutiveMessages(messages: OutputMessage[]): OutputMessage[] {
 }
 
 /**
- * Semi-strict mode: Merge roles, allow only one optional system message at start
+ * Semi-strict mode: SillyTavern behavior
+ * 1. Merge consecutive same-role messages
+ * 2. Change system role to user for any system message after first
+ * 3. Handle [assistant - system - user] or [user - system - assistant] patterns
+ * 4. Second cycle of merging consecutives after role reassignment
  */
 function semiStrictProcess(messages: OutputMessage[]): OutputMessage[] {
+  // Step 1: First cycle of merging consecutive same-role messages
   const merged = mergeConsecutiveMessages(messages);
   if (merged.length === 0) return [];
 
-  // Collect all system messages into one at the start
-  const systemContents: string[] = [];
-  const nonSystemMessages: OutputMessage[] = [];
+  // Step 2: Process system messages after the first
+  const processed: OutputMessage[] = [];
+  let firstSystemFound = false;
 
-  for (const msg of merged) {
+  for (let i = 0; i < merged.length; i++) {
+    const msg = merged[i];
+    
     if (msg.role === 'system') {
-      systemContents.push(msg.content);
+      if (!firstSystemFound) {
+        // Keep first system message as system
+        processed.push(msg);
+        firstSystemFound = true;
+      } else {
+        // Change subsequent system messages to user role
+        processed.push({
+          role: 'user',
+          content: msg.content,
+        });
+      }
     } else {
-      nonSystemMessages.push(msg);
+      processed.push(msg);
     }
   }
 
-  const result: OutputMessage[] = [];
-  if (systemContents.length > 0) {
-    result.push({
-      role: 'system',
-      content: systemContents.join('\n\n'),
-    });
+  // Step 3: Handle [assistant - system - user] and [user - system - assistant] patterns
+  // After role reassignment, system messages are now user messages
+  // We need to merge them with adjacent user messages
+  const finalMessages: OutputMessage[] = [];
+  for (let i = 0; i < processed.length; i++) {
+    const current = processed[i];
+    
+    if (current.role === 'user') {
+      // Check if next message is also user (could be converted system or original user)
+      let j = i + 1;
+      while (j < processed.length && processed[j].role === 'user') {
+        j++;
+      }
+      
+      // Merge all consecutive user messages
+      if (j > i + 1) {
+        const mergedContent = processed.slice(i, j).map(m => m.content).join('\n\n');
+        finalMessages.push({
+          role: 'user',
+          content: mergedContent,
+        });
+        i = j - 1; // Skip merged messages
+      } else {
+        finalMessages.push(current);
+      }
+    } else {
+      finalMessages.push(current);
+    }
   }
 
-  return [...result, ...nonSystemMessages];
+  // Step 4: Final merge of consecutive same-role messages
+  return mergeConsecutiveMessages(finalMessages);
 }
 
 /**
- * Strict mode: Merge roles, one system msg, ensure user message comes first after system
+ * Strict mode: SillyTavern behavior
+ * 1. Do everything Semi-Strict does
+ * 2. Additionally, add user message placeholder after first system message if not already user
  */
-function strictProcess(messages: OutputMessage[]): OutputMessage[] {
+function strictProcess(messages: OutputMessage[], placeholderMessage: string = '[Start a new chat]'): OutputMessage[] {
   const semiStrict = semiStrictProcess(messages);
   if (semiStrict.length === 0) return [];
 
-  // Find system message and non-system messages
-  const systemMsg = semiStrict.find(m => m.role === 'system');
-  const nonSystem = semiStrict.filter(m => m.role !== 'system');
-
-  // Ensure first non-system message is from user
-  if (nonSystem.length > 0 && nonSystem[0].role !== 'user') {
-    // Prepend an empty user message or adjust
-    nonSystem.unshift({
-      role: 'user',
-      content: '[Start]',
-    });
+  // Find the first system message index
+  const systemIndex = semiStrict.findIndex(m => m.role === 'system');
+  
+  // If there's no system message, return as-is
+  if (systemIndex === -1) {
+    return semiStrict;
   }
 
+  // Check if message immediately after system is a user message
+  const nextIndex = systemIndex + 1;
+  if (nextIndex < semiStrict.length && semiStrict[nextIndex].role === 'user') {
+    // Already has user message after system, return as-is
+    return semiStrict;
+  }
+
+  // Need to insert placeholder user message after system
   const result: OutputMessage[] = [];
-  if (systemMsg) result.push(systemMsg);
-  result.push(...nonSystem);
+  for (let i = 0; i < semiStrict.length; i++) {
+    result.push(semiStrict[i]);
+    if (i === systemIndex) {
+      // Insert placeholder user message after system
+      result.push({
+        role: 'user',
+        content: placeholderMessage,
+      });
+    }
+  }
 
   return result;
 }
@@ -200,7 +253,8 @@ function singleUserProcess(messages: OutputMessage[]): OutputMessage[] {
  */
 function applyPostProcessing(
   messages: OutputMessage[],
-  mode: PromptPostProcessingMode
+  mode: PromptPostProcessingMode,
+  settings?: { strictPlaceholderMessage?: string }
 ): OutputMessage[] {
   switch (mode) {
     case 'none':
@@ -213,7 +267,7 @@ function applyPostProcessing(
       return semiStrictProcess(messages);
     case 'strict':
     case 'strict-tools':
-      return strictProcess(messages);
+      return strictProcess(messages, settings?.strictPlaceholderMessage);
     case 'single-user':
       return singleUserProcess(messages);
     default:
@@ -417,7 +471,9 @@ export async function POST(request: NextRequest) {
 
     // Apply post-processing based on mode
     if (postProcessingMode !== 'none') {
-      processedMessages = applyPostProcessing(processedMessages, postProcessingMode);
+      processedMessages = applyPostProcessing(processedMessages, postProcessingMode, {
+        strictPlaceholderMessage: settings.strictPlaceholderMessage,
+      });
     }
 
     // Get sampler parameters from preset (only include enabled ones)

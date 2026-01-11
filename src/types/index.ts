@@ -428,6 +428,7 @@ export interface AppSettings {
   defaultSamplerPresetId?: string;
   defaultChatCompletionPresetId?: string;
   defaultPostProcessing?: PromptPostProcessingMode;
+  strictPlaceholderMessage?: string; // Placeholder message for strict post-processing mode
   showAdvancedOptions: boolean;
   logging: LoggingSettings;
 }

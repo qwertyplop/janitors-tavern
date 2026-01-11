@@ -78,7 +78,19 @@ function shouldResetDaily(lastReset: string): boolean {
   }
 
   // Should reset if last reset was before the most recent reset time
-  return lastResetDate < todayReset;
+  const shouldReset = lastResetDate < todayReset;
+  
+  // Debug logging
+  if (shouldReset) {
+    console.log(`[Stats] Daily reset needed:`, {
+      now: now.toISOString(),
+      lastReset: lastResetDate.toISOString(),
+      resetThreshold: todayReset.toISOString(),
+      timezone: 'UTC',
+    });
+  }
+  
+  return shouldReset;
 }
 
 /**
@@ -188,7 +200,8 @@ export function extractTokenCountsFromStreamChunk(chunkText: string): { promptTo
 async function loadStats(): Promise<UsageStats> {
   // Return cached if fresh enough
   if (cachedStats && Date.now() - lastLoadTime < CACHE_TTL) {
-    return cachedStats;
+    // Return a copy to prevent mutation
+    return { ...cachedStats };
   }
 
   try {
@@ -197,7 +210,8 @@ async function loadStats(): Promise<UsageStats> {
     if (data && typeof data === 'object') {
       cachedStats = data as UsageStats;
       lastLoadTime = Date.now();
-      return cachedStats;
+      // Return a copy to prevent mutation
+      return { ...cachedStats };
     }
   } catch {
     // Firebase doesn't exist or error
@@ -205,7 +219,8 @@ async function loadStats(): Promise<UsageStats> {
 
   cachedStats = getDefaultStats();
   lastLoadTime = Date.now();
-  return cachedStats;
+  // Return a copy to prevent mutation
+  return { ...cachedStats };
 }
 
 /**
@@ -227,24 +242,11 @@ async function saveStats(stats: UsageStats): Promise<void> {
 
 /**
  * Get current usage stats
+ * Note: Does NOT perform reset - reset only happens in recordUsage()
  */
 export async function getStats(): Promise<UsageStats> {
   try {
-    let stats = await loadStats();
-
-    // Check if daily reset is needed
-    if (shouldResetDaily(stats.lastDailyReset)) {
-      stats = {
-        ...stats,
-        dailyRequests: 0,
-        dailyTokens: 0,
-        lastDailyReset: new Date().toISOString(),
-      };
-      cachedStats = stats;
-      // Save the reset immediately
-      await saveStats(stats);
-    }
-
+    const stats = await loadStats();
     return stats;
   } catch (error) {
     console.error('[Stats] Failed to get stats:', error);
@@ -259,10 +261,14 @@ export async function getStats(): Promise<UsageStats> {
 export async function recordUsage(inputTokens: number, outputTokens: number): Promise<UsageStats> {
   try {
     // Load or use cached stats
-    const stats = cachedStats || await loadStats();
+    const currentStats = cachedStats || await loadStats();
+    
+    // Create a copy to avoid mutating shared reference
+    const stats = { ...currentStats };
 
     // Check if daily reset is needed first
     if (shouldResetDaily(stats.lastDailyReset)) {
+      console.log(`[Stats] Performing daily reset in recordUsage`);
       stats.dailyRequests = 0;
       stats.dailyTokens = 0;
       stats.lastDailyReset = new Date().toISOString();

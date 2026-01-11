@@ -266,6 +266,27 @@ export default function RegexScriptManager() {
   const handleSave = () => {
     if (!formName || !formFindRegex) return;
 
+    // Check if we're editing a preset script
+    const presetScriptInfo = (window as any)._editingPresetScript;
+    
+    // Determine the disabled state based on whether we're editing a preset or standalone script
+    let disabledState = false;
+    if (editingId) {
+      if (presetScriptInfo) {
+        // For preset scripts, find the script in presetScriptGroups
+        for (const group of presetScriptGroups) {
+          const script = group.scripts.find(s => s.id === editingId);
+          if (script) {
+            disabledState = script.disabled;
+            break;
+          }
+        }
+      } else {
+        // For standalone scripts, find in scripts array
+        disabledState = scripts.find(s => s.id === editingId)?.disabled ?? false;
+      }
+    }
+
     const scriptData: Omit<RegexScript, 'id' | 'createdAt' | 'updatedAt' | 'order' | '_presetId' | '_presetName'> = {
         scriptName: formName,
         findRegex: formFindRegex,
@@ -273,10 +294,7 @@ export default function RegexScriptManager() {
         trimStrings: formTrimStrings,
         placement: formPlacement,
         roles: formRoles, // Add the roles field
-        // New scripts start enabled; when editing we keep the existing disabled flag
-        disabled: editingId
-          ? (scripts.find(s => s.id === editingId)?.disabled ?? false)
-          : false,
+        disabled: disabledState,
         markdownOnly: formMarkdownOnly,
         substituteRegex: formSubstituteRegex,
         minDepth: formMinDepth,
@@ -284,8 +302,6 @@ export default function RegexScriptManager() {
         runOnEdit: false,
     };
 
-    // Check if we're editing a preset script
-    const presetScriptInfo = (window as any)._editingPresetScript;
     if (editingId && presetScriptInfo) {
       // Update preset script
       updatePresetRegexScript(presetScriptInfo.presetId, editingId, scriptData);

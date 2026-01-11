@@ -58,15 +58,22 @@ async function fetchFirebaseJson<T>(key: string, defaultValue: T): Promise<T> {
     // Use the storage manager to get data from Firebase
     const data = await storageManager.get(key as any);
     
-    // Handle regex scripts specifically to add default roles for backward compatibility
+    // Handle regex scripts specifically to add default values for backward compatibility
     if (key === 'regexScripts' && Array.isArray(data)) {
       const scripts = data as any[];
       const processedData = scripts.map((script: any) => {
-        // If the script doesn't have roles, add the default ['assistant', 'user']
-        if (!script.hasOwnProperty('roles')) {
-          return { ...script, roles: ['assistant', 'user'] };
-        }
-        return script;
+        // Ensure all required fields have default values
+        return {
+          ...script,
+          roles: script.roles || ['assistant', 'user'],
+          disabled: script.disabled ?? false,
+          markdownOnly: script.markdownOnly ?? false,
+          runOnEdit: script.runOnEdit ?? false,
+          substituteRegex: script.substituteRegex ?? 0,
+          minDepth: script.minDepth ?? null,
+          maxDepth: script.maxDepth ?? null,
+          order: script.order ?? 0,
+        };
       });
       
       setCache(key, processedData);

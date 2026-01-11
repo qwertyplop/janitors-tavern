@@ -497,6 +497,12 @@ export function addRegexScript(script: Omit<RegexScript, 'id' | 'createdAt' | 'u
     ...script,
     findRegex: normalizeRegexPattern(script.findRegex),
     roles: script.roles || ['assistant', 'user'], // Default to assistant and user roles
+    disabled: script.disabled ?? false, // Ensure disabled field has a default value
+    markdownOnly: script.markdownOnly ?? false, // Ensure markdownOnly has a default value
+    runOnEdit: script.runOnEdit ?? false, // Ensure runOnEdit has a default value
+    substituteRegex: script.substituteRegex ?? 0, // Ensure substituteRegex has a default value
+    minDepth: script.minDepth ?? null, // Ensure minDepth has a default value
+    maxDepth: script.maxDepth ?? null, // Ensure maxDepth has a default value
     id: generateId(),
     createdAt: now,
     updatedAt: now,
@@ -545,6 +551,39 @@ export function migrateRegexScriptsOrder(): void {
     const updatedScripts = scripts.map((script, index) => ({
       ...script,
       order: script.order ?? index, // Preserve existing order if present, otherwise use index
+      updatedAt: new Date().toISOString(),
+    }));
+    saveRegexScripts(updatedScripts);
+  }
+}
+
+/**
+ * Migrates existing regex scripts to ensure all required fields have default values
+ * This should be called once when the app starts to fix scripts missing required fields
+ */
+export function migrateRegexScriptsRequiredFields(): void {
+  const scripts = getRegexScripts();
+  // Check if any script is missing required fields
+  const needsMigration = scripts.some(script =>
+    script.disabled === undefined ||
+    script.markdownOnly === undefined ||
+    script.runOnEdit === undefined ||
+    script.substituteRegex === undefined ||
+    script.minDepth === undefined ||
+    script.maxDepth === undefined ||
+    !script.roles
+  );
+
+  if (needsMigration) {
+    const updatedScripts = scripts.map((script) => ({
+      ...script,
+      disabled: script.disabled ?? false,
+      markdownOnly: script.markdownOnly ?? false,
+      runOnEdit: script.runOnEdit ?? false,
+      substituteRegex: script.substituteRegex ?? 0,
+      minDepth: script.minDepth ?? null,
+      maxDepth: script.maxDepth ?? null,
+      roles: script.roles || ['assistant', 'user'],
       updatedAt: new Date().toISOString(),
     }));
     saveRegexScripts(updatedScripts);

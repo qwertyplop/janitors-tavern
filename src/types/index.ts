@@ -206,7 +206,7 @@ export interface ChatCompletionPreset {
   // Sampler settings
   sampler: STSamplerSettings;
 
-  // Track which sampler settings are enabled (default: all enabled)
+  // Track which sampler settings are enabled (default: all disabled except max tokens)
   samplerEnabled?: Partial<Record<SamplerSettingKey, boolean>>;
 
   // Prompt blocks (the actual content)

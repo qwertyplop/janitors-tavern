@@ -13,6 +13,7 @@ import {
   RegexScript,
   AppSettings,
   STORAGE_KEYS,
+  SamplerSettingKey,
 } from '@/types';
 import { triggerPush } from './storage-sync';
 
@@ -795,12 +796,27 @@ export function importSTPreset(
   const now = new Date().toISOString();
   const presetName = fileName?.replace(/\.json$/i, '') || 'Imported Preset';
 
+  // All sampler settings default to disabled (false) except max tokens which is enabled by default
+  const samplerEnabled: Partial<Record<SamplerSettingKey, boolean>> = {
+    temperature: false,
+    top_p: false,
+    top_k: false,
+    top_a: false,
+    min_p: false,
+    frequency_penalty: false,
+    presence_penalty: false,
+    repetition_penalty: false,
+    openai_max_tokens: true, // Enabled by default
+    seed: false,
+  };
+
   return {
     id: generateId(),
     name: presetName,
     description: `Imported from ${fileName || 'SillyTavern preset'}`,
     tags: ['imported', 'sillytavern'],
     sampler,
+    samplerEnabled,
     promptBlocks,
     promptOrder: rawJson.prompt_order || [],
     regexScripts: regexScripts.length > 0 ? regexScripts : undefined,
@@ -1018,11 +1034,26 @@ export function togglePresetRegexScriptDisabled(
 
 // Create a default/empty chat completion preset
 export function createDefaultChatCompletionPreset(): Omit<ChatCompletionPreset, 'id' | 'createdAt' | 'updatedAt'> {
+  // All sampler settings default to disabled (false) except max tokens which is enabled by default
+  const samplerEnabled: Partial<Record<SamplerSettingKey, boolean>> = {
+    temperature: false,
+    top_p: false,
+    top_k: false,
+    top_a: false,
+    min_p: false,
+    frequency_penalty: false,
+    presence_penalty: false,
+    repetition_penalty: false,
+    openai_max_tokens: true, // Enabled by default
+    seed: false,
+  };
+
   return {
     name: 'New Preset',
     description: '',
     tags: [],
     sampler: { ...DEFAULT_SAMPLER_SETTINGS },
+    samplerEnabled,
     promptBlocks: [],
     promptOrder: [],
     formatStrings: {

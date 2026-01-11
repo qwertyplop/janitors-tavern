@@ -91,10 +91,10 @@ export function SamplerSettingsPanel({
     onChange({ ...settings, [key]: value });
   };
 
-  // Helper to check if a setting is enabled (default: true)
+  // Helper to check if a setting is enabled (default: false)
   const isEnabled = (key: SamplerSettingKey): boolean => {
-    if (!enabledSettings) return true;
-    return enabledSettings[key] !== false;
+    if (!enabledSettings) return false;
+    return enabledSettings[key] === true;
   };
 
   // Helper to toggle a setting's enabled state

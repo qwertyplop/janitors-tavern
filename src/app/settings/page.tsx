@@ -24,10 +24,6 @@ import { AppSettings, Profile, ConnectionPreset, ThemeMode, LoggingSettings, Cha
 // Remove direct import of server-side auth functions
 // These functions are now called via API endpoints
 
-interface ServerSettings {
-  logging: LoggingSettings;
-}
-
 interface BackupData {
   version: string;
   exportedAt: string;
@@ -38,12 +34,10 @@ interface BackupData {
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [serverSettings, setServerSettings] = useState<ServerSettings | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [connections, setConnections] = useState<ConnectionPreset[]>([]);
   const [chatCompletionPresets, setChatCompletionPresets] = useState<ChatCompletionPreset[]>([]);
   const [saved, setSaved] = useState(false);
-  const [serverSaved, setServerSaved] = useState(false);
 
   // Storage sync from context
   const { initialized, blobConfigured: firebaseConfigured, lastSync, syncing, forcePush, forcePull } = useSync();
@@ -54,13 +48,15 @@ export default function SettingsPage() {
   const importFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setSettings(getSettings());
+    // Load local settings first
+    const localSettings = getSettings();
+    setSettings(localSettings);
     setProfiles(getProfiles());
     setConnections(getConnectionPresets());
     setChatCompletionPresets(getChatCompletionPresets());
 
-    // Fetch server settings
-    fetchServerSettings();
+    // Fetch server settings and merge them
+    fetchServerSettings(localSettings);
   }, []);
 
 
@@ -73,38 +69,39 @@ export default function SettingsPage() {
     }
   }, [initialized]);
 
-  const fetchServerSettings = async () => {
+  const fetchServerSettings = async (localSettings: AppSettings) => {
     try {
       const response = await fetch('/api/settings');
       if (response.ok) {
-        const data = await response.json();
-        setServerSettings(data);
+        const serverSettings = await response.json();
+        // Merge server settings with local settings, preferring server settings for logging
+        setSettings({
+          ...localSettings,
+          logging: serverSettings.logging || localSettings.logging,
+        });
       }
     } catch (error) {
       console.error('Failed to fetch server settings:', error);
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!settings) return;
+    
+    // Save local settings
     updateSettings(settings);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
-
-  const handleSaveServerSettings = async () => {
-    if (!serverSettings) return;
-
+    
+    // Save server settings (logging) to API
     try {
       const response = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(serverSettings),
+        body: JSON.stringify({ logging: settings.logging }),
       });
 
       if (response.ok) {
-        setServerSaved(true);
-        setTimeout(() => setServerSaved(false), 2000);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
       }
     } catch (error) {
       console.error('Failed to save server settings:', error);
@@ -117,10 +114,10 @@ export default function SettingsPage() {
   };
 
   const handleLoggingChange = (key: keyof LoggingSettings, value: unknown) => {
-    if (!serverSettings) return;
-    setServerSettings({
-      ...serverSettings,
-      logging: { ...serverSettings.logging, [key]: value },
+    if (!settings) return;
+    setSettings({
+      ...settings,
+      logging: { ...settings.logging, [key]: value },
     });
   };
 
@@ -229,11 +226,20 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">{t.settings.title}</h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          {t.settings.subtitle}
-        </p>
+      {/* Sticky header with save button */}
+      <div className="sticky top-0 z-10 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm py-4 -mx-6 px-6 border-b border-zinc-200 dark:border-zinc-800">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">{t.settings.title}</h1>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              {t.settings.subtitle}
+            </p>
+          </div>
+          <div className="flex items-center gap-4">
+            <Button onClick={handleSave}>{t.settings.saveSettings}</Button>
+            {saved && <span className="text-sm text-green-600 dark:text-green-400">{t.settings.settingsSaved}</span>}
+          </div>
+        </div>
       </div>
 
       {/* Logging Settings */}
@@ -241,7 +247,7 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             {t.settings.requestResponseLogging}
-            {serverSettings?.logging.enabled && (
+            {settings?.logging.enabled && (
               <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                 {t.common.enabled}
               </Badge>
@@ -252,13 +258,13 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {serverSettings ? (
+          {settings ? (
             <>
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
                   id="loggingEnabled"
-                  checked={serverSettings.logging.enabled}
+                  checked={settings.logging.enabled}
                   onChange={(e) => handleLoggingChange('enabled', e.target.checked)}
                   className="h-4 w-4 rounded border-zinc-300"
                 />
@@ -269,9 +275,9 @@ export default function SettingsPage() {
                 <input
                   type="checkbox"
                   id="logRequests"
-                  checked={serverSettings.logging.logRequests}
+                  checked={settings.logging.logRequests}
                   onChange={(e) => handleLoggingChange('logRequests', e.target.checked)}
-                  disabled={!serverSettings.logging.enabled}
+                  disabled={!settings.logging.enabled}
                   className="h-4 w-4 rounded border-zinc-300"
                 />
                 <Label htmlFor="logRequests">{t.settings.logRequests}</Label>
@@ -281,9 +287,9 @@ export default function SettingsPage() {
                 <input
                   type="checkbox"
                   id="logResponses"
-                  checked={serverSettings.logging.logResponses}
+                  checked={settings.logging.logResponses}
                   onChange={(e) => handleLoggingChange('logResponses', e.target.checked)}
-                  disabled={!serverSettings.logging.enabled}
+                  disabled={!settings.logging.enabled}
                   className="h-4 w-4 rounded border-zinc-300"
                 />
                 <Label htmlFor="logResponses">{t.settings.logResponses}</Label>
@@ -293,19 +299,12 @@ export default function SettingsPage() {
                 <Label htmlFor="logFilePath">{t.settings.logFilePath}</Label>
                 <Input
                   id="logFilePath"
-                  value={serverSettings.logging.logFilePath}
+                  value={settings.logging.logFilePath}
                   onChange={(e) => handleLoggingChange('logFilePath', e.target.value)}
                   placeholder="logs/proxy.log"
-                  disabled={!serverSettings.logging.enabled}
+                  disabled={!settings.logging.enabled}
                 />
                 <p className="text-xs text-zinc-500">{t.settings.logFilePathHint}</p>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <Button onClick={handleSaveServerSettings}>{t.settings.saveLoggingSettings}</Button>
-                {serverSaved && (
-                  <span className="text-sm text-green-600 dark:text-green-400">{t.settings.settingsSaved}</span>
-                )}
               </div>
             </>
           ) : (
@@ -540,11 +539,6 @@ export default function SettingsPage() {
           </p>
         </CardContent>
       </Card>
-
-      <div className="flex items-center gap-4">
-        <Button onClick={handleSave}>{t.settings.saveSettings}</Button>
-        {saved && <span className="text-sm text-green-600 dark:text-green-400">{t.settings.settingsSaved}</span>}
-      </div>
     </div>
   );
 }

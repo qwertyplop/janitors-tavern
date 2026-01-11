@@ -229,6 +229,14 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
   const requestId = generateRequestId();
 
+  // Get settings for logging and post-processing
+  const settings = await getServerSettings();
+
+  // Helper function to check if logging is enabled
+  const shouldLogRequest = () => settings.logging?.enabled && settings.logging?.logRequests;
+  const shouldLogResponse = () => settings.logging?.enabled && settings.logging?.logResponses;
+  const shouldLogError = () => true; // Always log errors for debugging
+
   try {
     const body: ProxyRequest = await request.json();
 
@@ -256,25 +264,29 @@ export async function POST(request: NextRequest) {
     }
 
     // Fire-and-forget: Log the raw incoming request (don't block processing)
-    logRequest(requestId, {
-      url: request.url,
-      method: 'POST',
-      headers: safeHeaders,
-      body: body,
-      incomingMessages: body.messages,
-      connectionPreset: connectionPreset ? {
-        name: connectionPreset.name,
-        baseUrl: connectionPreset.baseUrl,
-        model: connectionPreset.model,
-      } : undefined,
-      chatCompletionPreset: chatCompletionPreset ? {
-        name: chatCompletionPreset.name,
-      } : undefined,
-    }).catch(() => {});
+    if (shouldLogRequest()) {
+      logRequest(requestId, {
+        url: request.url,
+        method: 'POST',
+        headers: safeHeaders,
+        body: body,
+        incomingMessages: body.messages,
+        connectionPreset: connectionPreset ? {
+          name: connectionPreset.name,
+          baseUrl: connectionPreset.baseUrl,
+          model: connectionPreset.model,
+        } : undefined,
+        chatCompletionPreset: chatCompletionPreset ? {
+          name: chatCompletionPreset.name,
+        } : undefined,
+      }).catch(() => {});
+    }
 
     // Helper for error responses with CORS
     const errorWithCors = (message: string, status: number) => {
-      logError(requestId, message, 'validation').catch(() => {});
+      if (shouldLogError()) {
+        logError(requestId, message, 'validation').catch(() => {});
+      }
       return new Response(JSON.stringify({ error: message }), {
         status,
         headers: {
@@ -335,8 +347,7 @@ export async function POST(request: NextRequest) {
     const janitorData = parseJanitorRequest(janitorRequest);
     const macroContext = janitorDataToMacroContext(janitorData);
 
-    // Get settings for post-processing mode
-    const settings = await getServerSettings();
+    // Use settings already retrieved for post-processing mode
     console.log(`[JT] [${requestId}] Settings retrieved:`, JSON.stringify(settings, null, 2));
     console.log(`[JT] [${requestId}] Connection preset promptPostProcessing:`, connectionPreset.promptPostProcessing);
     console.log(`[JT] [${requestId}] Settings defaultPostProcessing:`, settings.defaultPostProcessing);
@@ -453,14 +464,16 @@ export async function POST(request: NextRequest) {
     };
 
     // Fire-and-forget: Log the processed request (don't block the actual request)
-    logProcessedRequest(requestId, {
-      processedMessages,
-      samplerSettings: parameters, // Only log enabled settings
-      providerUrl: connectionPreset.baseUrl,
-      model: connectionPreset.model,
-      streaming: body.stream === true,
-      postProcessingMode: postProcessingMode,
-    }).catch(() => {});
+    if (shouldLogRequest()) {
+      logProcessedRequest(requestId, {
+        processedMessages,
+        samplerSettings: parameters, // Only log enabled settings
+        providerUrl: connectionPreset.baseUrl,
+        model: connectionPreset.model,
+        streaming: body.stream === true,
+        postProcessingMode: postProcessingMode,
+      }).catch(() => {});
+    }
 
     // Calculate input tokens once for stats (used in both streaming and non-streaming)
     const inputTokensEstimate = calculateMessageTokens(processedMessages);
@@ -470,11 +483,15 @@ export async function POST(request: NextRequest) {
       const streamResult = await provider.sendChatCompletionStream(providerRequest);
 
       if (streamResult.error) {
-        logError(requestId, streamResult.error, 'provider').catch(() => {});
-        logResponse(requestId, {
-          status: 502,
-          response: { error: streamResult.error },
-        }, Date.now() - startTime).catch(() => {});
+        if (shouldLogError()) {
+          logError(requestId, streamResult.error, 'provider').catch(() => {});
+        }
+        if (shouldLogResponse()) {
+          logResponse(requestId, {
+            status: 502,
+            response: { error: streamResult.error },
+          }, Date.now() - startTime).catch(() => {});
+        }
         return new Response(JSON.stringify({ error: streamResult.error }), {
           status: 502,
           headers: {
@@ -507,10 +524,12 @@ export async function POST(request: NextRequest) {
 
       // Fire-and-forget: Log and record stats without blocking the stream
       // This is critical - awaiting these would delay/break the stream response
-      logResponse(requestId, {
-        status: streamResult.status,
-        response: { streaming: true },
-      }, Date.now() - startTime).catch(() => {});
+      if (shouldLogResponse()) {
+        logResponse(requestId, {
+          status: streamResult.status,
+          response: { streaming: true },
+        }, Date.now() - startTime).catch(() => {});
+      }
 
       recordUsage(inputTokensEstimate, 0).catch(() => {});
 
@@ -602,10 +621,12 @@ export async function POST(request: NextRequest) {
       console.log(`[JT] [${requestId}] RAW RESPONSE BODY (before processing):`, rawResult.body);
 
       // Fire-and-forget logging
-      logResponse(requestId, {
-        status: rawResult.status,
-        response: { raw: true, length: rawResult.body.length },
-      }, Date.now() - startTime).catch(() => {});
+      if (shouldLogResponse()) {
+        logResponse(requestId, {
+          status: rawResult.status,
+          response: { raw: true, length: rawResult.body.length },
+        }, Date.now() - startTime).catch(() => {});
+      }
 
       recordUsage(inputTokensEstimate, 0).catch(() => {});
 
@@ -666,7 +687,9 @@ export async function POST(request: NextRequest) {
     const result = await provider.sendChatCompletion(providerRequest);
 
     if (result.error) {
-      logError(requestId, result.error, 'provider').catch(() => {});
+      if (shouldLogError()) {
+        logError(requestId, result.error, 'provider').catch(() => {});
+      }
       return new Response(JSON.stringify({ error: result.error }), {
         status: 502,
         headers: {
@@ -729,16 +752,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Fire-and-forget logging (don't block error response)
-    logError(requestId, error, 'proxy').catch(() => {});
+    if (shouldLogError()) {
+      logError(requestId, error, 'proxy').catch(() => {});
+    }
 
     const errorResponse = {
       error: `Proxy error: ${error instanceof Error ? error.message : 'Unknown error'}`,
     };
 
-    logResponse(requestId, {
-      status: 500,
-      response: errorResponse,
-    }, Date.now() - startTime).catch(() => {});
+    if (shouldLogResponse()) {
+      logResponse(requestId, {
+        status: 500,
+        response: errorResponse,
+      }, Date.now() - startTime).catch(() => {});
+    }
 
     // Include CORS headers in error response
     return new Response(JSON.stringify(errorResponse), {

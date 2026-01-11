@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { LoggingSettings } from '@/types';
+import type { AppSettings, LoggingSettings } from '@/types';
 
-const SETTINGS_FILE = 'data/server-settings.json';
-
-interface ServerSettings {
-  logging: LoggingSettings;
-}
-
-const DEFAULT_SERVER_SETTINGS: ServerSettings = {
+const DEFAULT_SERVER_SETTINGS: AppSettings = {
+  theme: 'system',
+  language: 'en',
+  showAdvancedOptions: false,
+  defaultPostProcessing: 'none',
   logging: {
     enabled: false,
     logRequests: true,
@@ -18,9 +16,9 @@ const DEFAULT_SERVER_SETTINGS: ServerSettings = {
 
 // For server settings storage, we'll use a simple in-memory approach
 // This is a simplified approach for Edge Runtime compatibility
-let serverSettingsCache: ServerSettings | null = null;
+let serverSettingsCache: AppSettings | null = null;
 
-async function readServerSettings(): Promise<ServerSettings> {
+async function readServerSettings(): Promise<AppSettings> {
   // In Edge Runtime, we'll use a simple in-memory cache
   if (serverSettingsCache) {
     return serverSettingsCache;
@@ -30,7 +28,7 @@ async function readServerSettings(): Promise<ServerSettings> {
   return DEFAULT_SERVER_SETTINGS;
 }
 
-async function writeServerSettings(settings: ServerSettings): Promise<void> {
+async function writeServerSettings(settings: AppSettings): Promise<void> {
   // Update the in-memory cache
   serverSettingsCache = settings;
 }
@@ -57,7 +55,7 @@ export async function PUT(request: NextRequest) {
     const currentSettings = await readServerSettings();
 
     // Merge with current settings
-    const newSettings: ServerSettings = {
+    const newSettings: AppSettings = {
       ...currentSettings,
       ...body,
       logging: body.logging ? { ...currentSettings.logging, ...body.logging } : currentSettings.logging,

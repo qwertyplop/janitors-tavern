@@ -217,6 +217,13 @@ export const en = {
     saveLoggingSettings: 'Save Logging Settings',
     settingsSaved: 'Settings saved!',
     loadingServerSettings: 'Loading server settings...',
+    // Logging Status
+    loggingStatus: 'Logging Status',
+    enableLoggingStatus: 'Enable logging',
+    logRequestsStatus: 'Log requests',
+    logResponsesStatus: 'Log responses',
+    enabled: 'Enabled',
+    disabled: 'Disabled',
     // Log Viewer
     logViewer: 'Log Viewer',
     entries: 'entries',

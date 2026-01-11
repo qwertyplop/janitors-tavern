@@ -388,6 +388,27 @@ export default function SettingsPage() {
                   {t.settings.lastSync} {new Date(lastSync).toLocaleString()}
                 </p>
               )}
+              
+              {/* Logging Status Check */}
+              {settings && (
+                <div className="space-y-2 border-t pt-4 mt-4">
+                  <h5 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{t.settings.loggingStatus}</h5>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-block w-2 h-2 rounded-full ${settings.logging.enabled ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                      <span>{t.settings.enableLoggingStatus}: {settings.logging.enabled ? t.common.enabled : t.common.disabled}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-block w-2 h-2 rounded-full ${settings.logging.logRequests ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                      <span>{t.settings.logRequestsStatus}: {settings.logging.logRequests ? t.common.enabled : t.common.disabled}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-block w-2 h-2 rounded-full ${settings.logging.logResponses ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                      <span>{t.settings.logResponsesStatus}: {settings.logging.logResponses ? t.common.enabled : t.common.disabled}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

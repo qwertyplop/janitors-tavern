@@ -219,6 +219,13 @@ export const ru: TranslationKeys = {
     saveLoggingSettings: 'Сохранить настройки логирования',
     settingsSaved: 'Настройки сохранены!',
     loadingServerSettings: 'Загрузка настроек сервера...',
+    // Logging Status
+    loggingStatus: 'Logging Status',
+    enableLoggingStatus: 'Enable logging',
+    logRequestsStatus: 'Log requests',
+    logResponsesStatus: 'Log responses',
+    enabled: 'Enabled',
+    disabled: 'Disabled',
     // Log Viewer
     logViewer: 'Просмотр логов',
     entries: 'записей',

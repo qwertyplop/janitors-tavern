@@ -680,11 +680,17 @@ export default function ConnectionsPage() {
                                   {apiKeys.map((key) => (
                                     <div
                                       key={key.id}
-                                      className={`px-3 py-1.5 text-xs rounded border ${
+                                      className={`px-3 py-1.5 text-xs rounded border transition-colors ${
                                         selectedKeyId === key.id
-                                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
-                                          : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+                                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 cursor-default'
+                                          : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer'
                                       }`}
+                                      onClick={() => {
+                                        if (selectedKeyId !== key.id && selectedConnection) {
+                                          setSelectedApiKey(selectedConnection.id, key.id);
+                                          setConnections(getSortedConnections());
+                                        }
+                                      }}
                                     >
                                       {key.name}
                                     </div>

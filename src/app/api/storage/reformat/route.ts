@@ -4,11 +4,16 @@ import { OptimizedFirebaseStorageProvider } from '@/lib/firebase-storage-provide
 
 // POST /api/storage/reformat - Reformat database structure from old to new format
 export async function POST(request: NextRequest) {
+  console.log('[DatabaseReformat] Starting database reformatting process');
+  
   try {
     // Get the provider to access the reformat method
+    console.log('[DatabaseReformat] Getting provider type...');
     const providerType = await storageManager.getProviderType();
+    console.log('[DatabaseReformat] Provider type:', providerType);
     
     if (providerType !== 'firebase') {
+      console.log('[DatabaseReformat] Not Firebase storage, returning error');
       return NextResponse.json(
         { error: 'Database reformatting only available for Firebase storage' },
         { status: 400 }
@@ -16,9 +21,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the Firebase provider instance
+    console.log('[DatabaseReformat] Getting Firebase provider...');
     const firebaseProvider = storageManager.getFirebaseProvider();
     
     if (!firebaseProvider) {
+      console.log('[DatabaseReformat] Firebase provider not available');
       return NextResponse.json(
         { error: 'Firebase provider not available' },
         { status: 500 }
@@ -26,31 +33,50 @@ export async function POST(request: NextRequest) {
     }
 
     // Access the underlying optimized provider
+    console.log('[DatabaseReformat] Accessing optimized provider...');
     const optimizedProvider = (firebaseProvider as any).firebaseProvider as OptimizedFirebaseStorageProvider;
     
-    if (!optimizedProvider || typeof optimizedProvider.reformatDatabaseStructure !== 'function') {
+    if (!optimizedProvider) {
+      console.log('[DatabaseReformat] Optimized provider not found');
+      return NextResponse.json(
+        { error: 'Optimized Firebase provider not found' },
+        { status: 501 }
+      );
+    }
+    
+    if (typeof optimizedProvider.reformatDatabaseStructure !== 'function') {
+      console.log('[DatabaseReformat] reformatDatabaseStructure method not found');
       return NextResponse.json(
         { error: 'Database reformatting not supported by current provider' },
         { status: 501 }
       );
     }
 
-    // Call the reformat method
-    const result = await optimizedProvider.reformatDatabaseStructure();
+    // Call the reformat method with timeout protection
+    console.log('[DatabaseReformat] Calling reformatDatabaseStructure...');
+    const result = await Promise.race([
+      optimizedProvider.reformatDatabaseStructure(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Database reformatting timeout after 30 seconds')), 30000)
+      )
+    ]);
+    
+    console.log('[DatabaseReformat] Reformat completed:', result);
     
     return NextResponse.json({
       success: true,
-      migrated: result.migrated,
-      errors: result.errors,
-      message: `Database reformatted successfully. Migrated ${result.migrated} items with ${result.errors} errors.`
+      migrated: (result as any).migrated || 0,
+      errors: (result as any).errors || 0,
+      message: `Database reformatted successfully. Migrated ${(result as any).migrated || 0} items with ${(result as any).errors || 0} errors.`
     });
     
   } catch (error) {
-    console.error('Database reformatting failed:', error);
+    console.error('[DatabaseReformat] Database reformatting failed:', error);
     return NextResponse.json(
       {
         error: 'Database reformatting failed',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
       },
       { status: 500 }
     );

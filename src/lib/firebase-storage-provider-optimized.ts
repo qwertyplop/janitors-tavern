@@ -139,26 +139,36 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
   }
 
   private async getFromSubcollection<K extends StorageKey>(key: K): Promise<StorageData[K]> {
+    console.log(`[DatabaseReformat] getFromSubcollection for key: ${key}`);
+    
     if (!db) {
+      console.log(`[DatabaseReformat] Firebase db not available for ${key}`);
       return DEFAULT_STORAGE_DATA[key];
     }
 
     try {
       const collectionPath = this.getFirestoreCollectionPath(key);
+      console.log(`[DatabaseReformat] Querying collection: ${collectionPath}`);
+      
       const querySnapshot = await getDocs(collection(db!, collectionPath));
+      console.log(`[DatabaseReformat] Query completed, found ${querySnapshot.size} documents`);
       
       const items: any[] = [];
       querySnapshot.forEach((doc) => {
         items.push({ id: doc.id, ...doc.data() });
       });
       
+      console.log(`[DatabaseReformat] Processed ${items.length} items for ${key}`);
+      
       // If we found data in old format, migrate it to new format
       if (items.length > 0) {
+        console.log(`[DatabaseReformat] Found ${items.length} items in old format, migrating...`);
         await this.migrateToSingleDocument(key, items as StorageData[K]);
       }
       
       return items as StorageData[K];
     } catch (error) {
+      console.error(`[DatabaseReformat] Error getting from subcollection for ${key}:`, error);
       return DEFAULT_STORAGE_DATA[key];
     }
   }
@@ -200,7 +210,10 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
   // ⚠️ WARNING: Don't use this if you don't know what it does!
   // This migrates data from old subcollection format to new single document format
   async reformatDatabaseStructure(): Promise<{ migrated: number; errors: number }> {
+    console.log('[DatabaseReformat] Starting database reformatting...');
+    
     if (!db) {
+      console.log('[DatabaseReformat] Firebase db not available');
       return { migrated: 0, errors: 0 };
     }
 
@@ -209,34 +222,50 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
     try {
       // Migrate all array data from subcollections to single document
       const arrayKeys: StorageKey[] = ['connections', 'presets', 'regexScripts'];
+      console.log('[DatabaseReformat] Processing keys:', arrayKeys);
       
       for (const key of arrayKeys) {
+        console.log(`[DatabaseReformat] Processing key: ${key}`);
         try {
+          console.log(`[DatabaseReformat] Getting data from subcollection for ${key}...`);
           const oldData = await this.getFromSubcollection(key);
+          console.log(`[DatabaseReformat] Got ${Array.isArray(oldData) ? oldData.length : 0} items for ${key}`);
+          
           if (Array.isArray(oldData) && oldData.length > 0) {
             // Save to new format WITHOUT deleting old subcollections
             const docPath = this.getFirestoreDocPath(key);
+            console.log(`[DatabaseReformat] Saving to new document: ${docPath}`);
             const docRef = doc(db!, docPath);
             const docSnap = await getDoc(docRef);
             
             const existingData = docSnap.exists() ? docSnap.data() : {};
+            console.log(`[DatabaseReformat] Existing data in new format: ${Object.keys(existingData).length} fields`);
+            
             await setDoc(docRef, { ...existingData, [key]: oldData }, { merge: true });
+            console.log(`[DatabaseReformat] Saved ${oldData.length} items to new format for ${key}`);
             
             // DO NOT delete old subcollection - keep it as backup
             // await this.deleteSubcollection(key);
             
             results.migrated += oldData.length;
+            console.log(`[DatabaseReformat] Updated results: migrated=${results.migrated}, errors=${results.errors}`);
+          } else {
+            console.log(`[DatabaseReformat] No data found for ${key} or data is not an array`);
           }
         } catch (error) {
+          console.error(`[DatabaseReformat] Error processing ${key}:`, error);
           results.errors++;
         }
       }
       
       // Clear cache to force fresh reads from new format
+      console.log('[DatabaseReformat] Clearing cache...');
       this.clearCache();
       
+      console.log('[DatabaseReformat] Reformat completed successfully:', results);
       return results;
     } catch (error) {
+      console.error('[DatabaseReformat] Reformat failed with error:', error);
       return { migrated: results.migrated, errors: results.errors + 1 };
     }
   }

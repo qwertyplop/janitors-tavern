@@ -218,7 +218,7 @@ export default function PresetsPage() {
           {activePreset && (
             <div className="space-y-2">
               <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                Active Preset
+                {t.presets.activePreset}
               </h2>
               <Card
                 className={cn(
@@ -233,10 +233,10 @@ export default function PresetsPage() {
                   <div className="min-w-0 flex-1">
                     <h3 className="font-medium text-sm truncate">{activePreset.name}</h3>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                      Default preset for incoming requests
+                      {t.presets.defaultPresetForIncomingRequests}
                     </p>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                      {activePreset.promptBlocks.length} blocks · Temp: {activePreset.sampler.temperature}
+                      {activePreset.promptBlocks.length} {t.dashboard.blocksTemp} {activePreset.sampler.temperature}
                     </p>
                   </div>
                   <div className="flex gap-1 ml-2">
@@ -282,15 +282,15 @@ export default function PresetsPage() {
                   onChange={(e) => setSortMethod(e.target.value as 'alphabetical' | 'blockCount')}
                   className="h-8 text-xs w-32"
                 >
-                  <option value="alphabetical">Alphabetical</option>
-                  <option value="blockCount">Block Count</option>
+                  <option value="alphabetical">{t.presets.sortAlphabetical}</option>
+                  <option value="blockCount">{t.presets.sortBlockCount}</option>
                 </Select>
                 <Button
                   variant="outline"
                   size="sm"
                   className="h-8 w-8 p-0"
                   onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
-                  title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+                  title={sortDirection === 'asc' ? t.presets.ascending : t.presets.descending}
                 >
                   {sortDirection === 'asc' ? '↑' : '↓'}
                 </Button>
@@ -319,7 +319,7 @@ export default function PresetsPage() {
                       <div className="min-w-0 flex-1">
                         <h3 className="font-medium text-sm truncate">{preset.name}</h3>
                         <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                          {preset.promptBlocks.length} blocks · Temp: {preset.sampler.temperature}
+                          {preset.promptBlocks.length} {t.dashboard.blocksTemp} {preset.sampler.temperature}
                         </p>
                       </div>
                       <div className="flex gap-1 ml-2">
@@ -451,7 +451,7 @@ export default function PresetsPage() {
                               <div className="flex items-center gap-2 min-w-0">
                                 <span className="truncate font-medium">{block.name || block.identifier}</span>
                                 {block.marker && (
-                                  <span className="text-amber-600 dark:text-amber-400 flex-shrink-0" title="Marker - Dynamic content placeholder">
+                                  <span className="text-amber-600 dark:text-amber-400 flex-shrink-0" title={t.presets.markerTooltip}>
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                       <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                                     </svg>

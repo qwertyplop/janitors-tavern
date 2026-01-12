@@ -209,6 +209,14 @@ export const en = {
     system: 'System',
     user: 'User',
     assistant: 'Assistant',
+    // Additional presets keys
+    activePreset: 'Active Preset',
+    defaultPresetForIncomingRequests: 'Default preset for incoming requests',
+    sortAlphabetical: 'Alphabetical',
+    sortBlockCount: 'Block Count',
+    ascending: 'Ascending',
+    descending: 'Descending',
+    markerTooltip: 'Marker - Dynamic content placeholder',
   },
 
   // Settings

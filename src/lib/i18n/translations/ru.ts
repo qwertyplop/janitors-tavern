@@ -211,6 +211,14 @@ export const ru: TranslationKeys = {
     system: 'Система',
     user: 'Пользователь',
     assistant: 'Ассистент',
+    // Additional presets keys
+    activePreset: 'Активный пресет',
+    defaultPresetForIncomingRequests: 'Пресет по умолчанию для входящих запросов',
+    sortAlphabetical: 'Алфавитный',
+    sortBlockCount: 'По количеству блоков',
+    ascending: 'По возрастанию',
+    descending: 'По убыванию',
+    markerTooltip: 'Маркер - Динамический заполнитель контента',
   },
 
   // Settings

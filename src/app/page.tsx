@@ -12,6 +12,7 @@ import {
   getChatCompletionPresets,
   getSettings,
   updateSettings,
+  getSelectedApiKey,
 } from '@/lib/storage';
 import { ConnectionPreset, ChatCompletionPreset, AppSettings, PromptPostProcessingMode } from '@/types';
 import { useSync } from '@/components/providers/SyncProvider';
@@ -293,14 +294,22 @@ export default function DashboardPage() {
                   </option>
                 ))}
               </Select>
-              {pendingConnection && (
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {pendingConnection.baseUrl}
-                  {pendingConnectionId !== settings?.defaultConnectionId && (
-                    <span className="ml-2 text-amber-600 dark:text-amber-400">(pending)</span>
-                  )}
-                </p>
-              )}
+              {pendingConnection && (() => {
+                const selectedKey = getSelectedApiKey(pendingConnection.id);
+                return (
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {pendingConnection.baseUrl}
+                    {selectedKey && (
+                      <span className="ml-2 text-zinc-400 dark:text-zinc-500">
+                        • Key: {selectedKey.name}
+                      </span>
+                    )}
+                    {pendingConnectionId !== settings?.defaultConnectionId && (
+                      <span className="ml-2 text-amber-600 dark:text-amber-400">(pending)</span>
+                    )}
+                  </p>
+                );
+              })()}
             </div>
             <div className="space-y-2">
               <Label htmlFor="dashboardPreset">{t.dashboard.chatCompletionPreset}</Label>

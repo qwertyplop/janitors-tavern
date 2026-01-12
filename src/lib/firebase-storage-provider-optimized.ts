@@ -129,7 +129,10 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
   }
 
   private getFirestoreDocPath(key: StorageKey): string {
-    // Store all data in a single document per user for better performance
+    // Store data in optimized structure:
+    // - Small arrays (connections, regexScripts) in main document
+    // - Large arrays (presets) in separate documents
+    // - Settings always in main document
     // Firestore requires even number of segments, so add 'data' as the final segment
     return `users/${this.userId}/storage/data`;
   }
@@ -137,6 +140,16 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
   private getFirestoreCollectionPath(key: StorageKey): string {
     // Old subcollection path for backward compatibility
     return `users/${this.userId}/storage/${key}/items`;
+  }
+
+  private getOptimizedPresetsPath(): string {
+    // Store presets in separate optimized documents to avoid 1MB limit
+    return `users/${this.userId}/storage/presets`;
+  }
+
+  private shouldUseSeparateDocument(key: StorageKey): boolean {
+    // Use separate documents for large arrays that might exceed 1MB limit
+    return key === 'presets';
   }
 
   private async getFromSubcollection<K extends StorageKey>(key: K): Promise<StorageData[K]> {
@@ -161,10 +174,10 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
       
       console.log(`[DatabaseReformat] Processed ${items.length} items for ${key}`);
       
-      // If we found data in old format, migrate it to new format
+      // If we found data in old format, migrate it to optimized format
       if (items.length > 0) {
         console.log(`[DatabaseReformat] Found ${items.length} items in old format, migrating...`);
-        await this.migrateToSingleDocument(key, items as StorageData[K]);
+        await this.migrateToOptimizedFormat(key, items as StorageData[K]);
       }
       
       return items as StorageData[K];
@@ -174,22 +187,69 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
     }
   }
 
-  private async migrateToSingleDocument<K extends StorageKey>(key: K, data: StorageData[K]): Promise<void> {
+  private async migrateToOptimizedFormat<K extends StorageKey>(key: K, data: StorageData[K]): Promise<void> {
     if (!db) return;
     
     try {
-      // Save to new single document format
-      const docPath = this.getFirestoreDocPath(key);
-      const docRef = doc(db!, docPath);
-      const docSnap = await getDoc(docRef);
-      
-      const existingData = docSnap.exists() ? docSnap.data() : {};
-      await setDoc(docRef, { ...existingData, [key]: data }, { merge: true });
+      if (this.shouldUseSeparateDocument(key)) {
+        // Store presets in separate documents
+        await this.saveToSeparateDocuments(key, data as ChatCompletionPreset[]);
+      } else {
+        // Store connections and regexScripts in main document
+        const docPath = this.getFirestoreDocPath(key);
+        const docRef = doc(db!, docPath);
+        const docSnap = await getDoc(docRef);
+        
+        const existingData = docSnap.exists() ? docSnap.data() : {};
+        await setDoc(docRef, { ...existingData, [key]: data }, { merge: true });
+      }
       
       // DO NOT delete old subcollection - keep as backup
-      // await this.deleteSubcollection(key);
     } catch (error) {
+      console.error(`[DatabaseReformat] Migration failed for ${key}:`, error);
       // Migration failed, but that's OK - we'll try again next time
+    }
+  }
+
+  private async saveToSeparateDocuments(key: StorageKey, items: ChatCompletionPreset[]): Promise<void> {
+    if (!db || key !== 'presets') return;
+    
+    try {
+      const collectionPath = this.getOptimizedPresetsPath();
+      const batch = writeBatch(db!);
+      
+      // Save each preset as separate document
+      items.forEach((item, index) => {
+        const docRef = doc(db!, collectionPath, item.id || `preset_${index}`);
+        batch.set(docRef, item);
+      });
+      
+      await batch.commit();
+      console.log(`[DatabaseReformat] Saved ${items.length} presets to separate documents`);
+    } catch (error) {
+      console.error(`[DatabaseReformat] Error saving ${key} to separate documents:`, error);
+      throw error;
+    }
+  }
+
+  private async getFromSeparateDocuments(key: StorageKey): Promise<StorageData[typeof key]> {
+    if (!db || key !== 'presets') {
+      return DEFAULT_STORAGE_DATA[key];
+    }
+    
+    try {
+      const collectionPath = this.getOptimizedPresetsPath();
+      const querySnapshot = await getDocs(collection(db!, collectionPath));
+      
+      const items: ChatCompletionPreset[] = [];
+      querySnapshot.forEach((doc) => {
+        items.push({ id: doc.id, ...doc.data() } as ChatCompletionPreset);
+      });
+      
+      return items as StorageData[typeof key];
+    } catch (error) {
+      console.error(`[DatabaseReformat] Error getting ${key} from separate documents:`, error);
+      return DEFAULT_STORAGE_DATA[key];
     }
   }
 
@@ -209,7 +269,7 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
 
   // Public method to reformat database structure (can be called from settings UI)
   // ⚠️ WARNING: Don't use this if you don't know what it does!
-  // This migrates data from old subcollection format to new single document format
+  // This migrates data from old subcollection format to optimized format
   async reformatDatabaseStructure(): Promise<{ migrated: number; errors: number }> {
     console.log('[DatabaseReformat] Starting database reformatting...');
     
@@ -221,7 +281,7 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
     const results = { migrated: 0, errors: 0 };
     
     try {
-      // Migrate all array data from subcollections to single document
+      // Migrate all array data from subcollections to optimized format
       const arrayKeys: StorageKey[] = ['connections', 'presets', 'regexScripts'];
       console.log('[DatabaseReformat] Processing keys:', arrayKeys);
       
@@ -233,17 +293,24 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
           console.log(`[DatabaseReformat] Got ${Array.isArray(oldData) ? oldData.length : 0} items for ${key}`);
           
           if (Array.isArray(oldData) && oldData.length > 0) {
-            // Save to new format WITHOUT deleting old subcollections
-            const docPath = this.getFirestoreDocPath(key);
-            console.log(`[DatabaseReformat] Saving to new document: ${docPath}`);
-            const docRef = doc(db!, docPath);
-            const docSnap = await getDoc(docRef);
-            
-            const existingData = docSnap.exists() ? docSnap.data() : {};
-            console.log(`[DatabaseReformat] Existing data in new format: ${Object.keys(existingData).length} fields`);
-            
-            await setDoc(docRef, { ...existingData, [key]: oldData }, { merge: true });
-            console.log(`[DatabaseReformat] Saved ${oldData.length} items to new format for ${key}`);
+            if (this.shouldUseSeparateDocument(key)) {
+              // Save presets to separate documents
+              console.log(`[DatabaseReformat] Saving ${oldData.length} presets to separate documents...`);
+              await this.saveToSeparateDocuments(key, oldData as ChatCompletionPreset[]);
+              console.log(`[DatabaseReformat] Saved ${oldData.length} presets to separate documents`);
+            } else {
+              // Save connections and regexScripts to main document
+              const docPath = this.getFirestoreDocPath(key);
+              console.log(`[DatabaseReformat] Saving to main document: ${docPath}`);
+              const docRef = doc(db!, docPath);
+              const docSnap = await getDoc(docRef);
+              
+              const existingData = docSnap.exists() ? docSnap.data() : {};
+              console.log(`[DatabaseReformat] Existing data in new format: ${Object.keys(existingData).length} fields`);
+              
+              await setDoc(docRef, { ...existingData, [key]: oldData }, { merge: true });
+              console.log(`[DatabaseReformat] Saved ${oldData.length} items to main document for ${key}`);
+            }
             
             // DO NOT delete old subcollection - keep it as backup
             // await this.deleteSubcollection(key);
@@ -326,23 +393,28 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
 
     return this.measurePerformance(`get(${key})`, async () => {
       try {
-        // Try new single document format first (optimized)
-        const docPath = this.getFirestoreDocPath(key);
-        const docRef = doc(db!, docPath);
-        const docSnap = await getDoc(docRef);
-
         let data: StorageData[K];
         
-        if (docSnap.exists()) {
-          const docData = docSnap.data();
-          data = docData[key] as StorageData[K];
+        if (this.shouldUseSeparateDocument(key)) {
+          // Get presets from separate documents
+          data = await this.getFromSeparateDocuments(key) as StorageData[K];
         } else {
-          // If not found in new format, try old subcollection format for backward compatibility
-          if (key === 'connections' || key === 'presets' || key === 'regexScripts') {
-            data = await this.getFromSubcollection(key);
+          // Try new single document format first (optimized)
+          const docPath = this.getFirestoreDocPath(key);
+          const docRef = doc(db!, docPath);
+          const docSnap = await getDoc(docRef);
+
+          if (docSnap.exists()) {
+            const docData = docSnap.data();
+            data = docData[key] as StorageData[K];
           } else {
-            // Return default value if document doesn't exist
-            data = DEFAULT_STORAGE_DATA[key];
+            // If not found in new format, try old subcollection format for backward compatibility
+            if (key === 'connections' || key === 'presets' || key === 'regexScripts') {
+              data = await this.getFromSubcollection(key);
+            } else {
+              // Return default value if document doesn't exist
+              data = DEFAULT_STORAGE_DATA[key];
+            }
           }
         }
 
@@ -350,6 +422,7 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
         this.setCached<K>(key, data);
         return data;
       } catch (error) {
+        console.error(`[FirebaseStorage] Error getting ${key}:`, error);
         return DEFAULT_STORAGE_DATA[key];
       }
     });
@@ -363,16 +436,21 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
 
     return this.measurePerformance(`set(${key})`, async () => {
       try {
-        // Always save to new single document format
-        const docPath = this.getFirestoreDocPath(key);
-        const docRef = doc(db!, docPath);
-        
-        // Get existing document to preserve other fields
-        const docSnap = await getDoc(docRef);
-        const existingData = docSnap.exists() ? docSnap.data() : {};
-        
-        // Update only the specific field
-        await setDoc(docRef, { ...existingData, [key]: value }, { merge: true });
+        if (this.shouldUseSeparateDocument(key)) {
+          // Store presets in separate documents
+          await this.saveToSeparateDocuments(key, value as ChatCompletionPreset[]);
+        } else {
+          // Save to main document format
+          const docPath = this.getFirestoreDocPath(key);
+          const docRef = doc(db!, docPath);
+          
+          // Get existing document to preserve other fields
+          const docSnap = await getDoc(docRef);
+          const existingData = docSnap.exists() ? docSnap.data() : {};
+          
+          // Update only the specific field
+          await setDoc(docRef, { ...existingData, [key]: value }, { merge: true });
+        }
         
         // DO NOT delete old subcollection format - keep as backup
         // if (key === 'connections' || key === 'presets' || key === 'regexScripts') {
@@ -382,6 +460,7 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
         // Update cache
         this.setCached<K>(key, value);
       } catch (error) {
+        console.error(`[FirebaseStorage] Error setting ${key}:`, error);
         throw error;
       }
     });
@@ -403,7 +482,7 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
 
     return this.measurePerformance('getAll()', async () => {
       try {
-        // Get the entire storage document in one operation
+        // Get main document data
         const docPath = this.getFirestoreDocPath('settings');
         const docRef = doc(db!, docPath);
         const docSnap = await getDoc(docRef);
@@ -413,12 +492,20 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
           const docData = docSnap.data();
           result = {
             connections: docData.connections || DEFAULT_STORAGE_DATA.connections,
-            presets: docData.presets || DEFAULT_STORAGE_DATA.presets,
+            presets: [], // Will be loaded separately
             settings: docData.settings || DEFAULT_STORAGE_DATA.settings,
             regexScripts: docData.regexScripts || DEFAULT_STORAGE_DATA.regexScripts,
           };
         } else {
           result = DEFAULT_STORAGE_DATA;
+        }
+
+        // Load presets from separate documents
+        if (this.shouldUseSeparateDocument('presets')) {
+          result.presets = await this.getFromSeparateDocuments('presets') as ChatCompletionPreset[];
+        } else if (docSnap.exists()) {
+          const docData = docSnap.data();
+          result.presets = docData.presets || DEFAULT_STORAGE_DATA.presets;
         }
 
         // Cache all results
@@ -428,6 +515,7 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
 
         return result;
       } catch (error) {
+        console.error('[FirebaseStorage] Error in getAll:', error);
         return DEFAULT_STORAGE_DATA;
       }
     });
@@ -440,18 +528,51 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
 
     return this.measurePerformance('setAll()', async () => {
       try {
-        // Use a single batch operation for all updates
+        // Use batch operations for efficiency
+        const batch = writeBatch(db!);
+        
+        // Save connections, settings, regexScripts to main document
         const docPath = this.getFirestoreDocPath('settings');
         const docRef = doc(db!, docPath);
         
-        // Update all fields in one document
-        await setDoc(docRef, data, { merge: true });
+        const mainData = {
+          connections: data.connections,
+          settings: data.settings,
+          regexScripts: data.regexScripts,
+        };
+        
+        batch.set(docRef, mainData, { merge: true });
+        
+        // Save presets to separate documents if needed
+        if (this.shouldUseSeparateDocument('presets')) {
+          // First, clear existing presets collection
+          const presetsCollectionPath = this.getOptimizedPresetsPath();
+          const presetsCollection = collection(db!, presetsCollectionPath);
+          const existingPresets = await getDocs(presetsCollection);
+          
+          // Delete existing presets
+          existingPresets.forEach((doc) => {
+            batch.delete(doc.ref);
+          });
+          
+          // Add new presets
+          data.presets.forEach((preset, index) => {
+            const presetDocRef = doc(db!, presetsCollectionPath, preset.id || `preset_${index}`);
+            batch.set(presetDocRef, preset);
+          });
+        } else {
+          // Include presets in main document
+          batch.set(docRef, { ...mainData, presets: data.presets }, { merge: true });
+        }
+        
+        await batch.commit();
         
         // Update cache for all keys
         Object.keys(data).forEach(key => {
           this.setCached(key as StorageKey, data[key as StorageKey]);
         });
       } catch (error) {
+        console.error('[FirebaseStorage] Error in setAll:', error);
         throw error;
       }
     });

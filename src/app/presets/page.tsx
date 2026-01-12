@@ -14,7 +14,6 @@ import {
   deleteChatCompletionPreset,
   importSTPreset,
   createDefaultChatCompletionPreset,
-  updateSettings,
   getSettings,
 } from '@/lib/storage';
 import { ChatCompletionPreset, STChatCompletionPreset } from '@/types';
@@ -57,8 +56,10 @@ export default function PresetsPage() {
     
     // Only set selectedId if it's not already set (to avoid overriding user selection)
     if (presetToSelect && !selectedId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedId(presetToSelect);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const selectedPreset = presets.find(p => p.id === selectedId);
@@ -244,6 +245,7 @@ export default function PresetsPage() {
                         e.stopPropagation();
                         handleEdit(activePreset);
                       }}
+                      title={t.common.edit}
                     >
                       ✎
                     </Button>
@@ -255,6 +257,7 @@ export default function PresetsPage() {
                         e.stopPropagation();
                         setDeleteConfirmId(activePreset.id);
                       }}
+                      title={t.common.delete}
                     >
                       ✕
                     </Button>
@@ -322,6 +325,7 @@ export default function PresetsPage() {
                             e.stopPropagation();
                             handleEdit(preset);
                           }}
+                          title={t.common.edit}
                         >
                           ✎
                         </Button>
@@ -333,6 +337,7 @@ export default function PresetsPage() {
                             e.stopPropagation();
                             setDeleteConfirmId(preset.id);
                           }}
+                          title={t.common.delete}
                         >
                           ✕
                         </Button>

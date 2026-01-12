@@ -528,6 +528,7 @@ export default function ConnectionsPage() {
                         e.stopPropagation();
                         handleKeyManagement(defaultConnection.id);
                       }}
+                      title="Manage API keys"
                     >
                       🔑
                     </Button>
@@ -539,6 +540,7 @@ export default function ConnectionsPage() {
                         e.stopPropagation();
                         handleEdit(defaultConnection);
                       }}
+                      title={t.connections.editConnection}
                     >
                       ✎
                     </Button>
@@ -550,6 +552,7 @@ export default function ConnectionsPage() {
                         e.stopPropagation();
                         setDeleteConfirmId(defaultConnection.id);
                       }}
+                      title={t.common.delete}
                     >
                       ✕
                     </Button>
@@ -603,6 +606,7 @@ export default function ConnectionsPage() {
                           e.stopPropagation();
                           handleKeyManagement(connection.id);
                         }}
+                        title="Manage API keys"
                       >
                         🔑
                       </Button>
@@ -614,6 +618,7 @@ export default function ConnectionsPage() {
                           e.stopPropagation();
                           handleEdit(connection);
                         }}
+                        title={t.connections.editConnection}
                       >
                         ✎
                       </Button>
@@ -625,6 +630,7 @@ export default function ConnectionsPage() {
                           e.stopPropagation();
                           setDeleteConfirmId(connection.id);
                         }}
+                        title={t.common.delete}
                       >
                         ✕
                       </Button>

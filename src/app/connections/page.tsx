@@ -528,7 +528,7 @@ export default function ConnectionsPage() {
                         e.stopPropagation();
                         handleKeyManagement(defaultConnection.id);
                       }}
-                      title="Manage API keys"
+                      title={t.connections.manageApiKeys}
                     >
                       🔑
                     </Button>
@@ -562,7 +562,7 @@ export default function ConnectionsPage() {
             ) : (
               <Card className="p-3">
                 <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
-                  No active profile set
+                  {t.connections.noConnectionsYet}
                 </p>
               </Card>
             )}
@@ -606,7 +606,7 @@ export default function ConnectionsPage() {
                           e.stopPropagation();
                           handleKeyManagement(connection.id);
                         }}
-                        title="Manage API keys"
+                        title={t.connections.manageApiKeys}
                       >
                         🔑
                       </Button>
@@ -675,7 +675,7 @@ export default function ConnectionsPage() {
                 {/* Key Management */}
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 border-b pb-2">
-                    API Key Management
+                    {t.connections.apiKeyManagement}
                   </h3>
                   {selectedConnection && (() => {
                     const apiKeys = selectedConnection.apiKeys || [];
@@ -688,19 +688,19 @@ export default function ConnectionsPage() {
                           <div className="flex-1">
                             {apiKeys.length === 0 ? (
                               <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                                No API keys configured. Click the key button (🔑) on the left to add keys.
+                                {t.connections.noApiKeysConfigured}
                               </p>
                             ) : (
                               <div className="space-y-2">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm font-medium">Selected Key:</span>
+                                  <span className="text-sm font-medium">{t.connections.selectedKey}</span>
                                   {selectedKey ? (
                                     <span className="text-sm text-zinc-700 dark:text-zinc-300">
                                       {selectedKey.name}
                                     </span>
                                   ) : (
                                     <span className="text-sm text-zinc-500 dark:text-zinc-400">
-                                      No key selected
+                                      {t.connections.noKeySelected}
                                     </span>
                                   )}
                                 </div>
@@ -732,11 +732,11 @@ export default function ConnectionsPage() {
                             size="sm"
                             onClick={() => handleKeyManagement(selectedConnection.id)}
                           >
-                            Manage Keys
+                            {t.connections.manageKeys}
                           </Button>
                         </div>
                         <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                          Add, edit, or select API keys for this connection. The selected key will be used for API calls.
+                          {t.connections.apiKeyManagementHint}
                         </p>
                       </div>
                     );
@@ -758,7 +758,7 @@ export default function ConnectionsPage() {
                           label: model.id
                         }))}
                         placeholder={t.connections.selectModel}
-                        searchPlaceholder="Search models..."
+                        searchPlaceholder={t.common.select}
                         className="flex-1"
                       />
                     ) : (
@@ -806,7 +806,7 @@ export default function ConnectionsPage() {
                   <div className="flex flex-col gap-1">
                     {selectedConnection?.lastTestedAt && (
                       <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                        Last tested: {formatLastTestedTime(selectedConnection.lastTestedAt)}
+                        {t.connections.lastTested} {formatLastTestedTime(selectedConnection.lastTestedAt)}
                       </p>
                     )}
                     <p className="text-xs text-zinc-500">
@@ -857,7 +857,7 @@ export default function ConnectionsPage() {
                 id="name"
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
-                placeholder="My API Connection"
+                placeholder={t.common.name}
               />
             </div>
             <div className="space-y-2">
@@ -866,7 +866,7 @@ export default function ConnectionsPage() {
                 id="url"
                 value={formUrl}
                 onChange={(e) => setFormUrl(e.target.value)}
-                placeholder="https://api.openai.com/v1"
+                placeholder={t.connections.apiUrl}
               />
               <p className="text-xs text-zinc-500">
                 {t.connections.apiUrlHint}
@@ -908,7 +908,7 @@ export default function ConnectionsPage() {
       <Dialog open={!!keyManagementConnectionId} onOpenChange={() => setKeyManagementConnectionId(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>API Key Management</DialogTitle>
+            <DialogTitle>{t.connections.apiKeyManagement}</DialogTitle>
           </DialogHeader>
           {keyManagementConnectionId && (() => {
             const connection = connections.find(c => c.id === keyManagementConnectionId);
@@ -922,11 +922,11 @@ export default function ConnectionsPage() {
                 <div className="space-y-4">
                   <div>
                     <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
-                      Existing API Keys
+                      {t.connections.existingApiKeys}
                     </h3>
                     {apiKeys.length === 0 ? (
                       <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                        No API keys added yet
+                        {t.connections.noApiKeysAddedYet}
                       </p>
                     ) : (
                       <div className="space-y-2">
@@ -952,7 +952,7 @@ export default function ConnectionsPage() {
                                 <span className="font-medium text-sm">{key.name}</span>
                                 {selectedKeyId === key.id && (
                                   <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-0.5 rounded">
-                                    Selected
+                                    {t.connections.selectedBadge}
                                   </span>
                                 )}
                               </div>
@@ -973,7 +973,7 @@ export default function ConnectionsPage() {
                                 }}
                                 disabled={selectedKeyId === key.id}
                               >
-                                Select
+                                {t.common.select}
                               </Button>
                               <Button
                                 variant="ghost"
@@ -983,7 +983,7 @@ export default function ConnectionsPage() {
                                   handleEditKey(key.id);
                                 }}
                               >
-                                Edit
+                                {t.common.edit}
                               </Button>
                               <Button
                                 variant="ghost"
@@ -994,7 +994,7 @@ export default function ConnectionsPage() {
                                   handleDeleteKey(key.id);
                                 }}
                               >
-                                Delete
+                                {t.common.delete}
                               </Button>
                             </div>
                           </div>
@@ -1006,26 +1006,26 @@ export default function ConnectionsPage() {
                   {/* Add new key form */}
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                      {editingKeyId ? 'Edit Key' : 'Add New Key'}
+                      {editingKeyId ? t.connections.editKey : t.connections.addNewKey}
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="keyName">Key Name</Label>
+                        <Label htmlFor="keyName">{t.connections.keyName}</Label>
                         <Input
                           id="keyName"
                           value={editingKeyId ? editKeyName : newKeyName}
                           onChange={(e) => editingKeyId ? setEditKeyName(e.target.value) : setNewKeyName(e.target.value)}
-                          placeholder="e.g., Production Key"
+                          placeholder={t.connections.keyNamePlaceholder}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="keyValue">Key Value</Label>
+                        <Label htmlFor="keyValue">{t.connections.keyValue}</Label>
                         <Input
                           id="keyValue"
                           type="password"
                           value={editingKeyId ? editKeyValue : newKeyValue}
                           onChange={(e) => editingKeyId ? setEditKeyValue(e.target.value) : setNewKeyValue(e.target.value)}
-                          placeholder="sk-..."
+                          placeholder={t.connections.keyValuePlaceholder}
                         />
                       </div>
                     </div>
@@ -1040,13 +1040,13 @@ export default function ConnectionsPage() {
                               setEditKeyValue('');
                             }}
                           >
-                            Cancel
+                            {t.common.cancel}
                           </Button>
                           <Button
                             onClick={handleSaveEditKey}
                             disabled={!editKeyName || !editKeyValue}
                           >
-                            Save Changes
+                            {t.connections.saveChanges}
                           </Button>
                         </>
                       ) : (
@@ -1054,7 +1054,7 @@ export default function ConnectionsPage() {
                           onClick={handleAddKey}
                           disabled={!newKeyName || !newKeyValue}
                         >
-                          Add Key
+                          {t.connections.addKey}
                         </Button>
                       )}
                     </div>
@@ -1065,7 +1065,7 @@ export default function ConnectionsPage() {
           })()}
           <DialogFooter>
             <Button variant="outline" onClick={() => setKeyManagementConnectionId(null)}>
-              Close
+              {t.connections.close}
             </Button>
           </DialogFooter>
         </DialogContent>

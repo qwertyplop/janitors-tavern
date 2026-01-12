@@ -15,6 +15,7 @@ import {
   importSTPreset,
   createDefaultChatCompletionPreset,
   updateSettings,
+  getSettings,
 } from '@/lib/storage';
 import { ChatCompletionPreset, STChatCompletionPreset } from '@/types';
 import { readJsonFile, formatDate } from '@/lib/utils';
@@ -35,12 +36,35 @@ export default function PresetsPage() {
   useEffect(() => {
     const loaded = getChatCompletionPresets();
     setPresets(loaded);
-    if (loaded.length > 0 && !selectedId) {
-      setSelectedId(loaded[0].id);
+    
+    // Get default preset from settings
+    const settings = getSettings();
+    const defaultPresetId = settings.defaultChatCompletionPresetId;
+    
+    // Determine which preset to select
+    let presetToSelect = null;
+    if (defaultPresetId) {
+      const defaultPreset = loaded.find(p => p.id === defaultPresetId);
+      if (defaultPreset) {
+        presetToSelect = defaultPresetId;
+      }
+    }
+    
+    // If no default preset or default not found, select first preset
+    if (!presetToSelect && loaded.length > 0) {
+      presetToSelect = loaded[0].id;
+    }
+    
+    // Only set selectedId if it's not already set (to avoid overriding user selection)
+    if (presetToSelect && !selectedId) {
+      setSelectedId(presetToSelect);
     }
   }, []);
 
   const selectedPreset = presets.find(p => p.id === selectedId);
+  const settings = getSettings();
+  const activePresetId = settings.defaultChatCompletionPresetId;
+  const activePreset = presets.find(p => p.id === activePresetId);
 
   // Sort presets based on selected method and direction
   const sortedPresets = useMemo(() => {
@@ -188,83 +212,137 @@ export default function PresetsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Panel - Preset List */}
-        <div className="lg:col-span-1 space-y-2">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-              {t.presets.savedPresets}
-            </h2>
-            <div className="flex items-center gap-2">
-              <Select
-                value={sortMethod}
-                onChange={(e) => setSortMethod(e.target.value as 'alphabetical' | 'blockCount')}
-                className="h-8 text-xs w-32"
-              >
-                <option value="alphabetical">Alphabetical</option>
-                <option value="blockCount">Block Count</option>
-              </Select>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 w-8 p-0"
-                onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
-                title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
-              >
-                {sortDirection === 'asc' ? '↑' : '↓'}
-              </Button>
-            </div>
-          </div>
-          {sortedPresets.length === 0 ? (
-            <Card className="p-4">
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
-                {t.presets.noPresetsYet}
-              </p>
-            </Card>
-          ) : (
+        <div className="lg:col-span-1 space-y-4">
+          {/* Active Preset Section */}
+          {activePreset && (
             <div className="space-y-2">
-              {sortedPresets.map((preset) => (
-                <Card
-                  key={preset.id}
-                  className={cn(
-                    'p-3 cursor-pointer transition-colors',
-                    selectedId === preset.id
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
-                      : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'
-                  )}
-                  onClick={() => selectPreset(preset.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-medium text-sm truncate">{preset.name}</h3>
-                    </div>
-                    <div className="flex gap-1 ml-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 hover:bg-zinc-300 dark:hover:bg-zinc-600"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEdit(preset);
-                        }}
-                      >
-                        ✎
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/50"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteConfirmId(preset.id);
-                        }}
-                      >
-                        ✕
-                      </Button>
-                    </div>
+              <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                Active Preset
+              </h2>
+              <Card
+                className={cn(
+                  'p-3 cursor-pointer transition-colors border-green-500 bg-green-50 dark:bg-green-950',
+                  selectedId === activePreset.id
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
+                    : 'hover:bg-green-100 dark:hover:bg-green-900'
+                )}
+                onClick={() => selectPreset(activePreset.id)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-medium text-sm truncate">{activePreset.name}</h3>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                      Default preset for incoming requests
+                    </p>
                   </div>
-                </Card>
-              ))}
+                  <div className="flex gap-1 ml-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(activePreset);
+                      }}
+                    >
+                      ✎
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/50"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteConfirmId(activePreset.id);
+                      }}
+                    >
+                      ✕
+                    </Button>
+                  </div>
+                </div>
+              </Card>
             </div>
           )}
+
+          {/* Saved Presets Section */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                {t.presets.savedPresets}
+              </h2>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={sortMethod}
+                  onChange={(e) => setSortMethod(e.target.value as 'alphabetical' | 'blockCount')}
+                  className="h-8 text-xs w-32"
+                >
+                  <option value="alphabetical">Alphabetical</option>
+                  <option value="blockCount">Block Count</option>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                  title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+                >
+                  {sortDirection === 'asc' ? '↑' : '↓'}
+                </Button>
+              </div>
+            </div>
+            {sortedPresets.length === 0 ? (
+              <Card className="p-4">
+                <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
+                  {t.presets.noPresetsYet}
+                </p>
+              </Card>
+            ) : (
+              <div className="space-y-2">
+                {sortedPresets.map((preset) => (
+                  <Card
+                    key={preset.id}
+                    className={cn(
+                      'p-3 cursor-pointer transition-colors',
+                      selectedId === preset.id
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
+                        : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                    )}
+                    onClick={() => selectPreset(preset.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-medium text-sm truncate">{preset.name}</h3>
+                      </div>
+                      <div className="flex gap-1 ml-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(preset);
+                          }}
+                        >
+                          ✎
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteConfirmId(preset.id);
+                          }}
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right Panel - Preset Details */}

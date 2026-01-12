@@ -899,8 +899,18 @@ export default function ConnectionsPage() {
                           <div
                             key={key.id}
                             className={`flex items-center justify-between p-3 border rounded-lg ${
-                              selectedKeyId === key.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-950' : 'border-zinc-200 dark:border-zinc-700'
+                              selectedKeyId === key.id
+                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-950 cursor-default'
+                                : 'border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer'
                             }`}
+                            onClick={(e) => {
+                              // Only trigger selection if clicking on the block itself (not buttons)
+                              if (!(e.target instanceof HTMLButtonElement) &&
+                                  !(e.target as HTMLElement).closest('button') &&
+                                  selectedKeyId !== key.id) {
+                                handleSelectKey(key.id);
+                              }
+                            }}
                           >
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
@@ -922,7 +932,10 @@ export default function ConnectionsPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleSelectKey(key.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectKey(key.id);
+                                }}
                                 disabled={selectedKeyId === key.id}
                               >
                                 Select
@@ -930,7 +943,10 @@ export default function ConnectionsPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleEditKey(key.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditKey(key.id);
+                                }}
                               >
                                 Edit
                               </Button>
@@ -938,7 +954,10 @@ export default function ConnectionsPage() {
                                 variant="ghost"
                                 size="sm"
                                 className="text-red-600 hover:text-red-700"
-                                onClick={() => handleDeleteKey(key.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteKey(key.id);
+                                }}
                               >
                                 Delete
                               </Button>

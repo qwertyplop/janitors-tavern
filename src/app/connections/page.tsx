@@ -230,7 +230,27 @@ export default function ConnectionsPage() {
     }
   };
 
-  // Test connection by sending "hi!" message
+  // Helper function to format last tested timestamp in user's local time
+  const formatLastTestedTime = (timestamp?: string): string | null => {
+    if (!timestamp) return null;
+    try {
+      const date = new Date(timestamp);
+      // Format in user's local timezone
+      return date.toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      });
+    } catch {
+      return null;
+    }
+  };
+
+  // Test connection by sending "hi!" message through Vercel proxy
   const testConnection = async () => {
     if (!selectedConnection || !selectedModel) {
       setTestResult({ success: false, message: t.connections.selectModelFirst });
@@ -241,42 +261,44 @@ export default function ConnectionsPage() {
     setTestResult(null);
 
     try {
-      let chatUrl = selectedConnection.baseUrl.replace(/\/+$/, '');
-      if (!chatUrl.endsWith('/v1')) {
-        chatUrl += '/v1';
-      }
-      chatUrl += '/chat/completions';
-
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-
       // Get selected API key
       const selectedKey = getSelectedApiKey(selectedConnection.id);
       const apiKey = selectedKey?.value;
-      if (apiKey) {
-        headers['Authorization'] = `Bearer ${apiKey}`;
-      }
 
-      const testPayload = {
-        model: selectedModel,
-        messages: [{ role: 'user', content: 'hi!' }],
-        max_tokens: 50,
-      };
-
-      const response = await fetch(chatUrl, {
+      // Use Vercel proxy API to avoid 403 errors from user's IP
+      const response = await fetch('/api/proxy/test-connection', {
         method: 'POST',
-        headers,
-        body: JSON.stringify(testPayload),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          providerType: selectedConnection.providerType,
+          baseUrl: selectedConnection.baseUrl,
+          apiKey: apiKey,
+          model: selectedModel,
+          extraHeaders: selectedConnection.extraHeaders,
+        }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        const responseText = data.choices?.[0]?.message?.content || 'Response received';
-        setTestResult({ success: true, message: `Success: ${responseText.substring(0, 100)}` });
+        if (data.success) {
+          const responseText = data.message || 'Test successful';
+          setTestResult({ success: true, message: `Success: ${responseText.substring(0, 100)}` });
+          
+          // Update last tested timestamp only on successful tests
+          const now = new Date().toISOString();
+          updateConnectionPreset(selectedConnection.id, { lastTestedAt: now });
+          setConnections(getSortedConnections());
+        } else {
+          setTestResult({ success: false, message: `Error: ${data.message || 'Test failed'}` });
+        }
       } else {
-        const errorText = await response.text();
-        setTestResult({ success: false, message: `Error ${response.status}: ${errorText.substring(0, 100)}` });
+        const errorData = await response.json().catch(() => ({}));
+        setTestResult({
+          success: false,
+          message: `Error ${response.status}: ${errorData.message || 'Request failed'}`
+        });
       }
     } catch (error) {
       setTestResult({
@@ -775,9 +797,16 @@ export default function ConnectionsPage() {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-zinc-500">
-                    {t.connections.testHint}
-                  </p>
+                  <div className="flex flex-col gap-1">
+                    {selectedConnection?.lastTestedAt && (
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                        Last tested: {formatLastTestedTime(selectedConnection.lastTestedAt)}
+                      </p>
+                    )}
+                    <p className="text-xs text-zinc-500">
+                      {t.connections.testHint}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Quick Actions */}

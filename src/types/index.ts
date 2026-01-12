@@ -41,6 +41,8 @@ export interface ConnectionPreset {
   defaultParameters?: SamplerParameters;
   extraHeaders?: Record<string, string>;
   extraQueryParams?: Record<string, string>;
+  // Last test timestamp (ISO string)
+  lastTestedAt?: string;
   createdAt: string;
   updatedAt: string;
 }

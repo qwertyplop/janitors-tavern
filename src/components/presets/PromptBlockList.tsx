@@ -353,7 +353,7 @@ export function PromptBlockList({
                   {/* Block info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">
+                      <span className="text-base font-semibold truncate">
                         {block.name || block.identifier}
                       </span>
                       <Badge className={getRoleBadgeColor(block.role)}>
@@ -365,15 +365,11 @@ export function PromptBlockList({
                         </Badge>
                       )}
                     </div>
-                    {block.marker ? (
+                    {block.marker && (
                       <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
                         Dynamic content placeholder - cannot be edited
                       </p>
-                    ) : block.content ? (
-                      <p className="text-sm text-gray-500 truncate mt-1">
-                        {block.content.substring(0, 100)}...
-                      </p>
-                    ) : null}
+                    )}
                   </div>
 
                   {/* Edit button - only for non-markers */}
@@ -452,7 +448,7 @@ export function PromptBlockList({
                     {/* Block info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium truncate">
+                        <span className="text-base font-semibold truncate">
                           {block.name || block.identifier}
                         </span>
                         <Badge className={getRoleBadgeColor(block.role)}>
@@ -464,15 +460,11 @@ export function PromptBlockList({
                           </Badge>
                         )}
                       </div>
-                      {block.marker ? (
+                      {block.marker && (
                         <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
                           Dynamic content placeholder - cannot be edited
                         </p>
-                      ) : block.content ? (
-                        <p className="text-sm text-gray-500 truncate mt-1">
-                          {block.content.substring(0, 100)}...
-                        </p>
-                      ) : null}
+                      )}
                     </div>
 
                     {/* Edit button - only for non-markers */}

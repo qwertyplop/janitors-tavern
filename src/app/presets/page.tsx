@@ -235,6 +235,9 @@ export default function PresetsPage() {
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                       Default preset for incoming requests
                     </p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                      {activePreset.promptBlocks.length} blocks · Temp: {activePreset.sampler.temperature}
+                    </p>
                   </div>
                   <div className="flex gap-1 ml-2">
                     <Button

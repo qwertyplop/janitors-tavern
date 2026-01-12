@@ -22,6 +22,7 @@ import {
   deleteApiKey,
   setSelectedApiKey,
   migrateConnectionPresetsToMultiKey,
+  getSettings,
 } from '@/lib/storage';
 import { ConnectionPreset } from '@/types';
 import { downloadJson, readJsonFile } from '@/lib/utils';
@@ -129,6 +130,9 @@ export default function ConnectionsPage() {
   }, []);
 
   const selectedConnection = connections.find(c => c.id === selectedId);
+  const settings = getSettings();
+  const defaultConnectionId = settings.defaultConnectionId;
+  const defaultConnection = defaultConnectionId ? connections.find(c => c.id === defaultConnectionId) : null;
 
   // Select connection for viewing (does not set as default)
   const selectConnection = (id: string) => {
@@ -466,6 +470,69 @@ export default function ConnectionsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Panel - Connection List */}
         <div className="lg:col-span-1 space-y-2">
+          {/* Active Profile Section */}
+          <div className="mb-4">
+            <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">
+              {t.connections.activeProfile}
+            </h2>
+            {defaultConnection ? (
+              <Card
+                className="p-3 border-green-500 bg-green-50 dark:bg-green-950 cursor-pointer transition-colors"
+                onClick={() => selectConnection(defaultConnection.id)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-medium text-sm truncate">{defaultConnection.name}</h3>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                      {defaultConnection.baseUrl}
+                    </p>
+                  </div>
+                  <div className="flex gap-1 ml-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleKeyManagement(defaultConnection.id);
+                      }}
+                    >
+                      🔑
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(defaultConnection);
+                      }}
+                    >
+                      ✎
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/50"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteConfirmId(defaultConnection.id);
+                      }}
+                    >
+                      ✕
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ) : (
+              <Card className="p-3">
+                <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
+                  No active profile set
+                </p>
+              </Card>
+            )}
+          </div>
+
           <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">
             {t.connections.savedConnections}
           </h2>

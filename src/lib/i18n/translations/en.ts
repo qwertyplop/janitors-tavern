@@ -101,6 +101,7 @@ export const en = {
     subtitle: 'Manage API connection presets for different providers',
     newConnection: 'New Connection',
     savedConnections: 'Saved Connections',
+    activeProfile: 'Active Profile',
     noConnectionsYet: 'No connections yet',
     connectionSection: 'Connection',
     connect: 'Connect',

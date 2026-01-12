@@ -103,6 +103,7 @@ export const ru: TranslationKeys = {
     subtitle: 'Управление пресетами API-подключений для различных провайдеров',
     newConnection: 'Новое подключение',
     savedConnections: 'Сохранённые подключения',
+    activeProfile: 'Активный профиль',
     noConnectionsYet: 'Подключений пока нет',
     connectionSection: 'Подключение',
     connect: 'Подключить',

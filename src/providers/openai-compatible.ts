@@ -264,27 +264,22 @@ export class OpenAICompatibleProvider extends ChatProvider {
   async testConnection(): Promise<{ success: boolean; message: string }> {
     try {
       // Send a simple test message to validate the API key works for chat completions
-      const testRequest: ProviderRequest = {
+      // Use minimal request without sampler parameters to avoid provider-specific errors
+      const requestBody = {
+        model: this.config.model,
         messages: [
           {
             role: 'user',
             content: 'Hi',
           },
         ],
-        model: this.config.model,
-        parameters: {
-          temperature: -1, // Use -1 to indicate no temperature override
-          topP: -1,
-          maxTokens: 10, // Limit tokens for quick test
-          presencePenalty: -1,
-          frequencyPenalty: -1,
-        },
+        max_tokens: 10, // Limit tokens for quick test
       };
 
       const response = await fetch(this.buildUrl('/chat/completions'), {
         method: 'POST',
         headers: this.getNonStreamHeaders(),
-        body: JSON.stringify(this.buildOpenAIRequest(testRequest, false)),
+        body: JSON.stringify(requestBody),
       });
 
       if (response.ok) {

@@ -121,6 +121,7 @@ export class JanitorAIProvider extends ChatProvider {
       };
       
       // Send a simple test message to validate the API key works for chat completions
+      // Use minimal request without sampler parameters to avoid provider-specific errors
       const requestBody = {
         model: this.config.model,
         messages: [

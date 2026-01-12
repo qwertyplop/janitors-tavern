@@ -133,6 +133,137 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
     return `users/${this.userId}/storage`;
   }
 
+  private getFirestoreCollectionPath(key: StorageKey): string {
+    // Old subcollection path for backward compatibility
+    return `users/${this.userId}/storage/${key}/items`;
+  }
+
+  private async getFromSubcollection<K extends StorageKey>(key: K): Promise<StorageData[K]> {
+    if (!db) {
+      return DEFAULT_STORAGE_DATA[key];
+    }
+
+    try {
+      const collectionPath = this.getFirestoreCollectionPath(key);
+      const querySnapshot = await getDocs(collection(db!, collectionPath));
+      
+      const items: any[] = [];
+      querySnapshot.forEach((doc) => {
+        items.push({ id: doc.id, ...doc.data() });
+      });
+      
+      // If we found data in old format, migrate it to new format
+      if (items.length > 0) {
+        await this.migrateToSingleDocument(key, items as StorageData[K]);
+      }
+      
+      return items as StorageData[K];
+    } catch (error) {
+      return DEFAULT_STORAGE_DATA[key];
+    }
+  }
+
+  private async migrateToSingleDocument<K extends StorageKey>(key: K, data: StorageData[K]): Promise<void> {
+    if (!db) return;
+    
+    try {
+      // Save to new single document format
+      const docPath = this.getFirestoreDocPath(key);
+      const docRef = doc(db!, docPath);
+      const docSnap = await getDoc(docRef);
+      
+      const existingData = docSnap.exists() ? docSnap.data() : {};
+      await setDoc(docRef, { ...existingData, [key]: data }, { merge: true });
+      
+      // Optionally delete old subcollection to save space
+      await this.deleteSubcollection(key);
+    } catch (error) {
+      // Migration failed, but that's OK - we'll try again next time
+    }
+  }
+
+  private async deleteSubcollection(key: StorageKey): Promise<void> {
+    if (!db) return;
+    
+    try {
+      const collectionPath = this.getFirestoreCollectionPath(key);
+      const querySnapshot = await getDocs(collection(db!, collectionPath));
+      
+      const deletePromises = querySnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+    } catch (error) {
+      // Ignore errors - subcollection might not exist
+    }
+  }
+
+  // Public method to reformat database structure (can be called from settings UI)
+  // ⚠️ WARNING: Don't use this if you don't know what it does!
+  // This migrates data from old subcollection format to new single document format
+  async reformatDatabaseStructure(): Promise<{ migrated: number; errors: number }> {
+    if (!db) {
+      return { migrated: 0, errors: 0 };
+    }
+
+    const results = { migrated: 0, errors: -1 };
+    
+    try {
+      // Migrate all array data from subcollections to single document
+      const arrayKeys: StorageKey[] = ['connections', 'presets', 'regexScripts'];
+      
+      for (const key of arrayKeys) {
+        try {
+          const oldData = await this.getFromSubcollection(key);
+          if (Array.isArray(oldData) && oldData.length > 0) {
+            // Save to new format
+            const docPath = this.getFirestoreDocPath(key);
+            const docRef = doc(db!, docPath);
+            const docSnap = await getDoc(docRef);
+            
+            const existingData = docSnap.exists() ? docSnap.data() : {};
+            await setDoc(docRef, { ...existingData, [key]: oldData }, { merge: true });
+            
+            // Delete old subcollection
+            await this.deleteSubcollection(key);
+            
+            results.migrated += oldData.length;
+          }
+        } catch (error) {
+          results.errors++;
+        }
+      }
+      
+      // Clear cache to force fresh reads from new format
+      this.clearCache();
+      
+      return results;
+    } catch (error) {
+      return { migrated: results.migrated, errors: results.errors + 1 };
+    }
+  }
+
+  // Check if data needs migration
+  async needsMigration(): Promise<boolean> {
+    if (!db) return false;
+    
+    try {
+      const arrayKeys: StorageKey[] = ['connections', 'presets', 'regexScripts'];
+      
+      for (const key of arrayKeys) {
+        // Check if data exists in old subcollection format
+        const collectionPath = this.getFirestoreCollectionPath(key);
+        const querySnapshot = await getDocs(collection(db!, collectionPath));
+        
+        if (!querySnapshot.empty) {
+          return true; // Migration needed
+        }
+      }
+      
+      return false;
+    } catch (error) {
+      return false;
+    }
+  }
+
   private async measurePerformance<T>(operation: string, fn: () => Promise<T>): Promise<T> {
     if (!this.performanceLogging) {
       return fn();
@@ -165,22 +296,24 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
 
     return this.measurePerformance(`get(${key})`, async () => {
       try {
-        // Get the entire storage document once
-        if (!db) {
-          return DEFAULT_STORAGE_DATA[key];
-        }
-        
+        // Try new single document format first (optimized)
         const docPath = this.getFirestoreDocPath(key);
         const docRef = doc(db!, docPath);
         const docSnap = await getDoc(docRef);
 
         let data: StorageData[K];
+        
         if (docSnap.exists()) {
           const docData = docSnap.data();
           data = docData[key] as StorageData[K];
         } else {
-          // Return default value if document doesn't exist
-          data = DEFAULT_STORAGE_DATA[key];
+          // If not found in new format, try old subcollection format for backward compatibility
+          if (key === 'connections' || key === 'presets' || key === 'regexScripts') {
+            data = await this.getFromSubcollection(key);
+          } else {
+            // Return default value if document doesn't exist
+            data = DEFAULT_STORAGE_DATA[key];
+          }
         }
 
         // Cache the result
@@ -200,11 +333,7 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
 
     return this.measurePerformance(`set(${key})`, async () => {
       try {
-        // Update only the specific key field in the document using merge
-        if (!db) {
-          throw new Error('Firebase not available');
-        }
-        
+        // Always save to new single document format
         const docPath = this.getFirestoreDocPath(key);
         const docRef = doc(db!, docPath);
         
@@ -214,6 +343,11 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
         
         // Update only the specific field
         await setDoc(docRef, { ...existingData, [key]: value }, { merge: true });
+        
+        // Also delete old subcollection format if it exists (cleanup)
+        if (key === 'connections' || key === 'presets' || key === 'regexScripts') {
+          await this.deleteSubcollection(key);
+        }
         
         // Update cache
         this.setCached<K>(key, value);

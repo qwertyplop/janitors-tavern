@@ -8,6 +8,14 @@ import { Select } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   getSettings,
   updateSettings,
   getProfiles,
@@ -84,6 +92,11 @@ export default function SettingsPage() {
   // Local sync status for UI feedback
   const [syncFeedback, setSyncFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
+
+  // Clear data verification state
+  const [showClearDataDialog, setShowClearDataDialog] = useState(false);
+  const [verificationText1, setVerificationText1] = useState('');
+  const [verificationText2, setVerificationText2] = useState('');
 
   useEffect(() => {
     // Load local settings first
@@ -164,10 +177,41 @@ export default function SettingsPage() {
   };
 
   const handleClearData = () => {
-    if (confirm('Are you sure you want to clear all data? This cannot be undone.')) {
-      localStorage.clear();
-      window.location.reload();
+    setShowClearDataDialog(true);
+  };
+
+  const handleConfirmClearData = async () => {
+    // Check if both verification texts match exactly
+    if (verificationText1 === 'delete all data' && verificationText2 === 'I understand this cannot be undone') {
+      try {
+        // Clear local storage
+        localStorage.clear();
+        
+        // If Firebase is configured, also clear cloud data
+        if (firebaseConfigured) {
+          const response = await fetch('/api/storage/all', {
+            method: 'DELETE',
+          });
+          
+          if (!response.ok) {
+            console.error('Failed to clear Firebase data:', await response.text());
+            // Continue anyway - we've cleared local storage
+          }
+        }
+        
+        // Reload the page
+        window.location.reload();
+      } catch (error) {
+        console.error('Error clearing data:', error);
+        alert('Failed to clear all data. Please try again.');
+      }
     }
+  };
+
+  const handleCloseClearDataDialog = () => {
+    setShowClearDataDialog(false);
+    setVerificationText1('');
+    setVerificationText2('');
   };
 
   // Export all data as a backup file
@@ -584,6 +628,63 @@ export default function SettingsPage() {
           </p>
         </CardContent>
       </Card>
+
+      {/* Clear Data Confirmation Dialog */}
+      <Dialog open={showClearDataDialog} onOpenChange={handleCloseClearDataDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">{t.settings.clearAllData}</DialogTitle>
+            <DialogDescription>
+              {t.settings.confirmClearData}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="verification1">
+                Type <span className="font-mono font-bold">"delete all data"</span> to confirm:
+              </Label>
+              <Input
+                id="verification1"
+                value={verificationText1}
+                onChange={(e) => setVerificationText1(e.target.value)}
+                placeholder="delete all data"
+              />
+              {verificationText1 !== 'delete all data' && verificationText1.length > 0 && (
+                <p className="text-sm text-red-500">Text does not match. Please type exactly: "delete all data"</p>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="verification2">
+                Type <span className="font-mono font-bold">"I understand this cannot be undone"</span> to confirm:
+              </Label>
+              <Input
+                id="verification2"
+                value={verificationText2}
+                onChange={(e) => setVerificationText2(e.target.value)}
+                placeholder="I understand this cannot be undone"
+              />
+              {verificationText2 !== 'I understand this cannot be undone' && verificationText2.length > 0 && (
+                <p className="text-sm text-red-500">Text does not match. Please type exactly: "I understand this cannot be undone"</p>
+              )}
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseClearDataDialog}>
+              {t.common.cancel}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmClearData}
+              disabled={verificationText1 !== 'delete all data' || verificationText2 !== 'I understand this cannot be undone'}
+            >
+              {t.settings.clearAllData}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

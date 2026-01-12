@@ -235,9 +235,6 @@ export default function PresetsPage() {
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
                       <h3 className="font-medium text-sm truncate">{preset.name}</h3>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
-                        {preset.promptBlocks.length} blocks · T: {preset.sampler.temperature}
-                      </p>
                     </div>
                     <div className="flex gap-1 ml-2">
                       <Button

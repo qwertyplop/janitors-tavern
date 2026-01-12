@@ -316,12 +316,9 @@ export default function DashboardPage() {
                   </option>
                 ))}
               </Select>
-              {pendingPreset && (
+              {pendingPreset && pendingPresetId !== settings?.defaultChatCompletionPresetId && (
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {pendingPreset.promptBlocks.length} {t.dashboard.blocksTemp} {pendingPreset.sampler.temperature}
-                  {pendingPresetId !== settings?.defaultChatCompletionPresetId && (
-                    <span className="ml-2 text-amber-600 dark:text-amber-400">(pending)</span>
-                  )}
+                  <span className="text-amber-600 dark:text-amber-400">(pending)</span>
                 </p>
               )}
             </div>

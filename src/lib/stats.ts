@@ -237,12 +237,47 @@ async function saveStats(stats: UsageStats): Promise<void> {
 // ============================================
 
 /**
+ * Check if daily reset is needed and perform it if necessary
+ * This ensures stats are always up-to-date when retrieved
+ */
+async function checkAndResetDaily(): Promise<UsageStats> {
+  try {
+    // Load current stats
+    const currentStats = cachedStats || await loadStats();
+    
+    // Create a copy to avoid mutating shared reference
+    const stats = { ...currentStats };
+    
+    // Check if daily reset is needed
+    if (shouldResetDaily(stats.lastDailyReset)) {
+      console.log(`[Stats] Performing daily reset in checkAndResetDaily`);
+      stats.dailyRequests = 0;
+      stats.dailyTokens = 0;
+      stats.lastDailyReset = new Date().toISOString();
+      stats.lastUpdated = new Date().toISOString();
+      
+      // Update cache
+      cachedStats = stats;
+      
+      // Save to Firebase immediately
+      console.log(`[Stats] Saving reset stats to Firebase`);
+      await saveStats(stats);
+    }
+    
+    return stats;
+  } catch (error) {
+    console.error('[Stats] Failed to check and reset daily:', error);
+    return cachedStats || getDefaultStats();
+  }
+}
+
+/**
  * Get current usage stats
- * Note: Does NOT perform reset - reset only happens in recordUsage()
+ * Performs daily reset check if needed
  */
 export async function getStats(): Promise<UsageStats> {
   try {
-    const stats = await loadStats();
+    const stats = await checkAndResetDaily();
     return stats;
   } catch (error) {
     console.error('[Stats] Failed to get stats:', error);
@@ -256,19 +291,11 @@ export async function getStats(): Promise<UsageStats> {
  */
 export async function recordUsage(inputTokens: number, outputTokens: number): Promise<UsageStats> {
   try {
-    // Load or use cached stats
-    const currentStats = cachedStats || await loadStats();
+    // First ensure daily reset is checked and applied if needed
+    const currentStats = await checkAndResetDaily();
     
     // Create a copy to avoid mutating shared reference
     const stats = { ...currentStats };
-
-    // Check if daily reset is needed first
-    if (shouldResetDaily(stats.lastDailyReset)) {
-      console.log(`[Stats] Performing daily reset in recordUsage`);
-      stats.dailyRequests = 0;
-      stats.dailyTokens = 0;
-      stats.lastDailyReset = new Date().toISOString();
-    }
 
     const totalTokensUsed = inputTokens + outputTokens;
 

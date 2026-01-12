@@ -144,7 +144,8 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
 
   private getOptimizedPresetsPath(): string {
     // Store presets in separate optimized documents to avoid 1MB limit
-    return `users/${this.userId}/storage/presets`;
+    // Firestore requires even number of segments, so add 'items' as the final segment
+    return `users/${this.userId}/storage/presets/items`;
   }
 
   private shouldUseSeparateDocument(key: StorageKey): boolean {

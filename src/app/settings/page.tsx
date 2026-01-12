@@ -11,25 +11,63 @@ import {
   getSettings,
   updateSettings,
   getProfiles,
+  saveProfiles,
   getConnectionPresets,
   saveConnectionPresets,
   saveChatCompletionPresets,
   saveSettings as saveSettingsToStorage,
   getChatCompletionPresets,
+  getPromptPresets,
+  savePromptPresets,
+  getSamplerPresets,
+  saveSamplerPresets,
+  getExtensions,
+  saveExtensions,
+  getExtensionsPipelines,
+  saveExtensionsPipelines,
+  getRegexScripts,
+  saveRegexScripts,
 } from '@/lib/storage';
+import { getStats } from '@/lib/stats';
 import { downloadJson, readJsonFile } from '@/lib/utils';
 import { useSync } from '@/components/providers/SyncProvider';
 import { useI18n } from '@/components/providers/I18nProvider';
-import { AppSettings, Profile, ConnectionPreset, ThemeMode, LoggingSettings, ChatCompletionPreset } from '@/types';
+import {
+  AppSettings,
+  Profile,
+  ConnectionPreset,
+  ThemeMode,
+  LoggingSettings,
+  ChatCompletionPreset,
+  PromptPreset,
+  SamplerPreset,
+  Extension,
+  ExtensionsPipeline,
+  RegexScript,
+} from '@/types';
+import { UsageStats } from '@/lib/stats';
 // Remove direct import of server-side auth functions
 // These functions are now called via API endpoints
 
 interface BackupData {
   version: string;
   exportedAt: string;
+  appVersion?: string;
   connections: ConnectionPreset[];
-  presets: ChatCompletionPreset[];
+  chatCompletionPresets: ChatCompletionPreset[];
+  // For backward compatibility with v1.0 backups
+  presets?: ChatCompletionPreset[];
+  // Optional fields for backward compatibility (v2.0+)
+  promptPresets?: PromptPreset[];
+  samplerPresets?: SamplerPreset[];
+  profiles?: Profile[];
+  extensions?: Extension[];
+  extensionsPipelines?: ExtensionsPipeline[];
+  regexScripts?: RegexScript[];
   settings: AppSettings;
+  serverSettings?: AppSettings;
+  // Firebase data
+  stats?: UsageStats;
 }
 
 export default function SettingsPage() {
@@ -133,17 +171,41 @@ export default function SettingsPage() {
   };
 
   // Export all data as a backup file
-  const handleExportBackup = () => {
-    const backup: BackupData = {
-      version: '1.0',
-      exportedAt: new Date().toISOString(),
-      connections: getConnectionPresets(),
-      presets: getChatCompletionPresets(),
-      settings: getSettings(),
-    };
+  const handleExportBackup = async () => {
+    try {
+      // Fetch stats from Firebase if available
+      let stats: UsageStats | undefined;
+      if (firebaseConfigured) {
+        try {
+          stats = await getStats();
+        } catch (error) {
+          console.warn('Failed to fetch stats from Firebase:', error);
+          // Continue without stats
+        }
+      }
 
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
-    downloadJson(backup, `janitors-tavern-backup-${timestamp}.json`);
+      const backup: BackupData = {
+        version: '2.0',
+        exportedAt: new Date().toISOString(),
+        appVersion: '1.0.0',
+        connections: getConnectionPresets(),
+        chatCompletionPresets: getChatCompletionPresets(),
+        promptPresets: getPromptPresets(),
+        samplerPresets: getSamplerPresets(),
+        profiles: getProfiles(),
+        extensions: getExtensions(),
+        extensionsPipelines: getExtensionsPipelines(),
+        regexScripts: getRegexScripts(),
+        settings: getSettings(),
+        stats,
+      };
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+      downloadJson(backup, `janitors-tavern-backup-${timestamp}.json`);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export backup. Please try again.');
+    }
   };
 
   // Import data from a backup file
@@ -154,8 +216,11 @@ export default function SettingsPage() {
     try {
       const backup = await readJsonFile<BackupData>(file);
 
-      // Validate backup structure
-      if (!backup.connections || !backup.presets || !backup.settings) {
+      // Handle backward compatibility: check for old backup format with "presets" field
+      const chatCompletionPresets = backup.chatCompletionPresets || backup.presets || [];
+
+      // Validate backup structure - require at least connections and settings
+      if (!backup.connections || !backup.settings) {
         throw new Error('Invalid backup file structure');
       }
 
@@ -164,10 +229,34 @@ export default function SettingsPage() {
         return;
       }
 
-      // Import data
+      // Import all data types
       saveConnectionPresets(backup.connections);
-      saveChatCompletionPresets(backup.presets);
+      saveChatCompletionPresets(chatCompletionPresets);
+      
+      // Import optional data types if they exist in the backup
+      if (backup.promptPresets) {
+        savePromptPresets(backup.promptPresets);
+      }
+      if (backup.samplerPresets) {
+        saveSamplerPresets(backup.samplerPresets);
+      }
+      if (backup.profiles) {
+        saveProfiles(backup.profiles);
+      }
+      if (backup.extensions) {
+        saveExtensions(backup.extensions);
+      }
+      if (backup.extensionsPipelines) {
+        saveExtensionsPipelines(backup.extensionsPipelines);
+      }
+      if (backup.regexScripts) {
+        saveRegexScripts(backup.regexScripts);
+      }
+      
       saveSettingsToStorage(backup.settings);
+
+      // Note: Stats are not imported as they are usage statistics
+      // that are typically not restored from backup
 
       // Force sync to cloud before reloading (if Firebase is configured)
       if (firebaseConfigured) {
@@ -281,16 +370,6 @@ export default function SettingsPage() {
                 <Label htmlFor="logResponses">{t.settings.logResponses}</Label>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="logFilePath">{t.settings.logFilePath}</Label>
-                <Input
-                  id="logFilePath"
-                  value={settings.logging.logFilePath}
-                  onChange={(e) => handleLoggingChange('logFilePath', e.target.value)}
-                  placeholder="logs/proxy.log"
-                />
-                <p className="text-xs text-zinc-500">{t.settings.logFilePathHint}</p>
-              </div>
             </>
           ) : (
             <p className="text-zinc-500">{t.settings.loadingServerSettings}</p>

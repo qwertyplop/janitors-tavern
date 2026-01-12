@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/components/providers/I18nProvider';
 
 interface ChatCompletionPresetEditorProps {
   preset: ChatCompletionPreset;
@@ -26,28 +27,6 @@ interface Tab {
   label: string;
 }
 
-const TABS: Tab[] = [
-  { id: 'prompts', label: 'Prompt Blocks' },
-  { id: 'sampler', label: 'Sampler Settings' },
-  { id: 'advanced', label: 'Advanced' },
-];
-
-const NAMES_BEHAVIOR_OPTIONS = [
-  { value: 0, label: 'None', description: 'No special handling for character names' },
-  { value: 1, label: 'Prefix messages', description: 'Add character name prefix to messages' },
-  { value: 2, label: 'Include in system', description: 'Include names in system prompt' },
-  { value: 3, label: 'Both', description: 'Prefix and system prompt' },
-];
-
-const REASONING_EFFORT_OPTIONS = [
-  { value: 'auto', label: 'Auto', description: 'Let the model decide' },
-  { value: 'min', label: 'Minimum', description: 'Minimal reasoning (1024 tokens)' },
-  { value: 'low', label: 'Low', description: '15% of max response' },
-  { value: 'medium', label: 'Medium', description: '25% of max response' },
-  { value: 'high', label: 'High', description: '50% of max response' },
-  { value: 'max', label: 'Maximum', description: '95% of max response' },
-];
-
 
 export function ChatCompletionPresetEditor({
   preset,
@@ -56,6 +35,14 @@ export function ChatCompletionPresetEditor({
   onCancel,
 }: ChatCompletionPresetEditorProps) {
   const [activeTab, setActiveTab] = useState<TabId>('prompts');
+  const { t } = useI18n();
+
+  // Create tabs using translation keys
+  const TABS: Tab[] = [
+    { id: 'prompts', label: t.presets.presetEditor.tabs.prompts },
+    { id: 'sampler', label: t.presets.presetEditor.tabs.sampler },
+    { id: 'advanced', label: t.presets.presetEditor.tabs.advanced },
+  ];
 
   const handleBlocksChange = (
     promptBlocks: STPromptBlock[],
@@ -134,16 +121,16 @@ export function ChatCompletionPresetEditor({
         <div className="flex-1 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="name">Preset Name</Label>
+              <Label htmlFor="name">{t.presets.presetEditor.labels.presetName}</Label>
               <Input
                 id="name"
                 value={preset.name}
                 onChange={(e) => onChange({ ...preset, name: e.target.value })}
-                placeholder="Preset name"
+                placeholder={t.presets.presetEditor.placeholders.presetName}
               />
             </div>
             <div>
-              <Label htmlFor="tags">Tags (comma-separated)</Label>
+              <Label htmlFor="tags">{t.presets.presetEditor.labels.tags}</Label>
               <Input
                 id="tags"
                 value={preset.tags.join(', ')}
@@ -153,17 +140,17 @@ export function ChatCompletionPresetEditor({
                     tags: e.target.value.split(',').map((t) => t.trim()).filter(Boolean),
                   })
                 }
-                placeholder="tag1, tag2, ..."
+                placeholder={t.presets.presetEditor.placeholders.tags}
               />
             </div>
           </div>
           <div>
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">{t.presets.presetEditor.labels.description}</Label>
             <Textarea
               id="description"
               value={preset.description || ''}
               onChange={(e) => onChange({ ...preset, description: e.target.value })}
-              placeholder="Optional description..."
+              placeholder={t.presets.presetEditor.placeholders.description}
               className="h-20"
             />
           </div>
@@ -173,9 +160,11 @@ export function ChatCompletionPresetEditor({
       {/* Action buttons */}
       <div className="flex items-center justify-between border-b pb-4">
         <Button variant="outline" onClick={onCancel}>
-          Cancel
+          {t.presets.presetEditor.buttons.cancel}
         </Button>
-        <Button onClick={() => onSave(cleanupPresetForSave(preset))}>Save Preset</Button>
+        <Button onClick={() => onSave(cleanupPresetForSave(preset))}>
+          {t.presets.presetEditor.buttons.savePreset}
+        </Button>
       </div>
 
       {/* Tabs */}
@@ -222,9 +211,9 @@ export function ChatCompletionPresetEditor({
         {activeTab === 'advanced' && (
           <div className="space-y-6">
             <Card className="p-4">
-              <h3 className="text-lg font-semibold mb-4">Provider Settings</h3>
+              <h3 className="text-lg font-semibold mb-4">{t.presets.presetEditor.sections.providerSettings}</h3>
               <p className="text-sm text-zinc-500 mb-4">
-                Settings specific to different API providers
+                {t.presets.presetEditor.sections.providerSettingsDescription}
               </p>
               <div className="space-y-3">
                 <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
@@ -235,8 +224,8 @@ export function ChatCompletionPresetEditor({
                     className="w-4 h-4 rounded"
                   />
                   <div>
-                    <span className="text-sm font-medium">Use Claude System Prompt</span>
-                    <p className="text-xs text-zinc-500">Merge system messages into a separate system instruction field (Claude)</p>
+                    <span className="text-sm font-medium">{t.presets.presetEditor.checkboxes.claudeUseSysprompt}</span>
+                    <p className="text-xs text-zinc-500">{t.presets.presetEditor.checkboxes.claudeUseSyspromptDesc}</p>
                   </div>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
@@ -247,8 +236,8 @@ export function ChatCompletionPresetEditor({
                     className="w-4 h-4 rounded"
                   />
                   <div>
-                    <span className="text-sm font-medium">Use MakerSuite System Prompt</span>
-                    <p className="text-xs text-zinc-500">Merge system messages into a separate system instruction field (Gemini)</p>
+                    <span className="text-sm font-medium">{t.presets.presetEditor.checkboxes.makersuiteUseSysprompt}</span>
+                    <p className="text-xs text-zinc-500">{t.presets.presetEditor.checkboxes.makersuiteUseSyspromptDesc}</p>
                   </div>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
@@ -259,20 +248,20 @@ export function ChatCompletionPresetEditor({
                     className="w-4 h-4 rounded"
                   />
                   <div>
-                    <span className="text-sm font-medium">Squash System Messages</span>
-                    <p className="text-xs text-zinc-500">Combine consecutive System messages into a single message (deprecated)</p>
+                    <span className="text-sm font-medium">{t.presets.presetEditor.checkboxes.squashSystemMessages}</span>
+                    <p className="text-xs text-zinc-500">{t.presets.presetEditor.checkboxes.squashSystemMessagesDesc}</p>
                   </div>
                 </label>
               </div>
               <p className="text-xs text-zinc-500 mt-3">
-                Note: Streaming is controlled by the JanitorAI request, not preset settings.
+                {t.presets.presetEditor.note}
               </p>
             </Card>
 
             <Card className="p-4">
-              <h3 className="text-lg font-semibold mb-4">Reasoning Settings</h3>
+              <h3 className="text-lg font-semibold mb-4">{t.presets.presetEditor.sections.reasoningSettings}</h3>
               <p className="text-sm text-zinc-500 mb-4">
-                Settings for models that support reasoning/thinking modes
+                {t.presets.presetEditor.sections.reasoningSettingsDescription}
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -282,14 +271,14 @@ export function ChatCompletionPresetEditor({
                     value={preset.advancedSettings.reasoningEffort}
                     onChange={(e) => handleAdvancedSettingsChange('reasoningEffort', e.target.value)}
                   >
-                    {REASONING_EFFORT_OPTIONS.map((option) => (
+                    {t.presets.presetEditor.reasoningEffortOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
                     ))}
                   </Select>
                   <p className="text-xs text-zinc-500 mt-1">
-                    {REASONING_EFFORT_OPTIONS.find((o) => o.value === preset.advancedSettings.reasoningEffort)?.description}
+                    {t.presets.presetEditor.reasoningEffortOptions.find((o) => o.value === preset.advancedSettings.reasoningEffort)?.description}
                   </p>
                 </div>
                 <div className="flex items-center">
@@ -301,8 +290,8 @@ export function ChatCompletionPresetEditor({
                       className="w-4 h-4 rounded"
                     />
                     <div>
-                      <span className="text-sm font-medium">Show Thoughts</span>
-                      <p className="text-xs text-zinc-500">Display model reasoning in responses</p>
+                      <span className="text-sm font-medium">{t.presets.presetEditor.checkboxes.showThoughts}</span>
+                      <p className="text-xs text-zinc-500">{t.presets.presetEditor.checkboxes.showThoughtsDesc}</p>
                     </div>
                   </label>
                 </div>
@@ -311,7 +300,7 @@ export function ChatCompletionPresetEditor({
 
 
             <Card className="p-4">
-              <h3 className="text-lg font-semibold mb-4">Advanced Features</h3>
+              <h3 className="text-lg font-semibold mb-4">{t.presets.presetEditor.sections.advancedFeatures}</h3>
               <div className="grid grid-cols-2 gap-4">
                 <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
                   <input
@@ -321,8 +310,8 @@ export function ChatCompletionPresetEditor({
                     className="w-4 h-4 rounded"
                   />
                   <div>
-                    <span className="text-sm font-medium">Enable Function Calling</span>
-                    <p className="text-xs text-zinc-500">Allow model to call functions/tools</p>
+                    <span className="text-sm font-medium">{t.presets.presetEditor.checkboxes.enableFunctionCalling}</span>
+                    <p className="text-xs text-zinc-500">{t.presets.presetEditor.checkboxes.enableFunctionCallingDesc}</p>
                   </div>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
@@ -333,8 +322,8 @@ export function ChatCompletionPresetEditor({
                     className="w-4 h-4 rounded"
                   />
                   <div>
-                    <span className="text-sm font-medium">Enable Web Search</span>
-                    <p className="text-xs text-zinc-500">Enrich prompts with search results</p>
+                    <span className="text-sm font-medium">{t.presets.presetEditor.checkboxes.enableWebSearch}</span>
+                    <p className="text-xs text-zinc-500">{t.presets.presetEditor.checkboxes.enableWebSearchDesc}</p>
                   </div>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
@@ -345,8 +334,8 @@ export function ChatCompletionPresetEditor({
                     className="w-4 h-4 rounded"
                   />
                   <div>
-                    <span className="text-sm font-medium">Wrap in Quotes</span>
-                    <p className="text-xs text-zinc-500">Wrap user messages in hidden quotation marks (deprecated)</p>
+                    <span className="text-sm font-medium">{t.presets.presetEditor.checkboxes.wrapInQuotes}</span>
+                    <p className="text-xs text-zinc-500">{t.presets.presetEditor.checkboxes.wrapInQuotesDesc}</p>
                   </div>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
@@ -357,17 +346,17 @@ export function ChatCompletionPresetEditor({
                     className="w-4 h-4 rounded"
                   />
                   <div>
-                    <span className="text-sm font-medium">Unlock Max Context</span>
-                    <p className="text-xs text-zinc-500">Allow higher context limits</p>
+                    <span className="text-sm font-medium">{t.presets.presetEditor.checkboxes.maxContextUnlocked}</span>
+                    <p className="text-xs text-zinc-500">{t.presets.presetEditor.checkboxes.maxContextUnlockedDesc}</p>
                   </div>
                 </label>
               </div>
             </Card>
 
             <Card className="p-4">
-              <h3 className="text-lg font-semibold mb-4">Start Reply With</h3>
+              <h3 className="text-lg font-semibold mb-4">{t.presets.presetEditor.sections.startReplyWith}</h3>
               <p className="text-sm text-zinc-500 mb-4">
-                Prepend text to the beginning of every AI response. Useful for forcing a specific format or style.
+                {t.presets.presetEditor.sections.startReplyWithDescription}
               </p>
               <div className="space-y-4">
                 <label className="flex items-center gap-3 cursor-pointer">
@@ -380,10 +369,10 @@ export function ChatCompletionPresetEditor({
                     })}
                     className="w-4 h-4 rounded"
                   />
-                  <span className="text-sm font-medium">Enable Start Reply With</span>
+                  <span className="text-sm font-medium">{t.presets.presetEditor.checkboxes.enableStartReplyWith}</span>
                 </label>
                 <div className={preset.advancedSettings.startReplyWith?.enabled ? '' : 'opacity-50'}>
-                  <Label htmlFor="startReplyContent">Content to prepend</Label>
+                  <Label htmlFor="startReplyContent">{t.presets.presetEditor.checkboxes.startReplyContent}</Label>
                   <Textarea
                     id="startReplyContent"
                     value={preset.advancedSettings.startReplyWith?.content ?? ''}
@@ -394,7 +383,7 @@ export function ChatCompletionPresetEditor({
                     })}
                     disabled={!preset.advancedSettings.startReplyWith?.enabled}
                     className="h-20 font-mono text-sm"
-                    placeholder="Text to prepend to AI responses..."
+                    placeholder={t.presets.presetEditor.checkboxes.startReplyContentPlaceholder}
                   />
                 </div>
               </div>

@@ -355,6 +355,44 @@ export default function SettingsPage() {
     // If successful, the page will reload automatically
   };
 
+  // Reformat database structure (migrate from old to new format)
+  const handleReformatDatabase = async () => {
+    if (!firebaseConfigured) return;
+
+    if (!confirm('⚠️ WARNING: This will reformat your database structure from old subcollections to new single-document format.\n\nThis operation migrates data and cannot be undone.\n\nOnly use this if you know what you are doing!\n\nContinue?')) {
+      return;
+    }
+
+    setSyncFeedback(null);
+
+    try {
+      const response = await fetch('/api/storage/reformat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setSyncFeedback({
+          type: 'success',
+          message: `Database reformatted successfully! Migrated ${result.migrated} items.`
+        });
+        setTimeout(() => setSyncFeedback(null), -5000);
+      } else {
+        const error = await response.text();
+        setSyncFeedback({
+          type: 'error',
+          message: `Failed to reformat database: ${error}`
+        });
+      }
+    } catch (error) {
+      setSyncFeedback({
+        type: 'error',
+        message: `Failed to reformat database: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+    }
+  };
+
 
 
   if (!settings) {
@@ -481,6 +519,26 @@ export default function SettingsPage() {
                   {t.settings.pullFromCloud}
                 </Button>
               </div>
+              
+              {/* Database Migration Button */}
+              <div className="space-y-2 border-t pt-4 mt-4">
+                <h5 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Database Optimization</h5>
+                <p className="text-xs text-zinc-500">
+                  Migrate from old subcollection format to new optimized format for better performance
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={handleReformatDatabase}
+                  disabled={syncing}
+                  className="bg-yellow-50 text-yellow-800 hover:bg-yellow-100 dark:bg-yellow-900/20 dark:text-yellow-300"
+                >
+                  ⚠️ Reformat Database Structure
+                </Button>
+                <p className="text-xs text-red-500">
+                  ⚠️ Warning: Only use this if you know what it does!
+                </p>
+              </div>
+              
               {syncFeedback && (
                 <p className={`text-sm ${
                   syncFeedback.type === 'success' ? 'text-green-600' : 'text-red-600'

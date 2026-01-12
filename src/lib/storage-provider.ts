@@ -223,6 +223,16 @@ export class StorageManager {
     return this.provider === this.firebaseProvider ? 'firebase' : 'local';
   }
 
+  // Get the current provider instance
+  getProvider(): StorageProvider | null {
+    return this.provider;
+  }
+
+  // Get the Firebase provider if available
+  getFirebaseProvider(): FirebaseProvider | null {
+    return this.provider === this.firebaseProvider ? this.firebaseProvider : null;
+  }
+
   // Force use of a specific provider (useful for testing)
   forceProvider(type: 'firebase' | 'local'): void {
     this.provider = type === 'firebase' ? this.firebaseProvider : this.localProvider;

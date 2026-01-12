@@ -263,13 +263,38 @@ export class OpenAICompatibleProvider extends ChatProvider {
 
   async testConnection(): Promise<{ success: boolean; message: string }> {
     try {
-      const response = await fetch(this.buildUrl('/models'), {
-        method: 'GET',
+      // Send a simple test message to validate the API key works for chat completions
+      const testRequest: ProviderRequest = {
+        messages: [
+          {
+            role: 'user',
+            content: 'Hi',
+          },
+        ],
+        model: this.config.model,
+        parameters: {
+          temperature: -1, // Use -1 to indicate no temperature override
+          topP: -1,
+          maxTokens: 10, // Limit tokens for quick test
+          presencePenalty: -1,
+          frequencyPenalty: -1,
+        },
+      };
+
+      const response = await fetch(this.buildUrl('/chat/completions'), {
+        method: 'POST',
         headers: this.getNonStreamHeaders(),
+        body: JSON.stringify(this.buildOpenAIRequest(testRequest, false)),
       });
 
       if (response.ok) {
-        return { success: true, message: 'Connection successful' };
+        const data = await response.json();
+        // Check if we got a valid response with choices
+        if (data.choices && Array.isArray(data.choices) && data.choices.length > 0) {
+          return { success: true, message: 'Connection successful - API key validated' };
+        } else {
+          return { success: false, message: 'Connection failed: Invalid response format' };
+        }
       } else {
         const errorText = await response.text();
         return { success: false, message: `Connection failed: ${response.status} - ${errorText}` };

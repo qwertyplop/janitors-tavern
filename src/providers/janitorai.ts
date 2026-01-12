@@ -120,14 +120,32 @@ export class JanitorAIProvider extends ChatProvider {
         ...(janitorApiKey && { 'X-JanitorAI-API-Key': janitorApiKey })
       };
       
-      // Test by attempting to list models or a simple health check
-      const response = await fetch(this.buildUrl('/models'), {
-        method: 'GET',
+      // Send a simple test message to validate the API key works for chat completions
+      const requestBody = {
+        model: this.config.model,
+        messages: [
+          {
+            role: 'user',
+            content: 'Hi',
+          },
+        ],
+        max_tokens: 10, // Limit tokens for quick test
+      };
+      
+      const response = await fetch(this.buildUrl('/chat/completions'), {
+        method: 'POST',
         headers,
+        body: JSON.stringify(requestBody),
       });
 
       if (response.ok) {
-        return { success: true, message: 'JanitorAI connection successful' };
+        const data = await response.json();
+        // Check if we got a valid response with choices
+        if (data.choices && Array.isArray(data.choices) && data.choices.length > 0) {
+          return { success: true, message: 'JanitorAI connection successful - API key validated' };
+        } else {
+          return { success: false, message: 'Connection failed: Invalid response format' };
+        }
       } else {
         const errorText = await response.text();
         return { success: false, message: `Connection failed: ${response.status} - ${errorText}` };

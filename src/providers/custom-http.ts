@@ -84,17 +84,46 @@ export class CustomHTTPProvider extends ChatProvider {
 
   async testConnection(): Promise<{ success: boolean; message: string }> {
     try {
-      // For custom HTTP, we just try to reach the base URL
-      const response = await fetch(this.config.baseUrl, {
-        method: 'HEAD',
+      // First try to send a test message to validate the API key works for chat completions
+      const requestBody = {
+        model: this.config.model,
+        messages: [
+          {
+            role: 'user',
+            content: 'Hi',
+          },
+        ],
+        max_tokens: 10, // Limit tokens for quick test
+      };
+      
+      const response = await fetch(this.buildUrl('/chat/completions'), {
+        method: 'POST',
         headers: this.getHeaders(),
+        body: JSON.stringify(requestBody),
       });
 
-      // Even a 404 means the server is reachable
-      if (response.ok || response.status === 404 || response.status === 405) {
-        return { success: true, message: 'Server is reachable' };
+      if (response.ok) {
+        const data = await response.json();
+        // Check if we got a valid response
+        if (data.choices || data.message || data.content || data.response) {
+          return { success: true, message: 'Connection successful - API key validated' };
+        } else {
+          return { success: false, message: 'Connection failed: Invalid response format' };
+        }
       } else {
-        return { success: false, message: `Server returned: ${response.status}` };
+        // If POST fails, fall back to checking if server is reachable
+        const headResponse = await fetch(this.config.baseUrl, {
+          method: 'HEAD',
+          headers: this.getHeaders(),
+        });
+
+        // Even a 404 means the server is reachable
+        if (headResponse.ok || headResponse.status === 404 || headResponse.status === 405) {
+          return { success: true, message: 'Server is reachable (chat endpoint may require different configuration)' };
+        } else {
+          const errorText = await response.text();
+          return { success: false, message: `Connection failed: ${response.status} - ${errorText}` };
+        }
       }
     } catch (error) {
       return {

@@ -389,17 +389,17 @@ export function PromptBlockList({
         </div>
       )}
 
-      {/* Inactive Blocks Section */}
-      {inactiveBlocks.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
-            <div className="w-3 h-3 rounded-full bg-gray-400"></div>
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Inactive Blocks ({inactiveBlocks.length})
-            </h4>
-            <p className="text-xs text-gray-500">These blocks are available but not included in the prompt order</p>
-          </div>
-          
+      {/* Inactive Blocks Section - Always shown */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+          <div className="w-3 h-3 rounded-full bg-gray-400"></div>
+          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Inactive Blocks ({inactiveBlocks.length})
+          </h4>
+          <p className="text-xs text-gray-500">These blocks are available but not included in the prompt order</p>
+        </div>
+        
+        {inactiveBlocks.length > 0 ? (
           <div className="space-y-2">
             {inactiveBlocks.map(({ block, enabled }, index) => {
               const actualIndex = activeBlocks.length + index;
@@ -482,8 +482,37 @@ export function PromptBlockList({
               );
             })}
           </div>
-        </div>
-      )}
+        ) : (
+          <Card
+            className={cn(
+              "p-6 text-center bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700",
+              dropIndex === activeBlocks.length && "ring-2 ring-blue-500"
+            )}
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (draggedIndex !== null && dropIndex !== activeBlocks.length) {
+                setDropIndex(activeBlocks.length);
+              }
+            }}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              <p className="text-sm text-gray-500">No inactive blocks. Drag active blocks here or add new blocks.</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsAddingNew(true)}
+                className="mt-2"
+              >
+                Add New Block
+              </Button>
+            </div>
+          </Card>
+        )}
+      </div>
 
       {allBlocks.length === 0 && (
         <Card className="p-8 text-center text-gray-500">

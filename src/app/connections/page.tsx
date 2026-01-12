@@ -292,7 +292,7 @@ export default function ConnectionsPage() {
   const handleSaveModel = () => {
     if (!selectedConnection || !selectedModel) return;
     updateConnectionPreset(selectedConnection.id, { model: selectedModel });
-    setConnections(getConnectionPresets());
+    setConnections(getSortedConnections());
   };
 
   const handleCreate = () => {

@@ -175,8 +175,8 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
       const existingData = docSnap.exists() ? docSnap.data() : {};
       await setDoc(docRef, { ...existingData, [key]: data }, { merge: true });
       
-      // Optionally delete old subcollection to save space
-      await this.deleteSubcollection(key);
+      // DO NOT delete old subcollection - keep as backup
+      // await this.deleteSubcollection(key);
     } catch (error) {
       // Migration failed, but that's OK - we'll try again next time
     }
@@ -204,7 +204,7 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
       return { migrated: 0, errors: 0 };
     }
 
-    const results = { migrated: 0, errors: -1 };
+    const results = { migrated: 0, errors: 0 };
     
     try {
       // Migrate all array data from subcollections to single document
@@ -214,7 +214,7 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
         try {
           const oldData = await this.getFromSubcollection(key);
           if (Array.isArray(oldData) && oldData.length > 0) {
-            // Save to new format
+            // Save to new format WITHOUT deleting old subcollections
             const docPath = this.getFirestoreDocPath(key);
             const docRef = doc(db!, docPath);
             const docSnap = await getDoc(docRef);
@@ -222,8 +222,8 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
             const existingData = docSnap.exists() ? docSnap.data() : {};
             await setDoc(docRef, { ...existingData, [key]: oldData }, { merge: true });
             
-            // Delete old subcollection
-            await this.deleteSubcollection(key);
+            // DO NOT delete old subcollection - keep it as backup
+            // await this.deleteSubcollection(key);
             
             results.migrated += oldData.length;
           }
@@ -344,10 +344,10 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
         // Update only the specific field
         await setDoc(docRef, { ...existingData, [key]: value }, { merge: true });
         
-        // Also delete old subcollection format if it exists (cleanup)
-        if (key === 'connections' || key === 'presets' || key === 'regexScripts') {
-          await this.deleteSubcollection(key);
-        }
+        // DO NOT delete old subcollection format - keep as backup
+        // if (key === 'connections' || key === 'presets' || key === 'regexScripts') {
+        //   await this.deleteSubcollection(key);
+        // }
         
         // Update cache
         this.setCached<K>(key, value);

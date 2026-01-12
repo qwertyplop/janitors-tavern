@@ -9,7 +9,7 @@ import {
   AppSettings,
   STORAGE_KEYS,
 } from '@/types';
-import { FirebaseStorageProvider } from './firebase-storage-provider';
+import { OptimizedFirebaseStorageProvider } from './firebase-storage-provider-optimized';
 
 // ============================================
 // Types
@@ -128,11 +128,11 @@ export class LocalStorageProvider implements StorageProvider {
 // ============================================
 
 export class FirebaseProvider implements StorageProvider {
-  private firebaseProvider: FirebaseStorageProvider;
+  private firebaseProvider: OptimizedFirebaseStorageProvider;
 
   constructor() {
-    // Initialize Firebase provider directly
-    this.firebaseProvider = new FirebaseStorageProvider();
+    // Initialize optimized Firebase provider
+    this.firebaseProvider = new OptimizedFirebaseStorageProvider();
   }
 
   async get<K extends StorageKey>(key: K): Promise<StorageData[K]> {

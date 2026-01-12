@@ -130,7 +130,8 @@ export class OptimizedFirebaseStorageProvider implements StorageProvider {
 
   private getFirestoreDocPath(key: StorageKey): string {
     // Store all data in a single document per user for better performance
-    return `users/${this.userId}/storage`;
+    // Firestore requires even number of segments, so add 'data' as the final segment
+    return `users/${this.userId}/storage/data`;
   }
 
   private getFirestoreCollectionPath(key: StorageKey): string {

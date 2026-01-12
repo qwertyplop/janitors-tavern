@@ -125,7 +125,17 @@ export default function ConnectionsPage() {
     setConnections(sortedPresets);
 
     if (sortedPresets.length > 0) {
-      setSelectedId(sortedPresets[0].id);
+      // Get settings to check for default connection
+      const settings = getSettings();
+      const defaultConnectionId = settings.defaultConnectionId;
+      
+      // Try to find the default connection in the sorted presets
+      const defaultConnection = defaultConnectionId
+        ? sortedPresets.find(c => c.id === defaultConnectionId)
+        : null;
+      
+      // Set selectedId to default connection if it exists, otherwise first connection
+      setSelectedId(defaultConnection?.id || sortedPresets[0].id);
     }
   }, []);
 

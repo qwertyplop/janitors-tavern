@@ -429,6 +429,9 @@ export interface AppSettings {
   strictPlaceholderMessage?: string; // Placeholder message for strict post-processing mode
   showAdvancedOptions: boolean;
   logging: LoggingSettings;
+  // Presets sorting preferences
+  presetsSortMethod?: 'alphabetical' | 'blockCount';
+  presetsSortDirection?: 'asc' | 'desc';
 }
 
 // ============================================

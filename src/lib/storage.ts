@@ -6,6 +6,7 @@ import {
   ChatCompletionPreset,
   STChatCompletionPreset,
   STPromptBlock,
+  STPromptOrder,
   STSamplerSettings,
   Profile,
   Extension,
@@ -636,6 +637,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     logRequests: false, // Default disabled as requested
     logResponses: false, // Default disabled as requested
   },
+  presetsSortMethod: 'alphabetical',
+  presetsSortDirection: 'asc',
 };
 
 export function getSettings(): AppSettings {
@@ -1030,7 +1033,20 @@ export function togglePresetRegexScriptDisabled(
 
 // Create a default/empty chat completion preset
 export function createDefaultChatCompletionPreset(): Omit<ChatCompletionPreset, 'id' | 'createdAt' | 'updatedAt'> {
-  const sampler = { ...DEFAULT_SAMPLER_SETTINGS };
+  // Use SillyTavern Default.json as reference
+  const sampler: STSamplerSettings = {
+    temperature: 1,
+    top_p: 1,
+    top_k: 0,
+    min_p: 0,
+    frequency_penalty: 0,
+    presence_penalty: 0,
+    repetition_penalty: 1,
+    openai_max_context: 4095,
+    openai_max_tokens: 300,
+    seed: -1,
+    n: 1,
+  };
   
   // Determine which sampler settings are enabled based on whether they differ from defaults
   // Max tokens is always enabled by default regardless of value
@@ -1046,31 +1062,192 @@ export function createDefaultChatCompletionPreset(): Omit<ChatCompletionPreset, 
     seed: sampler.seed !== DEFAULT_SAMPLER_SETTINGS.seed,
   };
 
+  // Create SillyTavern default prompt blocks
+  const promptBlocks: STPromptBlock[] = [
+    {
+      identifier: 'main',
+      name: 'Main Prompt',
+      role: 'system',
+      content: "Write {{char}}'s next reply in a fictional chat between {{char}} and {{user}}.",
+      system_prompt: true,
+      marker: false,
+      injection_position: 0,
+      injection_depth: -1,
+    },
+    {
+      identifier: 'nsfw',
+      name: 'Auxiliary Prompt',
+      role: 'system',
+      content: '',
+      system_prompt: true,
+      marker: false,
+      injection_position: 0,
+      injection_depth: -1,
+    },
+    {
+      identifier: 'dialogueExamples',
+      name: 'Chat Examples',
+      role: 'system',
+      content: '',
+      system_prompt: true,
+      marker: true,
+      injection_position: 0,
+      injection_depth: -1,
+    },
+    {
+      identifier: 'jailbreak',
+      name: 'Post-History Instructions',
+      role: 'system',
+      content: '',
+      system_prompt: true,
+      marker: false,
+      injection_position: 0,
+      injection_depth: -1,
+    },
+    {
+      identifier: 'chatHistory',
+      name: 'Chat History',
+      role: 'system',
+      content: '',
+      system_prompt: true,
+      marker: true,
+      injection_position: 0,
+      injection_depth: -1,
+    },
+    {
+      identifier: 'worldInfoAfter',
+      name: 'World Info (after)',
+      role: 'system',
+      content: '',
+      system_prompt: true,
+      marker: true,
+      injection_position: 0,
+      injection_depth: -1,
+    },
+    {
+      identifier: 'worldInfoBefore',
+      name: 'World Info (before)',
+      role: 'system',
+      content: '',
+      system_prompt: true,
+      marker: true,
+      injection_position: 0,
+      injection_depth: -1,
+    },
+    {
+      identifier: 'enhanceDefinitions',
+      name: 'Enhance Definitions',
+      role: 'system',
+      content: "If you have more knowledge of {{char}}, add to the character's lore and personality to enhance them but keep the Character Sheet's definitions absolute.",
+      system_prompt: true,
+      marker: false,
+      injection_position: 0,
+      injection_depth: -1,
+    },
+    {
+      identifier: 'charDescription',
+      name: 'Char Description',
+      role: 'system',
+      content: '',
+      system_prompt: true,
+      marker: true,
+      injection_position: 0,
+      injection_depth: -1,
+    },
+    {
+      identifier: 'charPersonality',
+      name: 'Char Personality',
+      role: 'system',
+      content: '',
+      system_prompt: true,
+      marker: true,
+      injection_position: 0,
+      injection_depth: -1,
+    },
+    {
+      identifier: 'scenario',
+      name: 'Scenario',
+      role: 'system',
+      content: '',
+      system_prompt: true,
+      marker: true,
+      injection_position: 0,
+      injection_depth: -1,
+    },
+    {
+      identifier: 'personaDescription',
+      name: 'Persona Description',
+      role: 'system',
+      content: '',
+      system_prompt: true,
+      marker: true,
+      injection_position: 0,
+      injection_depth: -1,
+    },
+  ];
+
+  // Create SillyTavern default prompt order (character_id 100000 for regular characters, 100001 for persona)
+  const promptOrder: STPromptOrder[] = [
+    {
+      character_id: 100000,
+      order: [
+        { identifier: 'main', enabled: true },
+        { identifier: 'worldInfoBefore', enabled: true },
+        { identifier: 'charDescription', enabled: true },
+        { identifier: 'charPersonality', enabled: true },
+        { identifier: 'scenario', enabled: true },
+        { identifier: 'enhanceDefinitions', enabled: false },
+        { identifier: 'nsfw', enabled: true },
+        { identifier: 'worldInfoAfter', enabled: true },
+        { identifier: 'dialogueExamples', enabled: true },
+        { identifier: 'chatHistory', enabled: true },
+        { identifier: 'jailbreak', enabled: true },
+      ],
+    },
+    {
+      character_id: 100001,
+      order: [
+        { identifier: 'main', enabled: true },
+        { identifier: 'worldInfoBefore', enabled: true },
+        { identifier: 'personaDescription', enabled: true },
+        { identifier: 'charDescription', enabled: true },
+        { identifier: 'charPersonality', enabled: true },
+        { identifier: 'scenario', enabled: true },
+        { identifier: 'enhanceDefinitions', enabled: false },
+        { identifier: 'nsfw', enabled: true },
+        { identifier: 'worldInfoAfter', enabled: true },
+        { identifier: 'dialogueExamples', enabled: true },
+        { identifier: 'chatHistory', enabled: true },
+        { identifier: 'jailbreak', enabled: true },
+      ],
+    },
+  ];
+
   return {
     name: 'New Preset',
     description: '',
     tags: [],
     sampler,
     samplerEnabled,
-    promptBlocks: [],
-    promptOrder: [],
+    promptBlocks,
+    promptOrder,
     formatStrings: {
       worldInfo: '{0}',
       scenario: '{{scenario}}',
-      personality: "[{{char}}'s personality: {{personality}}]",
+      personality: '{{personality}}',
     },
     assistantPrefill: '',
     assistantImpersonation: '',
     providerSettings: {
       claudeUseSysprompt: false,
       makersuiteUseSysprompt: true,
-      squashSystemMessages: true,
-      streamOpenai: false,
+      squashSystemMessages: false,
+      streamOpenai: true,
     },
     mediaSettings: {
-      imageInlining: true,
+      imageInlining: false,
       inlineImageQuality: 'high',
-      videoInlining: true,
+      videoInlining: false,
     },
     advancedSettings: {
       functionCalling: false,
@@ -1082,7 +1259,7 @@ export function createDefaultChatCompletionPreset(): Omit<ChatCompletionPreset, 
       namesBehavior: 0,
       sendIfEmpty: '',
       biasPresetSelected: 'Default (none)',
-      maxContextUnlocked: true,
+      maxContextUnlocked: false,
       startReplyWith: {
         enabled: false,
         content: '',

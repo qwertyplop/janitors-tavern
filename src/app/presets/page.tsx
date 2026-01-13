@@ -15,6 +15,7 @@ import {
   importSTPreset,
   createDefaultChatCompletionPreset,
   getSettings,
+  updateSettings,
 } from '@/lib/storage';
 import { ChatCompletionPreset, STChatCompletionPreset } from '@/types';
 import { readJsonFile, formatDate } from '@/lib/utils';
@@ -31,36 +32,45 @@ export default function PresetsPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { t } = useI18n();
-
-  useEffect(() => {
-    const loaded = getChatCompletionPresets();
-    setPresets(loaded);
-    
-    // Get default preset from settings
-    const settings = getSettings();
-    const defaultPresetId = settings.defaultChatCompletionPresetId;
-    
-    // Determine which preset to select
-    let presetToSelect = null;
-    if (defaultPresetId) {
-      const defaultPreset = loaded.find(p => p.id === defaultPresetId);
-      if (defaultPreset) {
-        presetToSelect = defaultPresetId;
-      }
+useEffect(() => {
+  const loaded = getChatCompletionPresets();
+  setPresets(loaded);
+  
+  // Get settings
+  const settings = getSettings();
+  
+  // Load sorting preferences from settings
+  if (settings.presetsSortMethod) {
+    setSortMethod(settings.presetsSortMethod);
+  }
+  if (settings.presetsSortDirection) {
+    setSortDirection(settings.presetsSortDirection);
+  }
+  
+  // Get default preset from settings
+  const defaultPresetId = settings.defaultChatCompletionPresetId;
+  
+  // Determine which preset to select
+  let presetToSelect = null;
+  if (defaultPresetId) {
+    const defaultPreset = loaded.find(p => p.id === defaultPresetId);
+    if (defaultPreset) {
+      presetToSelect = defaultPresetId;
     }
-    
-    // If no default preset or default not found, select first preset
-    if (!presetToSelect && loaded.length > 0) {
-      presetToSelect = loaded[0].id;
-    }
-    
-    // Only set selectedId if it's not already set (to avoid overriding user selection)
-    if (presetToSelect && !selectedId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSelectedId(presetToSelect);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }
+  
+  // If no default preset or default not found, select first preset
+  if (!presetToSelect && loaded.length > 0) {
+    presetToSelect = loaded[0].id;
+  }
+  
+  // Only set selectedId if it's not already set (to avoid overriding user selection)
+  if (presetToSelect && !selectedId) {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedId(presetToSelect);
+  }
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
 
   const selectedPreset = presets.find(p => p.id === selectedId);
   const settings = getSettings();
@@ -92,6 +102,19 @@ export default function PresetsPage() {
   // Select preset for viewing (does not set as default)
   const selectPreset = (id: string) => {
     setSelectedId(id);
+  };
+
+  // Update sort method and save to settings
+  const handleSortMethodChange = (method: 'alphabetical' | 'blockCount') => {
+    setSortMethod(method);
+    updateSettings({ presetsSortMethod: method });
+  };
+
+  // Update sort direction and save to settings
+  const handleSortDirectionChange = () => {
+    const newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    setSortDirection(newDirection);
+    updateSettings({ presetsSortDirection: newDirection });
   };
 
   const handleCreate = () => {
@@ -279,7 +302,7 @@ export default function PresetsPage() {
               <div className="flex items-center gap-2">
                 <Select
                   value={sortMethod}
-                  onChange={(e) => setSortMethod(e.target.value as 'alphabetical' | 'blockCount')}
+                  onChange={(e) => handleSortMethodChange(e.target.value as 'alphabetical' | 'blockCount')}
                   className="h-8 text-xs w-32"
                 >
                   <option value="alphabetical">{t.presets.sortAlphabetical}</option>
@@ -289,7 +312,7 @@ export default function PresetsPage() {
                   variant="outline"
                   size="sm"
                   className="h-8 w-8 p-0"
-                  onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                  onClick={handleSortDirectionChange}
                   title={sortDirection === 'asc' ? t.presets.ascending : t.presets.descending}
                 >
                   {sortDirection === 'asc' ? '↑' : '↓'}

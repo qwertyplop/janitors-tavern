@@ -14,7 +14,9 @@ export type PromptPostProcessingMode =
   | 'semi-strict-tools' // Same as semi-strict but with tools
   | 'strict'         // Merge roles, one system msg, user message first (no tools)
   | 'strict-tools'   // Same as strict but with tools
-  | 'single-user';   // Merge all messages from all roles into a single user message
+  | 'single-user'    // Merge all messages from all roles into a single user message
+  | 'anthropic'      // Anthropic-specific: extract first system message, keep consecutive assistant/user messages
+  | 'anthropic-merge-consecutives'; // Anthropic with merging of consecutive same-role messages
 
 export interface ApiKey {
   id: string;

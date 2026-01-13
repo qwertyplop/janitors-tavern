@@ -91,6 +91,8 @@ export const ru: TranslationKeys = {
     postProcessingStrict: 'Строгий',
     postProcessingStrictTools: 'Строгий (с инструментами)',
     postProcessingSingleUser: 'Одно сообщение пользователя',
+    postProcessingAnthropic: 'Anthropic',
+    postProcessingAnthropicMergeConsecutives: 'Anthropic (объединять последовательные)',
     postProcessingTips: {
       'none': 'Без изменений. Сообщения отправляются как есть после обработки пресетом.',
       'merge': 'Объединяет последовательные сообщения с одинаковой ролью в одно.',
@@ -100,6 +102,8 @@ export const ru: TranslationKeys = {
       'strict': 'Строгий паттерн user→assistant→user. Первое сообщение становится system.',
       'strict-tools': 'Строгий паттерн user→assistant→user (первое сообщение становится system), но сохраняет вызовы инструментов в отдельных сообщениях.',
       'single-user': 'Объединяет все сообщения в одно сообщение пользователя. Для простых промптов.',
+      'anthropic': 'Извлекает первое системное сообщение для Anthropic API. Последовательные сообщения assistant/user сохраняются.',
+      'anthropic-merge-consecutives': 'Извлекает первое системное сообщение для Anthropic API. Объединяет последовательные сообщения с одинаковой ролью.',
     } as Record<string, string>,
     confirmChoice: 'Подтвердить выбор',
     choiceConfirmed: 'Выбор подтверждён!',

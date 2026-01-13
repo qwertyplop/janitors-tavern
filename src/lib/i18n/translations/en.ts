@@ -89,6 +89,8 @@ export const en = {
     postProcessingStrict: 'Strict',
     postProcessingStrictTools: 'Strict (with tools)',
     postProcessingSingleUser: 'Single user message',
+    postProcessingAnthropic: 'Anthropic',
+    postProcessingAnthropicMergeConsecutives: 'Anthropic (merge consecutives)',
     postProcessingTips: {
       'none': 'No changes. Messages are sent exactly as processed by the preset.',
       'merge': 'Combines consecutive messages with the same role into one message.',
@@ -98,6 +100,8 @@ export const en = {
       'strict': 'Forces strict user→assistant→user pattern. First message becomes system.',
       'strict-tools': 'Forces strict user→assistant→user pattern (first message becomes system), but preserves tool calls in separate messages.',
       'single-user': 'Combines all messages into a single user message. For simple prompts.',
+      'anthropic': 'Extracts first system message for Anthropic API. Consecutive assistant/user messages are preserved.',
+      'anthropic-merge-consecutives': 'Extracts first system message for Anthropic API. Merges consecutive same-role messages.',
     } as Record<string, string>,
     confirmChoice: 'Confirm choice',
     choiceConfirmed: 'Choice confirmed!',

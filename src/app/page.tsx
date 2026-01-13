@@ -177,16 +177,38 @@ export default function DashboardPage() {
     pendingPresetId !== settings?.defaultChatCompletionPresetId ||
     pendingPostProcessing !== settings?.defaultPostProcessing;
 
-  const postProcessingOptions: { value: PromptPostProcessingMode; label: string }[] = [
-    { value: 'none', label: t.dashboard.postProcessingNone },
-    { value: 'merge', label: t.dashboard.postProcessingMerge },
-    { value: 'merge-tools', label: t.dashboard.postProcessingMergeTools },
-    { value: 'semi-strict', label: t.dashboard.postProcessingSemiStrict },
-    { value: 'semi-strict-tools', label: t.dashboard.postProcessingSemiStrictTools },
-    { value: 'strict', label: t.dashboard.postProcessingStrict },
-    { value: 'strict-tools', label: t.dashboard.postProcessingStrictTools },
-    { value: 'single-user', label: t.dashboard.postProcessingSingleUser },
-  ];
+  // Check if the selected connection is Anthropic
+  const isAnthropicConnection = pendingConnection?.baseUrl?.includes('anthropic.com') || false;
+  
+  // Determine available post-processing options based on provider
+  const postProcessingOptions: { value: PromptPostProcessingMode; label: string }[] = isAnthropicConnection
+    ? [
+        { value: 'anthropic', label: t.dashboard.postProcessingAnthropic },
+        { value: 'anthropic-merge-consecutives', label: t.dashboard.postProcessingAnthropicMergeConsecutives },
+      ]
+    : [
+        { value: 'none', label: t.dashboard.postProcessingNone },
+        { value: 'merge', label: t.dashboard.postProcessingMerge },
+        { value: 'merge-tools', label: t.dashboard.postProcessingMergeTools },
+        { value: 'semi-strict', label: t.dashboard.postProcessingSemiStrict },
+        { value: 'semi-strict-tools', label: t.dashboard.postProcessingSemiStrictTools },
+        { value: 'strict', label: t.dashboard.postProcessingStrict },
+        { value: 'strict-tools', label: t.dashboard.postProcessingStrictTools },
+        { value: 'single-user', label: t.dashboard.postProcessingSingleUser },
+        { value: 'anthropic', label: t.dashboard.postProcessingAnthropic },
+        { value: 'anthropic-merge-consecutives', label: t.dashboard.postProcessingAnthropicMergeConsecutives },
+      ];
+  
+  // If Anthropic connection is selected but current post-processing mode is not Anthropic,
+  // automatically switch to 'anthropic' mode
+  useEffect(() => {
+    if (isAnthropicConnection &&
+        pendingPostProcessing !== 'anthropic' &&
+        pendingPostProcessing !== 'anthropic-merge-consecutives') {
+      console.log('[Dashboard] Anthropic connection detected, switching post-processing to "anthropic"');
+      setPendingPostProcessing('anthropic');
+    }
+  }, [isAnthropicConnection, pendingPostProcessing]);
 
   return (
     <div className="space-y-6">

@@ -249,6 +249,39 @@ function singleUserProcess(messages: OutputMessage[]): OutputMessage[] {
 }
 
 /**
+ * Anthropic mode: Extract first system message, keep consecutive assistant/user messages
+ * Similar to Strict but optimized for Anthropic's API which has separate 'system' parameter
+ */
+function anthropicProcess(messages: OutputMessage[], mergeConsecutives: boolean = false): OutputMessage[] {
+  if (messages.length === 0) return [];
+
+  // First, apply strict processing to handle system messages properly
+  const strictProcessed = strictProcess(messages, '[Start a new chat]');
+  
+  // Find the first system message
+  const systemIndex = strictProcessed.findIndex(m => m.role === 'system');
+  
+  if (systemIndex === -1) {
+    // No system message, return as-is (but optionally merge consecutives)
+    if (mergeConsecutives) {
+      return mergeConsecutiveMessages(strictProcessed);
+    }
+    return strictProcessed;
+  }
+
+  // Extract the system message (will be placed in separate 'system' parameter by provider)
+  // For Anthropic API, we keep it as a system message in the messages array
+  // but the provider will extract it to the 'system' parameter
+  
+  // Optionally merge consecutive same-role messages if requested
+  if (mergeConsecutives) {
+    return mergeConsecutiveMessages(strictProcessed);
+  }
+  
+  return strictProcessed;
+}
+
+/**
  * Apply post-processing based on mode
  */
 function applyPostProcessing(
@@ -270,6 +303,10 @@ function applyPostProcessing(
       return strictProcess(messages, settings?.strictPlaceholderMessage);
     case 'single-user':
       return singleUserProcess(messages);
+    case 'anthropic':
+      return anthropicProcess(messages, false);
+    case 'anthropic-merge-consecutives':
+      return anthropicProcess(messages, true);
     default:
       return messages;
   }

@@ -563,6 +563,7 @@ export const en = {
     savedScripts: 'Saved Scripts',
     noScriptsYet: 'No scripts yet',
     scriptName: 'Script Name',
+    scriptNamePlural: 'script(s)',
     pattern: 'Pattern',
     replacement: 'Replacement',
     flags: 'Flags',

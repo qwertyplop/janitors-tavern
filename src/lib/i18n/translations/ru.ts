@@ -565,6 +565,7 @@ export const ru: TranslationKeys = {
     savedScripts: 'Сохранённые скрипты',
     noScriptsYet: 'Скриптов пока нет',
     scriptName: 'Название скрипта',
+    scriptNamePlural: 'скрипт(ов)',
     pattern: 'Паттерн',
     replacement: 'Замена',
     flags: 'Флаги',

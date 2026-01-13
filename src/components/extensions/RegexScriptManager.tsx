@@ -622,7 +622,7 @@ export default function RegexScriptManager() {
                         </svg>
                         <span className="font-medium text-sm">{group.presetName}</span>
                         <Badge variant="outline" className="text-xs">
-                          {group.scripts.length} {t.regexScripts.scriptName.toLowerCase()}{group.scripts.length !== 1 ? 's' : ''}
+                          {group.scripts.length} {t.regexScripts.scriptNamePlural}
                         </Badge>
                       </div>
                     </div>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { AppSettings, LoggingSettings } from '@/types';
+import { storageManager } from '@/lib/storage-provider';
 
 const DEFAULT_SERVER_SETTINGS: AppSettings = {
   theme: 'system',
@@ -15,23 +16,25 @@ const DEFAULT_SERVER_SETTINGS: AppSettings = {
   },
 };
 
-// For server settings storage, we'll use a simple in-memory approach
-// This is a simplified approach for Edge Runtime compatibility
-let serverSettingsCache: AppSettings | null = null;
-
 async function readServerSettings(): Promise<AppSettings> {
-  // In Edge Runtime, we'll use a simple in-memory cache
-  if (serverSettingsCache) {
-    return serverSettingsCache;
+  try {
+    // Read from storage manager (which uses Firebase if available, otherwise localStorage)
+    const settings = await storageManager.get('settings');
+    return settings;
+  } catch (error) {
+    console.error('Failed to read server settings from storage:', error);
+    return DEFAULT_SERVER_SETTINGS;
   }
-
-  // Return default settings if no cache exists
-  return DEFAULT_SERVER_SETTINGS;
 }
 
 async function writeServerSettings(settings: AppSettings): Promise<void> {
-  // Update the in-memory cache
-  serverSettingsCache = settings;
+  try {
+    // Write to storage manager
+    await storageManager.set('settings', settings);
+  } catch (error) {
+    console.error('Failed to write server settings to storage:', error);
+    throw error;
+  }
 }
 
 // GET /api/settings - Get server settings

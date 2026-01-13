@@ -125,11 +125,38 @@ export default function SettingsPage() {
       const response = await fetch('/api/settings');
       if (response.ok) {
         const serverSettings = await response.json();
-        // Merge server settings with local settings, preferring server settings for logging and strictPlaceholderMessage
+        
+        // Helper function to check if server logging settings are default values
+        const isDefaultLoggingSettings = (logging: LoggingSettings): boolean => {
+          const defaultLogging: LoggingSettings = {
+            enabled: true,
+            logRequests: false,
+            logResponses: false,
+            logRawRequestBody: false,
+          };
+          return (
+            logging.logRequests === defaultLogging.logRequests &&
+            logging.logResponses === defaultLogging.logResponses &&
+            logging.logRawRequestBody === defaultLogging.logRawRequestBody
+          );
+        };
+
+        // Determine which logging settings to use:
+        // If server has non-default logging settings, use them
+        // Otherwise, keep local logging settings
+        const useServerLogging = serverSettings.logging && !isDefaultLoggingSettings(serverSettings.logging);
+        
+        // For strictPlaceholderMessage, use server value if it exists and is not default
+        const defaultStrictPlaceholder = '[Start a new chat]';
+        const useServerStrictPlaceholder = serverSettings.strictPlaceholderMessage &&
+          serverSettings.strictPlaceholderMessage !== defaultStrictPlaceholder;
+
         setSettings({
           ...localSettings,
-          logging: serverSettings.logging || localSettings.logging,
-          strictPlaceholderMessage: serverSettings.strictPlaceholderMessage || localSettings.strictPlaceholderMessage,
+          logging: useServerLogging ? serverSettings.logging : localSettings.logging,
+          strictPlaceholderMessage: useServerStrictPlaceholder
+            ? serverSettings.strictPlaceholderMessage
+            : localSettings.strictPlaceholderMessage,
         });
       }
     } catch (error) {

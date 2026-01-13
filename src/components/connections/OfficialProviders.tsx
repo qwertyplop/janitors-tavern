@@ -19,7 +19,7 @@ interface OfficialProvidersProps {
 }
 
 export default function OfficialProviders({
-  maxHeight = '300px',
+  maxHeight = '200px',
   showAddedStatus = true,
   onProviderAdded,
 }: OfficialProvidersProps) {

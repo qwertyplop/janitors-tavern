@@ -648,7 +648,7 @@ export default function ConnectionsPage() {
             <Card className="p-6">
               <CardHeader className="p-0 pb-4">
                 <CardTitle className="text-lg">{selectedConnection.name}</CardTitle>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">
                   {selectedConnection.baseUrl}
                 </p>
               </CardHeader>

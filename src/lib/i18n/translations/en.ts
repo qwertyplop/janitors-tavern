@@ -29,6 +29,7 @@ export const en = {
     manage: 'Manage',
     key: 'Key',
     value: 'Value',
+    unsavedChanges: 'Unsaved changes',
   },
 
   // Navigation
@@ -577,6 +578,26 @@ export const en = {
     testInput: 'Test Input',
     testOutput: 'Test Output',
     testHint: 'Enter text to test the regex pattern and replacement.',
+    placementLabels: {
+      1: 'Before sending to Model',
+      2: 'After receiving from Model',
+    },
+    none: 'None',
+    unknown: 'Unknown',
+    executionOrder: 'Execution Order',
+    executionOrderDesc: 'Scripts are executed from top to bottom, with the top script executing first. Drag and drop scripts to reorder them. This order applies to all placement contexts (before sending, after receiving).',
+    standaloneScripts: 'Standalone Scripts',
+    noStandaloneScripts: 'No standalone regex scripts yet. Create your first one!',
+    presetSpecificScripts: 'Preset-Specific Scripts',
+    scriptNamePlaceholder: 'My Regex Script',
+    scriptNameDesc: 'A descriptive name for this script, used in the script list.',
+    patternPlaceholder: '/pattern/flags',
+    patternDesc: 'Regular expression pattern to search for. Use /pattern/flags format (e.g., /hello/gi) or plain text. If using flags, ensure they are valid JavaScript regex flags (g, i, m, s, u, y).',
+    replacementPlaceholder: 'Replacement text',
+    replacementDesc: 'Text to replace matches with. Can include capture groups like $1, $2, etc. Use {{match}} to insert the trimmed matched text. Leave empty to delete matches.',
+    trimStrings: 'Trim Strings (one per line)',
+    trimStringsPlaceholder: 'le\napp',
+    trimStringsDesc: 'List of strings to trim from matches before replacement. One per line. For example, "le" and "app" will trim "le" and "app" from the matched text.',
   },
 
   // Provider Settings

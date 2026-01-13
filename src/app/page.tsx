@@ -297,15 +297,15 @@ export default function DashboardPage() {
               {pendingConnection && (() => {
                 const selectedKey = getSelectedApiKey(pendingConnection.id);
                 return (
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {pendingConnection.baseUrl}
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-2 flex-wrap">
+                    <span className="truncate min-w-0">{pendingConnection.baseUrl}</span>
                     {selectedKey && (
-                      <span className="ml-2 text-zinc-400 dark:text-zinc-500">
+                      <span className="shrink-0 text-zinc-400 dark:text-zinc-500">
                         • Key: {selectedKey.name}
                       </span>
                     )}
                     {pendingConnectionId !== settings?.defaultConnectionId && (
-                      <span className="ml-2 text-amber-600 dark:text-amber-400">(pending)</span>
+                      <span className="shrink-0 text-amber-600 dark:text-amber-400">(pending)</span>
                     )}
                   </p>
                 );

@@ -337,6 +337,174 @@ function transformAnthropicToOpenAI(anthropicResponse: any): any {
 }
 
 /**
+ * Transform Anthropic streaming SSE event to OpenAI streaming chunk
+ */
+function transformAnthropicStreamEvent(eventData: any): string | null {
+  // eventData is the parsed JSON from the 'data' field of an SSE event
+  if (!eventData || typeof eventData !== 'object') {
+    return null;
+  }
+
+  const eventType = eventData.type;
+  if (!eventType) {
+    return null;
+  }
+
+  // Handle different Anthropic event types
+  switch (eventType) {
+    case 'message_start': {
+      // Initial message with empty content
+      const openAIChunk = {
+        id: `chatcmpl-${Date.now()}`,
+        object: 'chat.completion.chunk',
+        created: Math.floor(Date.now() / 1000),
+        model: eventData.message?.model || 'claude-unknown',
+        choices: [
+          {
+            index: 0,
+            delta: {
+              role: 'assistant',
+            },
+            finish_reason: null,
+          },
+        ],
+      };
+      return `data: ${JSON.stringify(openAIChunk)}\n\n`;
+    }
+    case 'content_block_delta': {
+      const delta = eventData.delta;
+      if (!delta) {
+        return null;
+      }
+      // Only text deltas are supported for now
+      if (delta.type === 'text_delta' && delta.text) {
+        const openAIChunk = {
+          id: `chatcmpl-${Date.now()}`,
+          object: 'chat.completion.chunk',
+          created: Math.floor(Date.now() / 1000),
+          model: 'claude-unknown',
+          choices: [
+            {
+              index: 0,
+              delta: {
+                content: delta.text,
+              },
+              finish_reason: null,
+            },
+          ],
+        };
+        return `data: ${JSON.stringify(openAIChunk)}\n\n`;
+      }
+      // Ignore other delta types (input_json_delta, thinking_delta)
+      return null;
+    }
+    case 'message_delta': {
+      // Contains stop_reason and usage
+      const delta = eventData.delta;
+      const stopReason = delta?.stop_reason;
+      let finishReason = 'stop';
+      if (stopReason) {
+        switch (stopReason) {
+          case 'end_turn':
+          case 'stop_sequence':
+            finishReason = 'stop';
+            break;
+          case 'max_tokens':
+            finishReason = 'length';
+            break;
+          default:
+            finishReason = stopReason;
+        }
+      }
+      const openAIChunk = {
+        id: `chatcmpl-${Date.now()}`,
+        object: 'chat.completion.chunk',
+        created: Math.floor(Date.now() / 1000),
+        model: 'claude-unknown',
+        choices: [
+          {
+            index: 0,
+            delta: {},
+            finish_reason: finishReason,
+          },
+        ],
+        usage: eventData.usage ? {
+          prompt_tokens: eventData.usage.input_tokens || 0,
+          completion_tokens: eventData.usage.output_tokens || 0,
+          total_tokens: (eventData.usage.input_tokens || 0) + (eventData.usage.output_tokens || 0),
+        } : undefined,
+      };
+      return `data: ${JSON.stringify(openAIChunk)}\n\n`;
+    }
+    case 'message_stop': {
+      // Final stop event - send a final chunk with empty delta and finish_reason stop
+      const openAIChunk = {
+        id: `chatcmpl-${Date.now()}`,
+        object: 'chat.completion.chunk',
+        created: Math.floor(Date.now() / 1000),
+        model: 'claude-unknown',
+        choices: [
+          {
+            index: 0,
+            delta: {},
+            finish_reason: 'stop',
+          },
+        ],
+      };
+      return `data: ${JSON.stringify(openAIChunk)}\n\n`;
+    }
+    default:
+      // Ignore other events (content_block_start, content_block_stop, etc.)
+      return null;
+  }
+}
+
+/**
+ * Parse SSE chunk text and transform Anthropic events to OpenAI format
+ */
+function transformAnthropicStreamChunk(chunkText: string): string {
+  // Split by double newlines to separate SSE events
+  const lines = chunkText.split('\n');
+  let result = '';
+  let currentEvent: { event?: string; data?: string } = {};
+  
+  for (const line of lines) {
+    if (line.startsWith('event:')) {
+      currentEvent.event = line.substring(6).trim();
+    } else if (line.startsWith('data:')) {
+      currentEvent.data = line.substring(5).trim();
+    } else if (line === '') {
+      // End of event
+      if (currentEvent.data) {
+        try {
+          const data = JSON.parse(currentEvent.data);
+          const transformed = transformAnthropicStreamEvent(data);
+          if (transformed) {
+            result += transformed;
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+      currentEvent = {};
+    }
+  }
+  // Handle leftover event if any
+  if (currentEvent.data) {
+    try {
+      const data = JSON.parse(currentEvent.data);
+      const transformed = transformAnthropicStreamEvent(data);
+      if (transformed) {
+        result += transformed;
+      }
+    } catch (e) {
+      // Ignore
+    }
+  }
+  return result;
+}
+
+/**
  * Check if a response is in Anthropic format
  */
 function isAnthropicResponse(response: any): boolean {
@@ -738,11 +906,23 @@ export async function POST(request: NextRequest) {
       const encoder = new TextEncoder();
       const decoder = new TextDecoder();
       
+      // Determine if provider is Anthropic (for streaming transformation)
+      const isAnthropicProvider = connectionPreset.baseUrl.toLowerCase().includes('anthropic.com');
+      
       const streamingTransform = new TransformStream({
         transform(chunk, controller) {
-          const text = decoder.decode(chunk, { stream: true });
+          let text = decoder.decode(chunk, { stream: true });
           
-          // Try to extract token counts from this chunk
+          // Transform Anthropic SSE events to OpenAI format if needed
+          if (isAnthropicProvider && text.includes('event:') && text.includes('data:')) {
+            text = transformAnthropicStreamChunk(text);
+            // If transformation resulted in empty text (no relevant events), skip
+            if (text === '') {
+              return;
+            }
+          }
+          
+          // Try to extract token counts from this chunk (now in OpenAI format)
           const tokenCounts = extractTokenCountsFromStreamChunk(text);
           if (tokenCounts) {
             outputTokens = tokenCounts.completionTokens;
@@ -751,7 +931,7 @@ export async function POST(request: NextRequest) {
           }
           
           // Process startReplyWith and regex scripts if enabled
-          let processedChunk = chunk;
+          let processedChunk = encoder.encode(text);
           if (startReplyContent) {
             // Check if this chunk contains content delta
             if (text.includes('"delta"') && text.includes('"content"')) {

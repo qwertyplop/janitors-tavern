@@ -157,7 +157,7 @@ export class OpenAICompatibleProvider extends ChatProvider {
     return openaiRequest;
   }
 
-  private buildAnthropicRequest(request: ProviderRequest): any {
+  private buildAnthropicRequest(request: ProviderRequest, stream: boolean = false): any {
     // Extract system message from messages array
     const messages = [...request.messages];
     let systemMessage = '';
@@ -178,6 +178,11 @@ export class OpenAICompatibleProvider extends ChatProvider {
       })),
       max_tokens: request.parameters.maxTokens || 4096,
     };
+
+    // Add streaming parameter if requested
+    if (stream) {
+      anthropicRequest.stream = true;
+    }
 
     // Add system parameter if we found a system message
     if (systemMessage) {
@@ -202,8 +207,8 @@ export class OpenAICompatibleProvider extends ChatProvider {
     const startTime = Date.now();
     
     if (this.isAnthropicProvider()) {
-      // Use Anthropic API format
-      const anthropicRequest = this.buildAnthropicRequest(request);
+      // Use Anthropic API format (non-streaming)
+      const anthropicRequest = this.buildAnthropicRequest(request, false);
       
       try {
         const response = await fetch(this.buildUrl('/v1/messages'), {
@@ -308,8 +313,8 @@ export class OpenAICompatibleProvider extends ChatProvider {
     request: ProviderRequest
   ): Promise<{ body: string; status: number; headers: Headers; error?: string }> {
     if (this.isAnthropicProvider()) {
-      // Use Anthropic API format
-      const anthropicRequest = this.buildAnthropicRequest(request);
+      // Use Anthropic API format (non-streaming)
+      const anthropicRequest = this.buildAnthropicRequest(request, false);
       
       try {
         const response = await fetch(this.buildUrl('/v1/messages'), {
@@ -369,9 +374,8 @@ export class OpenAICompatibleProvider extends ChatProvider {
     request: ProviderRequest
   ): Promise<{ stream: ReadableStream<Uint8Array>; error?: string; status: number; headers: Headers }> {
     if (this.isAnthropicProvider()) {
-      // Anthropic doesn't support streaming with /v1/messages endpoint in the same way
-      // For now, we'll use non-streaming for Anthropic
-      const anthropicRequest = this.buildAnthropicRequest(request);
+      // Anthropic supports streaming with stream: true parameter
+      const anthropicRequest = this.buildAnthropicRequest(request, true);
       
       try {
         const response = await fetch(this.buildUrl('/v1/messages'), {

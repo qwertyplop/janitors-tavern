@@ -645,4 +645,20 @@ export const ru: TranslationKeys = {
     squashSystemMessages: 'Объединять последовательные системные сообщения',
     squashHint: 'Объединяет последовательные системные сообщения в одно для экономии токенов и избежания проблем с провайдером.',
   },
+
+  // Official Providers
+  officialProviders: {
+    title: 'Официальные провайдеры',
+    subtitle: 'Преднастроенные прямые провайдеры моделей',
+    addProvider: 'Добавить провайдер',
+    addProviderTooltip: 'Добавить этого провайдера в подключения',
+    providerAdded: 'Провайдер добавлен в подключения',
+    apiKeyRequired: 'Требуется API-ключ',
+    supportsModels: 'Поддерживает запрос моделей',
+    noModelsSupport: 'Не поддерживает запрос моделей',
+    viewDocs: 'Посмотреть документацию',
+    visitWebsite: 'Посетить сайт',
+    added: 'Добавлен',
+    notAdded: 'Не добавлен',
+  },
 };

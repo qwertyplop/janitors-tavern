@@ -28,6 +28,7 @@ import { ConnectionPreset } from '@/types';
 import { downloadJson, readJsonFile } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/components/providers/I18nProvider';
+import OfficialProviders from '@/components/connections/OfficialProviders';
 
 type ConnectionStatus = 'none' | 'connecting' | 'bypassed' | 'valid';
 
@@ -567,6 +568,16 @@ export default function ConnectionsPage() {
               </Card>
             )}
           </div>
+
+          {/* Official Providers Section */}
+          <OfficialProviders
+            maxHeight="300px"
+            showAddedStatus={true}
+            onProviderAdded={() => {
+              // Refresh connections when a provider is added
+              setConnections(getSortedConnections());
+            }}
+          />
 
           <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">
             {t.connections.savedConnections}

@@ -643,6 +643,22 @@ export const en = {
     squashSystemMessages: 'Squash consecutive system messages',
     squashHint: 'Merge consecutive system messages into one to save tokens and avoid provider issues.',
   },
+
+  // Official Providers
+  officialProviders: {
+    title: 'Official Providers',
+    subtitle: 'Pre-configured direct model providers',
+    addProvider: 'Add Provider',
+    addProviderTooltip: 'Add this provider to your connections',
+    providerAdded: 'Provider added to connections',
+    apiKeyRequired: 'API key required',
+    supportsModels: 'Supports models endpoint',
+    noModelsSupport: 'No models endpoint support',
+    viewDocs: 'View Docs',
+    visitWebsite: 'Visit Website',
+    added: 'Added',
+    notAdded: 'Not Added',
+  },
 };
 
 export type TranslationKeys = typeof en;

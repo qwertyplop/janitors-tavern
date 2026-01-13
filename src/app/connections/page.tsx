@@ -571,7 +571,7 @@ export default function ConnectionsPage() {
 
           {/* Official Providers Section */}
           <OfficialProviders
-            maxHeight="300px"
+            maxHeight="200px"
             showAddedStatus={true}
             onProviderAdded={() => {
               // Refresh connections when a provider is added

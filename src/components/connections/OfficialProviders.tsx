@@ -50,6 +50,11 @@ export default function OfficialProviders({
     setAddedProviders(added);
   };
 
+  // Refresh added providers on mount
+  useEffect(() => {
+    refreshAddedProviders();
+  }, []);
+
   // Listen for storage changes to update added status
   useEffect(() => {
     const handleStorageChange = (event: StorageEvent) => {
@@ -65,7 +70,7 @@ export default function OfficialProviders({
     // Set up polling to check for changes within same tab
     const pollInterval = setInterval(() => {
       refreshAddedProviders();
-    }, 2000); // Check every 2 seconds
+    }, 1000); // Check every 1 second (more responsive)
     
     return () => {
       window.removeEventListener('storage', handleStorageChange);
@@ -82,17 +87,28 @@ export default function OfficialProviders({
     const provider = OFFICIAL_PROVIDERS.find(p => p.id === providerId);
     if (!provider) return;
 
-    // Create connection preset from provider
-    const connectionPreset = officialProviderToConnectionPreset(provider);
-    
-    // Add to connections
-    addConnectionPreset(connectionPreset);
-    
-    // Update added state
-    setAddedProviders(prev => new Set([...prev, providerId]));
-    
-    // Notify parent
-    onProviderAdded?.(providerId);
+    try {
+      // Create connection preset from provider
+      const connectionPreset = officialProviderToConnectionPreset(provider);
+      
+      // Add to connections
+      addConnectionPreset(connectionPreset);
+      
+      // Force immediate refresh from storage to ensure consistency
+      setTimeout(() => {
+        refreshAddedProviders();
+      }, 100);
+      
+      // Update added state immediately for better UX
+      setAddedProviders(prev => new Set([...prev, providerId]));
+      
+      // Notify parent
+      onProviderAdded?.(providerId);
+    } catch (error) {
+      console.error('Failed to add provider:', error);
+      // Refresh anyway to ensure state is correct
+      refreshAddedProviders();
+    }
   };
 
   const handleOpenDocs = (url?: string) => {

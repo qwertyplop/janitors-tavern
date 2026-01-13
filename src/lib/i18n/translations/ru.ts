@@ -650,7 +650,7 @@ export const ru: TranslationKeys = {
   officialProviders: {
     title: 'Официальные провайдеры',
     subtitle: 'Преднастроенные прямые провайдеры моделей',
-    addProvider: 'Добавить провайдер',
+    addProvider: 'Добавить',
     addProviderTooltip: 'Добавить этого провайдера в подключения',
     providerAdded: 'Провайдер добавлен в подключения',
     apiKeyRequired: 'Требуется API-ключ',

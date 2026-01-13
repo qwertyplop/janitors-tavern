@@ -648,7 +648,7 @@ export const en = {
   officialProviders: {
     title: 'Official Providers',
     subtitle: 'Pre-configured direct model providers',
-    addProvider: 'Add Provider',
+    addProvider: 'Add',
     addProviderTooltip: 'Add this provider to your connections',
     providerAdded: 'Provider added to connections',
     apiKeyRequired: 'API key required',

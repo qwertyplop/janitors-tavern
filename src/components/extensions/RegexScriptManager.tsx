@@ -549,7 +549,7 @@ export default function RegexScriptManager() {
                           </svg>
                           <h4 className="font-medium text-sm truncate">{script.scriptName}</h4>
                           {script.disabled && (
-                            <Badge variant="secondary" className="text-xs">Disabled</Badge>
+                            <Badge variant="secondary" className="text-xs">{t.common.disabled}</Badge>
                           )}
                         </div>
                         <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
@@ -622,7 +622,7 @@ export default function RegexScriptManager() {
                         </svg>
                         <span className="font-medium text-sm">{group.presetName}</span>
                         <Badge variant="outline" className="text-xs">
-                          {group.scripts.length} script{group.scripts.length !== 1 ? 's' : ''}
+                          {group.scripts.length} {t.regexScripts.scriptName.toLowerCase()}{group.scripts.length !== 1 ? 's' : ''}
                         </Badge>
                       </div>
                     </div>
@@ -648,7 +648,7 @@ export default function RegexScriptManager() {
                                 <div className="flex items-center gap-2">
                                   <h4 className="font-medium text-sm truncate">{script.scriptName}</h4>
                                   {script.disabled && (
-                                    <Badge variant="secondary" className="text-xs">Disabled</Badge>
+                                    <Badge variant="secondary" className="text-xs">{t.common.disabled}</Badge>
                                   )}
                                 </div>
                                 <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
@@ -710,34 +710,34 @@ export default function RegexScriptManager() {
                 <CardTitle className="text-lg">{selectedScript.scriptName}</CardTitle>
                 <div className="flex items-center gap-2 mt-1">
                   {selectedScript.disabled && (
-                    <Badge variant="destructive">Disabled</Badge>
+                    <Badge variant="destructive">{t.common.disabled}</Badge>
                   )}
                   {selectedScript.markdownOnly && (
-                    <Badge variant="outline">Markdown Only</Badge>
+                    <Badge variant="outline">{t.regexScripts.markdownOnly}</Badge>
                   )}
                 </div>
               </CardHeader>
               <CardContent className="p-0 space-y-6">
                 <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Find Regex</h4>
+                  <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{t.regexScripts.findRegex}</h4>
                   <pre className="text-sm bg-zinc-100 dark:bg-zinc-800 p-3 rounded overflow-x-auto">
                     {selectedScript.findRegex}
                   </pre>
                 </div>
                 <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Replace With</h4>
+                  <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{t.regexScripts.replaceWith}</h4>
                   <pre className="text-sm bg-zinc-100 dark:bg-zinc-800 p-3 rounded overflow-x-auto">
                     {selectedScript.replaceString}
                   </pre>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Affects</h4>
+                    <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{t.regexScripts.affects}</h4>
                     <p className="text-sm">{formatPlacement(selectedScript.placement)}</p>
                   </div>
                   <div>
-                    <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Trim Strings</h4>
-                    <p className="text-sm">{selectedScript.trimStrings.length > 0 ? selectedScript.trimStrings.join(', ') : 'None'}</p>
+                    <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{t.regexScripts.trimStrings}</h4>
+                    <p className="text-sm">{selectedScript.trimStrings.length > 0 ? selectedScript.trimStrings.join(', ') : t.regexScripts.none}</p>
                   </div>
                 </div>
                 <div className="pt-4 border-t flex gap-2">
@@ -746,7 +746,7 @@ export default function RegexScriptManager() {
                     size="sm"
                     onClick={() => handleEdit(selectedScript)}
                   >
-                    Edit
+                    {t.regexScripts.editButton}
                   </Button>
                 </div>
               </CardContent>
@@ -758,47 +758,46 @@ export default function RegexScriptManager() {
                   <div>
                     <CardTitle className="text-lg">{selectedPresetScript.scriptName}</CardTitle>
                     <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                      From preset: {selectedPresetGroup?.presetName}
+                      {t.regexScripts.fromPreset} {selectedPresetGroup?.presetName}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     {selectedPresetScript.disabled && (
-                      <Badge variant="destructive">Disabled</Badge>
+                      <Badge variant="destructive">{t.common.disabled}</Badge>
                     )}
                     {selectedPresetScript.markdownOnly && (
-                      <Badge variant="outline">Markdown Only</Badge>
+                      <Badge variant="outline">{t.regexScripts.markdownOnly}</Badge>
                     )}
-                    <Badge variant="outline">Preset Script</Badge>
+                    <Badge variant="outline">{t.regexScripts.presetSpecificScripts}</Badge>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="p-0 space-y-6">
                 <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Find Regex</h4>
+                  <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{t.regexScripts.findRegex}</h4>
                   <pre className="text-sm bg-zinc-100 dark:bg-zinc-800 p-3 rounded overflow-x-auto">
                     {selectedPresetScript.findRegex}
                   </pre>
                 </div>
                 <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Replace With</h4>
+                  <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{t.regexScripts.replaceWith}</h4>
                   <pre className="text-sm bg-zinc-100 dark:bg-zinc-800 p-3 rounded overflow-x-auto">
                     {selectedPresetScript.replaceString}
                   </pre>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Affects</h4>
+                    <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{t.regexScripts.affects}</h4>
                     <p className="text-sm">{formatPlacement(selectedPresetScript.placement)}</p>
                   </div>
                   <div>
-                    <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Trim Strings</h4>
-                    <p className="text-sm">{selectedPresetScript.trimStrings.length > 0 ? selectedPresetScript.trimStrings.join(', ') : 'None'}</p>
+                    <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{t.regexScripts.trimStrings}</h4>
+                    <p className="text-sm">{selectedPresetScript.trimStrings.length > 0 ? selectedPresetScript.trimStrings.join(', ') : t.regexScripts.none}</p>
                   </div>
                 </div>
                 <div className="pt-4 border-t">
                   <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-2">
-                    This regex script is part of the "{selectedPresetGroup?.presetName}" preset.
-                    It will be automatically loaded when that preset is selected.
+                    {t.regexScripts.presetScriptDescription.replace('{presetName}', selectedPresetGroup?.presetName || '')}
                   </p>
                 </div>
               </CardContent>
@@ -808,11 +807,11 @@ export default function RegexScriptManager() {
               <div className="text-center">
                 <p className="text-zinc-500 dark:text-zinc-400 mb-4">
                   {scripts.length === 0 && presetScriptGroups.length === 0
-                    ? 'Create your first regex script to get started'
-                    : 'Select a script from the list to view details'}
+                    ? t.regexScripts.noStandaloneScripts
+                    : t.regexScripts.selectScriptFromList}
                 </p>
                 {scripts.length === 0 && (
-                  <Button onClick={handleCreate}>New Script</Button>
+                  <Button onClick={handleCreate}>{t.regexScripts.newScriptButton}</Button>
                 )}
               </div>
             </Card>
@@ -827,11 +826,10 @@ export default function RegexScriptManager() {
             <DialogTitle>{editingId ? t.regexScripts.editScript : t.regexScripts.newScript}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-zinc-500 px-6 pt-2">
-            Regex scripts allow you to find and replace text in messages using regular expressions.
-            They can be applied to user input, AI output, or both, with optional depth and markdown filtering.
+            {t.regexScripts.regexScriptsDescription}
           </p>
           <p className="text-xs text-zinc-500 px-6">
-            Note: the “Run on Edit” option has been removed; scripts no longer execute automatically when editing messages.
+            {t.regexScripts.runOnEditNote}
           </p>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -890,22 +888,22 @@ export default function RegexScriptManager() {
                   variant="outline"
                   onClick={() => setShowTestMode(prev => !prev)}
                 >
-                  Test Mode
+                  {t.regexScripts.testMode}
                 </Button>
                 <p className="text-xs text-zinc-500">
-                  The Test Mode button appears between the Trim Strings field and the Affects checkboxes. Click “Test Mode” to preview the script’s effect on sample input; the Input textarea and read‑only Output area appear directly below the button when active.
+                  {t.regexScripts.testModeDescription}
                 </p>
                 {showTestMode && (
                   <div className="space-y-2">
-                    <Label htmlFor="testInput">Input</Label>
+                    <Label htmlFor="testInput">{t.regexScripts.input}</Label>
                     <textarea
                       id="testInput"
                       className="w-full min-h-[80px] border rounded-md p-2 text-sm"
                       value={testInput}
                       onChange={(e) => setTestInput(e.target.value)}
-                      placeholder="Enter test string..."
+                      placeholder={t.regexScripts.testInputPlaceholder}
                     />
-                    <Label htmlFor="testOutput">Output</Label>
+                    <Label htmlFor="testOutput">{t.regexScripts.output}</Label>
                     <pre
                       id="testOutput"
                       className="w-full min-h-[80px] border rounded-md p-2 text-sm bg-zinc-100 dark:bg-zinc-800 overflow-auto"
@@ -917,7 +915,7 @@ export default function RegexScriptManager() {
               </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="affects">Affects</Label>
+                <Label htmlFor="affects">{t.regexScripts.affects}</Label>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
                     <input
@@ -934,7 +932,7 @@ export default function RegexScriptManager() {
                         });
                       }}
                     />
-                    <Label htmlFor="affectsBefore">Before sending to Model</Label>
+                    <Label htmlFor="affectsBefore">{t.regexScripts.placementLabels[1]}</Label>
                   </div>
                   <div className="flex items-center gap-2">
                     <input
@@ -951,16 +949,15 @@ export default function RegexScriptManager() {
                         });
                       }}
                     />
-                    <Label htmlFor="affectsAfter">After receiving from Model</Label>
+                    <Label htmlFor="affectsAfter">{t.regexScripts.placementLabels[2]}</Label>
                   </div>
                 </div>
                 <p className="text-xs text-zinc-500">
-                  Where the script should be applied: 1 = user input, 2 = AI output.
-                  Select one or both options. Default is 2 (AI output).
+                  {t.regexScripts.affectsDescription}
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="roles">Roles</Label>
+                <Label htmlFor="roles">{t.regexScripts.roles}</Label>
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
                     <input
@@ -980,7 +977,7 @@ export default function RegexScriptManager() {
                         });
                       }}
                     />
-                    <Label htmlFor="roleAssistant">Assistant</Label>
+                    <Label htmlFor="roleAssistant">{t.presets.assistant}</Label>
                   </div>
                   <div className="flex items-center gap-2">
                     <input
@@ -1000,7 +997,7 @@ export default function RegexScriptManager() {
                         });
                       }}
                     />
-                    <Label htmlFor="roleUser">User</Label>
+                    <Label htmlFor="roleUser">{t.presets.user}</Label>
                   </div>
                   <div className="flex items-center gap-2">
                     <input
@@ -1020,34 +1017,33 @@ export default function RegexScriptManager() {
                         });
                       }}
                     />
-                    <Label htmlFor="roleSystem">System</Label>
+                    <Label htmlFor="roleSystem">{t.presets.system}</Label>
                   </div>
                 </div>
                 <p className="text-xs text-zinc-500">
-                  Which message roles to apply the regex to. Default: Assistant and User (System disabled).
+                  {t.regexScripts.rolesDescription}
                 </p>
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="substituteRegex">Substitute Macros</Label>
+              <Label htmlFor="substituteRegex">{t.regexScripts.substituteMacros}</Label>
               <select
                 id="substituteRegex"
                 className="w-full border rounded-md p-2 text-sm"
                 value={formSubstituteRegex}
                 onChange={(e) => setFormSubstituteRegex(parseInt(e.target.value) as 0 | 1 | 2)}
               >
-                <option value={0}>Don't substitute</option>
-                <option value={1}>Raw</option>
-                <option value={2}>Escaped</option>
+                <option value={0}>{t.regexScripts.dontSubstitute}</option>
+                <option value={1}>{t.regexScripts.raw}</option>
+                <option value={2}>{t.regexScripts.escaped}</option>
               </select>
               <p className="text-xs text-zinc-500">
-                Whether to substitute macros (e.g., {'{{char}}'}, {'{{user}}'}) in the find regex.
-                Raw = replace with macro values; Escaped = also escape regex special characters.
+                {t.regexScripts.substituteMacrosDescription}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="minDepth">Min Depth (optional)</Label>
+                <Label htmlFor="minDepth">{t.regexScripts.minDepthOptional}</Label>
                 <Input
                   id="minDepth"
                   type="number"
@@ -1056,12 +1052,11 @@ export default function RegexScriptManager() {
                   placeholder="0"
                 />
                 <p className="text-xs text-zinc-500">
-                  Minimum message depth (0 = last message) where the script will apply.
-                  Leave empty for no minimum.
+                  {t.regexScripts.minDepthDescription}
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="maxDepth">Max Depth (optional)</Label>
+                <Label htmlFor="maxDepth">{t.regexScripts.maxDepthOptional}</Label>
                 <Input
                   id="maxDepth"
                   type="number"
@@ -1070,8 +1065,7 @@ export default function RegexScriptManager() {
                   placeholder="5"
                 />
                 <p className="text-xs text-zinc-500">
-                  Maximum message depth (0 = last message) where the script will apply.
-                  Leave empty for no maximum.
+                  {t.regexScripts.maxDepthDescription}
                 </p>
               </div>
             </div>
@@ -1084,20 +1078,20 @@ export default function RegexScriptManager() {
                     checked={formMarkdownOnly}
                     onChange={(e) => setFormMarkdownOnly(e.target.checked)}
                   />
-                  <Label htmlFor="markdownOnly">Markdown Only</Label>
+                  <Label htmlFor="markdownOnly">{t.regexScripts.markdownOnly}</Label>
                 </div>
                 <p className="text-xs text-zinc-500">
-                  Only apply if the message contains markdown formatting.
+                  {t.regexScripts.markdownOnlyDescription}
                 </p>
               </div>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button onClick={handleSave} disabled={!formName || !formFindRegex}>
-              {editingId ? 'Save' : 'Create'}
+              {editingId ? t.regexScripts.saveButton : t.regexScripts.createButton}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1110,14 +1104,14 @@ export default function RegexScriptManager() {
             <DialogTitle>{t.regexScripts.deleteScript}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Are you sure you want to delete this script? This action cannot be undone.
+            {t.regexScripts.deleteScriptConfirmation}
           </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button variant="destructive" onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}>
-              Delete
+              {t.common.delete}
             </Button>
           </DialogFooter>
         </DialogContent>

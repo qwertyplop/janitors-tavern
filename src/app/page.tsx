@@ -298,10 +298,10 @@ export default function DashboardPage() {
                 const selectedKey = getSelectedApiKey(pendingConnection.id);
                 return (
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-2 flex-wrap">
-                    <span className="truncate min-w-0">{pendingConnection.baseUrl}</span>
+                    <span className="truncate min-w-0 overflow-hidden text-ellipsis break-all">{pendingConnection.baseUrl}</span>
                     {selectedKey && (
                       <span className="shrink-0 text-zinc-400 dark:text-zinc-500">
-                        • Key: {selectedKey.name}
+                        • {t.common.key}: {selectedKey.name}
                       </span>
                     )}
                     {pendingConnectionId !== settings?.defaultConnectionId && (

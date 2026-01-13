@@ -326,10 +326,20 @@ export async function POST(request: NextRequest) {
   // Helper function to check if logging is enabled
   const shouldLogRequest = () => settings.logging?.logRequests;
   const shouldLogResponse = () => settings.logging?.logResponses;
+  const shouldLogRawRequestBody = () => settings.logging?.logRawRequestBody;
   const shouldLogError = () => true; // Always log errors for debugging
 
   try {
-    const body: ProxyRequest = await request.json();
+    // Read raw request body for logging
+    const rawBodyText = await request.text();
+    
+    // Log raw request body if enabled
+    if (shouldLogRawRequestBody()) {
+      console.log(`[JT] [${requestId}] RAW REQUEST BODY:`, rawBodyText);
+    }
+    
+    // Parse the JSON body
+    const body: ProxyRequest = JSON.parse(rawBodyText);
 
     // Use provided presets or load defaults from storage
     let connectionPreset = body.connectionPreset;

@@ -412,6 +412,17 @@ export default function SettingsPage() {
                 <Label htmlFor="logResponses">{t.settings.logResponses}</Label>
               </div>
 
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="logRawRequestBody"
+                  checked={settings.logging.logRawRequestBody}
+                  onChange={(e) => handleLoggingChange('logRawRequestBody', e.target.checked)}
+                  className="h-4 w-4 rounded border-zinc-300"
+                />
+                <Label htmlFor="logRawRequestBody">{t.settings.logRawRequestBody}</Label>
+              </div>
+
             </>
           ) : (
             <p className="text-zinc-500">{t.settings.loadingServerSettings}</p>
@@ -508,6 +519,10 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-2">
                       <span className={`inline-block w-2 h-2 rounded-full ${settings.logging.logResponses ? 'bg-green-500' : 'bg-red-500'}`}></span>
                       <span>{t.settings.logResponsesStatus}: {settings.logging.logResponses ? t.common.enabled : t.common.disabled}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-block w-2 h-2 rounded-full ${settings.logging.logRawRequestBody ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                      <span>{t.settings.logRawRequestBodyStatus}: {settings.logging.logRawRequestBody ? t.common.enabled : t.common.disabled}</span>
                     </div>
                   </div>
                 </div>

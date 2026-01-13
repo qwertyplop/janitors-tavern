@@ -62,6 +62,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     enabled: true,
     logRequests: false,
     logResponses: false,
+    logRawRequestBody: false,
   },
 };
 

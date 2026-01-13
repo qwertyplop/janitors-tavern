@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSettings } from '@/lib/server-storage';
 
 interface ModelInfo {
   id: string;
@@ -11,7 +12,20 @@ interface ModelInfo {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Get settings for logging
+    const settings = await getServerSettings();
+    const shouldLogRawRequestBody = () => settings.logging?.logRawRequestBody;
+    
+    // Read raw request body for logging
+    const rawBodyText = await request.text();
+    
+    // Log raw request body if enabled
+    if (shouldLogRawRequestBody()) {
+      console.log('[Models Proxy] RAW REQUEST BODY:', rawBodyText);
+    }
+    
+    // Parse the JSON body
+    const body = JSON.parse(rawBodyText);
     const { baseUrl, apiKey } = body;
 
     if (!baseUrl) {

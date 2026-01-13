@@ -322,6 +322,7 @@ export const en = {
     enableLogging: 'Enable logging',
     logRequests: 'Log requests',
     logResponses: 'Log responses',
+    logRawRequestBody: 'Log raw request body',
     saveLoggingSettings: 'Save Logging Settings',
     settingsSaved: 'Settings saved!',
     loadingServerSettings: 'Loading server settings...',
@@ -329,6 +330,7 @@ export const en = {
     loggingStatus: 'Logging Status',
     logRequestsStatus: 'Log requests',
     logResponsesStatus: 'Log responses',
+    logRawRequestBodyStatus: 'Log raw request body',
     enabled: 'Enabled',
     disabled: 'Disabled',
     // Log Viewer

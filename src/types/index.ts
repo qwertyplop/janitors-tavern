@@ -415,6 +415,7 @@ export interface LoggingSettings {
   enabled: boolean;
   logRequests: boolean;
   logResponses: boolean;
+  logRawRequestBody: boolean;
 }
 
 export type Language = 'en' | 'ru';

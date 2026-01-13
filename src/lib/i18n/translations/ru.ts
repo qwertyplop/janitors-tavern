@@ -324,6 +324,7 @@ export const ru: TranslationKeys = {
     enableLogging: 'Включить логирование',
     logRequests: 'Логировать запросы',
     logResponses: 'Логировать ответы',
+    logRawRequestBody: 'Логировать сырое тело запроса',
     saveLoggingSettings: 'Сохранить настройки логирования',
     settingsSaved: 'Настройки сохранены!',
     loadingServerSettings: 'Загрузка настроек сервера...',
@@ -331,6 +332,7 @@ export const ru: TranslationKeys = {
     loggingStatus: 'Статус логирования',
     logRequestsStatus: 'Логировать запросы',
     logResponsesStatus: 'Логировать ответы',
+    logRawRequestBodyStatus: 'Логировать сырое тело запроса',
     enabled: 'Включено',
     disabled: 'Отключено',
     // Log Viewer

@@ -24,6 +24,7 @@ import {
   getServerSettings,
   getServerRegexScripts,
 } from '@/lib/server-storage';
+import { DEFAULT_SAMPLER_SETTINGS } from '@/lib/storage';
 import { recordUsage, calculateMessageTokens, extractTokenCountsFromResponse, extractTokenCountsFromStreamChunk } from '@/lib/stats';
 import { applyRegexScripts } from '@/lib/regex-processor';
 
@@ -535,9 +536,26 @@ export async function POST(request: NextRequest) {
     };
     const samplerEnabled = chatCompletionPreset?.samplerEnabled ?? {};
 
-    // Helper to check if a setting is enabled (default: true)
+    // Helper to check if a setting is enabled following hierarchy:
+    // 1. User setting (samplerEnabled[key]) if defined
+    // 2. If value differs from default → enabled (except max tokens which is always enabled by default)
+    // 3. Otherwise disabled
     const isEnabled = (key: string): boolean => {
-      return samplerEnabled[key as keyof typeof samplerEnabled] !== false;
+      // User setting takes precedence
+      if (samplerEnabled && samplerEnabled[key as keyof typeof samplerEnabled] !== undefined) {
+        return samplerEnabled[key as keyof typeof samplerEnabled] === true;
+      }
+      
+      // Max tokens is always enabled by default unless explicitly disabled
+      if (key === 'openai_max_tokens') {
+        return true;
+      }
+      
+      // Compare value with default
+      const value = samplerParams[key as keyof typeof samplerParams];
+      const defaultValue = DEFAULT_SAMPLER_SETTINGS[key as keyof typeof DEFAULT_SAMPLER_SETTINGS];
+      // Use loose equality for numbers (including NaN handling)
+      return value !== defaultValue;
     };
 
     // Build parameters object with only enabled settings

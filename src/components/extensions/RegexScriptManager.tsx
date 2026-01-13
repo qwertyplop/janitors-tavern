@@ -49,13 +49,13 @@ export default function RegexScriptManager() {
   const { t } = useI18n();
   
   const placementLabels: Record<number, string> = {
-    1: t('regexScripts.placementLabels.1'),
-    2: t('regexScripts.placementLabels.2'),
+    1: t.regexScripts.placementLabels[1],
+    2: t.regexScripts.placementLabels[2],
   };
   
   function formatPlacement(arr: number[]): string {
-    if (!arr || arr.length === 0) return t('regexScripts.none');
-    return arr.map(v => placementLabels[v] ?? t('regexScripts.unknown')).join(', ');
+    if (!arr || arr.length === 0) return t.regexScripts.none;
+    return arr.map(v => placementLabels[v] ?? t.regexScripts.unknown).join(', ');
   }
 
   // Form state for create/edit dialog
@@ -453,12 +453,12 @@ export default function RegexScriptManager() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">{t('regexScripts.title')}</h2>
+          <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">{t.regexScripts.title}</h2>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            {t('regexScripts.subtitle')}
+            {t.regexScripts.subtitle}
             {hasUnsavedChanges && (
               <span className="ml-2 text-amber-600 dark:text-amber-400 font-medium">
-                • {t('common.unsavedChanges')}
+                • {t.common.unsavedChanges}
               </span>
             )}
           </p>
@@ -472,15 +472,15 @@ export default function RegexScriptManager() {
             className="hidden"
           />
           <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-            {t('common.import')}
+            {t.common.import}
           </Button>
-          <Button onClick={handleCreate}>{t('regexScripts.newScript')}</Button>
+          <Button onClick={handleCreate}>{t.regexScripts.newScript}</Button>
           <Button
             onClick={handleSaveChanges}
             disabled={!hasUnsavedChanges}
             className="bg-green-600 hover:bg-green-700 text-white"
           >
-            {t('common.save')}
+            {t.common.save}
           </Button>
         </div>
       </div>
@@ -492,9 +492,9 @@ export default function RegexScriptManager() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <div>
-            <p className="font-medium text-blue-800 dark:text-blue-200">{t('regexScripts.executionOrder')}</p>
+            <p className="font-medium text-blue-800 dark:text-blue-200">{t.regexScripts.executionOrder}</p>
             <p className="text-zinc-700 dark:text-zinc-300 mt-1">
-              {t('regexScripts.executionOrderDesc')}
+              {t.regexScripts.executionOrderDesc}
             </p>
           </div>
         </div>
@@ -506,12 +506,12 @@ export default function RegexScriptManager() {
           {/* Standalone Scripts Section */}
           <div className="space-y-2">
             <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">
-              {t('regexScripts.standaloneScripts')} ({scripts.length})
+              {t.regexScripts.standaloneScripts} ({scripts.length})
             </h3>
             {scripts.length === 0 ? (
               <Card className="p-4">
                 <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
-                  {t('regexScripts.noStandaloneScripts')}
+                  {t.regexScripts.noStandaloneScripts}
                 </p>
               </Card>
             ) : (
@@ -602,7 +602,7 @@ export default function RegexScriptManager() {
           {presetScriptGroups.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">
-                {t('regexScripts.presetSpecificScripts')} ({presetScriptGroups.reduce((total, group) => total + group.scripts.length, 0)})
+                {t.regexScripts.presetSpecificScripts} ({presetScriptGroups.reduce((total, group) => total + group.scripts.length, 0)})
               </h3>
               <div className="space-y-2">
                 {presetScriptGroups.map((group) => (
@@ -824,7 +824,7 @@ export default function RegexScriptManager() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingId ? t('regexScripts.editScript') : t('regexScripts.newScript')}</DialogTitle>
+            <DialogTitle>{editingId ? t.regexScripts.editScript : t.regexScripts.newScript}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-zinc-500 px-6 pt-2">
             Regex scripts allow you to find and replace text in messages using regular expressions.
@@ -835,52 +835,52 @@ export default function RegexScriptManager() {
           </p>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="name">{t('regexScripts.scriptName')}</Label>
+              <Label htmlFor="name">{t.regexScripts.scriptName}</Label>
               <Input
                 id="name"
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
-                placeholder={t('regexScripts.scriptNamePlaceholder')}
+                placeholder={t.regexScripts.scriptNamePlaceholder}
               />
               <p className="text-xs text-zinc-500">
-                {t('regexScripts.scriptNameDesc')}
+                {t.regexScripts.scriptNameDesc}
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="findRegex">{t('regexScripts.pattern')}</Label>
+              <Label htmlFor="findRegex">{t.regexScripts.pattern}</Label>
               <Input
                 id="findRegex"
                 value={formFindRegex}
                 onChange={(e) => setFormFindRegex(e.target.value)}
-                placeholder={t('regexScripts.patternPlaceholder')}
+                placeholder={t.regexScripts.patternPlaceholder}
               />
               <p className="text-xs text-zinc-500">
-                {t('regexScripts.patternDesc')}
+                {t.regexScripts.patternDesc}
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="replaceString">{t('regexScripts.replacement')}</Label>
+              <Label htmlFor="replaceString">{t.regexScripts.replacement}</Label>
               <Input
                 id="replaceString"
                 value={formReplaceString}
                 onChange={(e) => setFormReplaceString(e.target.value)}
-                placeholder={t('regexScripts.replacementPlaceholder')}
+                placeholder={t.regexScripts.replacementPlaceholder}
               />
               <p className="text-xs text-zinc-500">
-                {t('regexScripts.replacementDesc')}
+                {t.regexScripts.replacementDesc}
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="trimStrings">{t('regexScripts.trimStrings')}</Label>
+              <Label htmlFor="trimStrings">{t.regexScripts.trimStrings}</Label>
               <textarea
                 id="trimStrings"
                 className="w-full min-h-[80px] border rounded-md p-2 text-sm"
                 value={formTrimStrings.join('\n')}
                 onChange={(e) => setFormTrimStrings(e.target.value.split('\n').filter(s => s.trim() !== ''))}
-                placeholder={t('regexScripts.trimStringsPlaceholder')}
+                placeholder={t.regexScripts.trimStringsPlaceholder}
               />
               <p className="text-xs text-zinc-500">
-                {t('regexScripts.trimStringsDesc')}
+                {t.regexScripts.trimStringsDesc}
               </p>
               </div>
               
@@ -1107,7 +1107,7 @@ export default function RegexScriptManager() {
       <Dialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t('regexScripts.deleteScript')}</DialogTitle>
+            <DialogTitle>{t.regexScripts.deleteScript}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             Are you sure you want to delete this script? This action cannot be undone.

@@ -151,14 +151,6 @@ export default function LoginPage() {
               {loading ? t.login.loggingIn : t.login.signIn}
             </Button>
             
-            <div className="text-center text-sm text-zinc-600 dark:text-zinc-400 mt-4">
-              <a
-                href="/register?force=true"
-                className="text-blue-600 hover:underline"
-              >
-                {t.login.goToRegistration || 'Go to Registration'}
-              </a>
-            </div>
           </form>
         </CardContent>
       </Card>

@@ -155,14 +155,6 @@ export default function RegisterPage() {
               {loading ? (t.login.settingUp || 'Setting up...') : (t.login.setupAuth || 'Set Up Authentication')}
             </Button>
             
-            <div className="text-center text-sm text-zinc-600 dark:text-zinc-400 mt-4">
-              <a
-                href="/login"
-                className="text-blue-600 hover:underline"
-              >
-                {t.login.goToLogin || 'Go to Login'}
-              </a>
-            </div>
           </form>
         </CardContent>
       </Card>

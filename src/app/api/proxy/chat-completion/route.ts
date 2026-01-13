@@ -283,6 +283,73 @@ function anthropicProcess(messages: OutputMessage[], mergeConsecutives: boolean 
 }
 
 /**
+ * Transform Anthropic API response to OpenAI-compatible format
+ */
+function transformAnthropicToOpenAI(anthropicResponse: any): any {
+  // Extract text content from Anthropic's content array
+  let textContent = '';
+  if (Array.isArray(anthropicResponse.content)) {
+    for (const item of anthropicResponse.content) {
+      if (item.type === 'text' && item.text) {
+        textContent += item.text;
+      }
+    }
+  }
+  
+  // Map stop_reason to finish_reason
+  let finishReason = 'stop';
+  if (anthropicResponse.stop_reason) {
+    switch (anthropicResponse.stop_reason) {
+      case 'end_turn':
+      case 'stop_sequence':
+        finishReason = 'stop';
+        break;
+      case 'max_tokens':
+        finishReason = 'length';
+        break;
+      default:
+        finishReason = anthropicResponse.stop_reason;
+    }
+  }
+  
+  // Create OpenAI-compatible response
+  return {
+    id: anthropicResponse.id || `chatcmpl-${Date.now()}`,
+    object: 'chat.completion',
+    created: Math.floor(Date.now() / 1000),
+    model: anthropicResponse.model || 'claude-unknown',
+    choices: [
+      {
+        index: 0,
+        message: {
+          role: 'assistant',
+          content: textContent,
+        },
+        finish_reason: finishReason,
+      },
+    ],
+    usage: anthropicResponse.usage ? {
+      prompt_tokens: anthropicResponse.usage.input_tokens || 0,
+      completion_tokens: anthropicResponse.usage.output_tokens || 0,
+      total_tokens: (anthropicResponse.usage.input_tokens || 0) + (anthropicResponse.usage.output_tokens || 0),
+    } : undefined,
+  };
+}
+
+/**
+ * Check if a response is in Anthropic format
+ */
+function isAnthropicResponse(response: any): boolean {
+  return (
+    response &&
+    typeof response === 'object' &&
+    response.type === 'message' &&
+    Array.isArray(response.content) &&
+    response.content.every((item: any) => item.type === 'text')
+  );
+}
+
+/**
  * Apply post-processing based on mode
  */
 function applyPostProcessing(
@@ -798,8 +865,18 @@ export async function POST(request: NextRequest) {
         }
         
         const responseJson = JSON.parse(rawResult.body);
-        if (responseJson.choices?.[0]?.message?.content) {
-          let content = responseJson.choices[0].message.content;
+        
+        // Check if this is an Anthropic response and transform it to OpenAI format
+        let transformedResponse = responseJson;
+        if (isAnthropicResponse(responseJson)) {
+          if (shouldLogResponse()) {
+            console.log(`[JT] [${requestId}] Detected Anthropic response format, transforming to OpenAI format`);
+          }
+          transformedResponse = transformAnthropicToOpenAI(responseJson);
+        }
+        
+        if (transformedResponse.choices?.[0]?.message?.content) {
+          let content = transformedResponse.choices[0].message.content;
           // Apply startReplyWith prefix if enabled
           if (startReplyContent) {
             content = startReplyContent + content;
@@ -814,9 +891,9 @@ export async function POST(request: NextRequest) {
               content = applyRegexScripts(content, outputScripts, macroContext, 2, undefined, 'assistant');
             }
           }
-          responseJson.choices[0].message.content = content;
+          transformedResponse.choices[0].message.content = content;
         }
-        return new Response(JSON.stringify(responseJson), {
+        return new Response(JSON.stringify(transformedResponse), {
           status: rawResult.status,
           headers: responseHeaders,
         });

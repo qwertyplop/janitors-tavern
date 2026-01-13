@@ -73,24 +73,46 @@ export class OpenAICompatibleProvider extends ChatProvider {
 
   protected getHeaders(): Record<string, string> {
     // Clean headers - don't pass through any identifying info from JanitorAI
-    return {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${this.config.apiKey}`,
       'Accept': 'text/event-stream',
       'User-Agent': 'JanitorsTavern/1.0',
-      // Add custom headers from config (user can override)
+    };
+
+    // Add Anthropic version header if this is an Anthropic provider
+    if (this.isAnthropicProvider()) {
+      headers['anthropic-version'] = '2023-06-01';
+    }
+
+    // Add custom headers from config (user can override)
+    return {
+      ...headers,
       ...this.config.extraHeaders,
     };
   }
 
   protected getNonStreamHeaders(): Record<string, string> {
-    return {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${this.config.apiKey}`,
       'Accept': 'application/json',
       'User-Agent': 'JanitorsTavern/1.0',
+    };
+
+    // Add Anthropic version header if this is an Anthropic provider
+    if (this.isAnthropicProvider()) {
+      headers['anthropic-version'] = '2023-06-01';
+    }
+
+    return {
+      ...headers,
       ...this.config.extraHeaders,
     };
+  }
+
+  private isAnthropicProvider(): boolean {
+    return this.config.baseUrl.toLowerCase().includes('anthropic.com');
   }
 
   private buildOpenAIRequest(request: ProviderRequest, stream: boolean): OpenAIRequest {
@@ -127,53 +149,146 @@ export class OpenAICompatibleProvider extends ChatProvider {
     return openaiRequest;
   }
 
+  private buildAnthropicRequest(request: ProviderRequest): any {
+    // Extract system message from messages array
+    const messages = [...request.messages];
+    let systemMessage = '';
+    
+    // Find and remove the first system message
+    const systemIndex = messages.findIndex(m => m.role === 'system');
+    if (systemIndex !== -1) {
+      systemMessage = messages[systemIndex].content;
+      messages.splice(systemIndex, 1);
+    }
+
+    // Build Anthropic request according to their schema
+    const anthropicRequest: any = {
+      model: request.model || this.config.model,
+      messages: messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      })),
+      max_tokens: request.parameters.maxTokens || 4096,
+    };
+
+    // Add system parameter if we found a system message
+    if (systemMessage) {
+      anthropicRequest.system = systemMessage;
+    }
+
+    // Apply sampler parameters
+    if (request.parameters.temperature !== undefined) {
+      anthropicRequest.temperature = request.parameters.temperature;
+    }
+    if (request.parameters.topP !== undefined) {
+      anthropicRequest.top_p = request.parameters.topP;
+    }
+    if (request.parameters.stop) {
+      anthropicRequest.stop_sequences = request.parameters.stop;
+    }
+
+    return anthropicRequest;
+  }
+
   async sendChatCompletion(request: ProviderRequest): Promise<InternalChatResponse> {
     const startTime = Date.now();
-    const openaiRequest = this.buildOpenAIRequest(request, false);
+    
+    if (this.isAnthropicProvider()) {
+      // Use Anthropic API format
+      const anthropicRequest = this.buildAnthropicRequest(request);
+      
+      try {
+        const response = await fetch(this.buildUrl('/v1/messages'), {
+          method: 'POST',
+          headers: this.getNonStreamHeaders(),
+          body: JSON.stringify(anthropicRequest),
+        });
 
-    try {
-      const response = await fetch(this.buildUrl('/chat/completions'), {
-        method: 'POST',
-        headers: this.getNonStreamHeaders(),
-        body: JSON.stringify(openaiRequest),
-      });
+        if (!response.ok) {
+          const errorText = await response.text();
+          return {
+            message: { role: 'assistant', content: '' },
+            error: `Provider error: ${response.status} - ${errorText}`,
+          };
+        }
 
-      if (!response.ok) {
-        const errorText = await response.text();
+        const data = await response.json();
+        const duration = Date.now() - startTime;
+
+        const assistantMessage: ChatMessage = {
+          role: 'assistant',
+          content: data.content?.[0]?.text || '',
+        };
+
+        return {
+          message: assistantMessage,
+          usage: data.usage
+            ? {
+                promptTokens: data.usage.input_tokens || 0,
+                completionTokens: data.usage.output_tokens || 0,
+                totalTokens: (data.usage.input_tokens || 0) + (data.usage.output_tokens || 0),
+              }
+            : undefined,
+          debug: {
+            provider: 'openai-compatible',
+            model: data.model,
+            requestDuration: duration,
+          },
+        };
+      } catch (error) {
         return {
           message: { role: 'assistant', content: '' },
-          error: `Provider error: ${response.status} - ${errorText}`,
+          error: `Request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         };
       }
+    } else {
+      // Use standard OpenAI format
+      const openaiRequest = this.buildOpenAIRequest(request, false);
 
-      const data: OpenAIResponse = await response.json();
-      const duration = Date.now() - startTime;
+      try {
+        const response = await fetch(this.buildUrl('/chat/completions'), {
+          method: 'POST',
+          headers: this.getNonStreamHeaders(),
+          body: JSON.stringify(openaiRequest),
+        });
 
-      const assistantMessage: ChatMessage = {
-        role: 'assistant',
-        content: data.choices[0]?.message?.content || '',
-      };
+        if (!response.ok) {
+          const errorText = await response.text();
+          return {
+            message: { role: 'assistant', content: '' },
+            error: `Provider error: ${response.status} - ${errorText}`,
+          };
+        }
 
-      return {
-        message: assistantMessage,
-        usage: data.usage
-          ? {
-              promptTokens: data.usage.prompt_tokens,
-              completionTokens: data.usage.completion_tokens,
-              totalTokens: data.usage.total_tokens,
-            }
-          : undefined,
-        debug: {
-          provider: 'openai-compatible',
-          model: data.model,
-          requestDuration: duration,
-        },
-      };
-    } catch (error) {
-      return {
-        message: { role: 'assistant', content: '' },
-        error: `Request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      };
+        const data: OpenAIResponse = await response.json();
+        const duration = Date.now() - startTime;
+
+        const assistantMessage: ChatMessage = {
+          role: 'assistant',
+          content: data.choices[0]?.message?.content || '',
+        };
+
+        return {
+          message: assistantMessage,
+          usage: data.usage
+            ? {
+                promptTokens: data.usage.prompt_tokens,
+                completionTokens: data.usage.completion_tokens,
+                totalTokens: data.usage.total_tokens,
+              }
+            : undefined,
+          debug: {
+            provider: 'openai-compatible',
+            model: data.model,
+            requestDuration: duration,
+          },
+        };
+      } catch (error) {
+        return {
+          message: { role: 'assistant', content: '' },
+          error: `Request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        };
+      }
     }
   }
 
@@ -184,29 +299,57 @@ export class OpenAICompatibleProvider extends ChatProvider {
   async sendChatCompletionRaw(
     request: ProviderRequest
   ): Promise<{ body: string; status: number; headers: Headers; error?: string }> {
-    const openaiRequest = this.buildOpenAIRequest(request, false);
+    if (this.isAnthropicProvider()) {
+      // Use Anthropic API format
+      const anthropicRequest = this.buildAnthropicRequest(request);
+      
+      try {
+        const response = await fetch(this.buildUrl('/v1/messages'), {
+          method: 'POST',
+          headers: this.getNonStreamHeaders(),
+          body: JSON.stringify(anthropicRequest),
+        });
 
-    try {
-      const response = await fetch(this.buildUrl('/chat/completions'), {
-        method: 'POST',
-        headers: this.getNonStreamHeaders(),
-        body: JSON.stringify(openaiRequest),
-      });
+        const body = await response.text();
 
-      const body = await response.text();
+        return {
+          body,
+          status: response.status,
+          headers: response.headers,
+        };
+      } catch (error) {
+        return {
+          body: JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+          status: 500,
+          headers: new Headers({ 'Content-Type': 'application/json' }),
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    } else {
+      const openaiRequest = this.buildOpenAIRequest(request, false);
 
-      return {
-        body,
-        status: response.status,
-        headers: response.headers,
-      };
-    } catch (error) {
-      return {
-        body: JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-        status: 500,
-        headers: new Headers({ 'Content-Type': 'application/json' }),
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
+      try {
+        const response = await fetch(this.buildUrl('/chat/completions'), {
+          method: 'POST',
+          headers: this.getNonStreamHeaders(),
+          body: JSON.stringify(openaiRequest),
+        });
+
+        const body = await response.text();
+
+        return {
+          body,
+          status: response.status,
+          headers: response.headers,
+        };
+      } catch (error) {
+        return {
+          body: JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+          status: 500,
+          headers: new Headers({ 'Content-Type': 'application/json' }),
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
     }
   }
 
@@ -217,82 +360,162 @@ export class OpenAICompatibleProvider extends ChatProvider {
   async sendChatCompletionStream(
     request: ProviderRequest
   ): Promise<{ stream: ReadableStream<Uint8Array>; error?: string; status: number; headers: Headers }> {
-    const openaiRequest = this.buildOpenAIRequest(request, true);
+    if (this.isAnthropicProvider()) {
+      // Anthropic doesn't support streaming with /v1/messages endpoint in the same way
+      // For now, we'll use non-streaming for Anthropic
+      const anthropicRequest = this.buildAnthropicRequest(request);
+      
+      try {
+        const response = await fetch(this.buildUrl('/v1/messages'), {
+          method: 'POST',
+          headers: this.getHeaders(),
+          body: JSON.stringify(anthropicRequest),
+        });
 
-    try {
-      const response = await fetch(this.buildUrl('/chat/completions'), {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify(openaiRequest),
-      });
+        if (!response.ok) {
+          const errorText = await response.text();
+          return {
+            stream: new ReadableStream(),
+            error: `Provider error: ${response.status} - ${errorText}`,
+            status: response.status,
+            headers: response.headers,
+          };
+        }
 
-      if (!response.ok) {
-        const errorText = await response.text();
+        if (!response.body) {
+          return {
+            stream: new ReadableStream(),
+            error: 'No response body',
+            status: 500,
+            headers: new Headers(),
+          };
+        }
+
+        // Pure passthrough - no transformation, just like Python proxy
         return {
-          stream: new ReadableStream(),
-          error: `Provider error: ${response.status} - ${errorText}`,
+          stream: response.body,
           status: response.status,
           headers: response.headers,
         };
-      }
-
-      if (!response.body) {
+      } catch (error) {
         return {
           stream: new ReadableStream(),
-          error: 'No response body',
+          error: `Request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
           status: 500,
           headers: new Headers(),
         };
       }
+    } else {
+      const openaiRequest = this.buildOpenAIRequest(request, true);
 
-      // Pure passthrough - no transformation, just like Python proxy
-      return {
-        stream: response.body,
-        status: response.status,
-        headers: response.headers,
-      };
-    } catch (error) {
-      return {
-        stream: new ReadableStream(),
-        error: `Request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        status: 500,
-        headers: new Headers(),
-      };
+      try {
+        const response = await fetch(this.buildUrl('/chat/completions'), {
+          method: 'POST',
+          headers: this.getHeaders(),
+          body: JSON.stringify(openaiRequest),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          return {
+            stream: new ReadableStream(),
+            error: `Provider error: ${response.status} - ${errorText}`,
+            status: response.status,
+            headers: response.headers,
+          };
+        }
+
+        if (!response.body) {
+          return {
+            stream: new ReadableStream(),
+            error: 'No response body',
+            status: 500,
+            headers: new Headers(),
+          };
+        }
+
+        // Pure passthrough - no transformation, just like Python proxy
+        return {
+          stream: response.body,
+          status: response.status,
+          headers: response.headers,
+        };
+      } catch (error) {
+        return {
+          stream: new ReadableStream(),
+          error: `Request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          status: 500,
+          headers: new Headers(),
+        };
+      }
     }
   }
 
   async testConnection(): Promise<{ success: boolean; message: string }> {
     try {
-      // Send a simple test message to validate the API key works for chat completions
-      // Use minimal request without sampler parameters to avoid provider-specific errors
-      const requestBody = {
-        model: this.config.model,
-        messages: [
-          {
-            role: 'user',
-            content: 'Hi',
-          },
-        ],
-        max_tokens: 10, // Limit tokens for quick test
-      };
+      if (this.isAnthropicProvider()) {
+        // Use Anthropic API format for testing
+        const requestBody = {
+          model: this.config.model,
+          messages: [
+            {
+              role: 'user',
+              content: 'Hi',
+            },
+          ],
+          max_tokens: 10, // Limit tokens for quick test
+        };
 
-      const response = await fetch(this.buildUrl('/chat/completions'), {
-        method: 'POST',
-        headers: this.getNonStreamHeaders(),
-        body: JSON.stringify(requestBody),
-      });
+        const response = await fetch(this.buildUrl('/v1/messages'), {
+          method: 'POST',
+          headers: this.getNonStreamHeaders(),
+          body: JSON.stringify(requestBody),
+        });
 
-      if (response.ok) {
-        const data = await response.json();
-        // Check if we got a valid response with choices
-        if (data.choices && Array.isArray(data.choices) && data.choices.length > 0) {
-          return { success: true, message: 'Connection successful - API key validated' };
+        if (response.ok) {
+          const data = await response.json();
+          // Check if we got a valid response with content
+          if (data.content && Array.isArray(data.content) && data.content.length > 0) {
+            return { success: true, message: 'Connection successful - API key validated' };
+          } else {
+            return { success: false, message: 'Connection failed: Invalid response format' };
+          }
         } else {
-          return { success: false, message: 'Connection failed: Invalid response format' };
+          const errorText = await response.text();
+          return { success: false, message: `Connection failed: ${response.status} - ${errorText}` };
         }
       } else {
-        const errorText = await response.text();
-        return { success: false, message: `Connection failed: ${response.status} - ${errorText}` };
+        // Send a simple test message to validate the API key works for chat completions
+        // Use minimal request without sampler parameters to avoid provider-specific errors
+        const requestBody = {
+          model: this.config.model,
+          messages: [
+            {
+              role: 'user',
+              content: 'Hi',
+            },
+          ],
+          max_tokens: 10, // Limit tokens for quick test
+        };
+
+        const response = await fetch(this.buildUrl('/chat/completions'), {
+          method: 'POST',
+          headers: this.getNonStreamHeaders(),
+          body: JSON.stringify(requestBody),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Check if we got a valid response with choices
+          if (data.choices && Array.isArray(data.choices) && data.choices.length > 0) {
+            return { success: true, message: 'Connection successful - API key validated' };
+          } else {
+            return { success: false, message: 'Connection failed: Invalid response format' };
+          }
+        } else {
+          const errorText = await response.text();
+          return { success: false, message: `Connection failed: ${response.status} - ${errorText}` };
+        }
       }
     } catch (error) {
       return {

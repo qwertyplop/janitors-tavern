@@ -4,6 +4,9 @@ interface ModelInfo {
   id: string;
   object?: string;
   owned_by?: string;
+  display_name?: string;
+  type?: string;
+  created_at?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -15,12 +18,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'baseUrl is required' }, { status: 400 });
     }
 
+    // Check if this is an Anthropic provider
+    const isAnthropic = baseUrl.toLowerCase().includes('anthropic.com');
+
     // Normalize the base URL
     let normalizedUrl = baseUrl.replace(/\/+$/, '');
     normalizedUrl = normalizedUrl.replace(/\/v1$/i, '');
     const modelsUrl = `${normalizedUrl}/v1/models`;
 
-    console.log('[Models Proxy] Fetching from:', modelsUrl);
+    console.log('[Models Proxy] Fetching from:', modelsUrl, 'isAnthropic:', isAnthropic);
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -28,6 +34,11 @@ export async function POST(request: NextRequest) {
 
     if (apiKey) {
       headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+
+    // Add Anthropic version header if this is an Anthropic provider
+    if (isAnthropic) {
+      headers['anthropic-version'] = '2023-06-01';
     }
 
     const response = await fetch(modelsUrl, {
@@ -61,6 +72,14 @@ export async function POST(request: NextRequest) {
     } else if (data.models && Array.isArray(data.models)) {
       // Some APIs use { models: [...] }
       models = data.models;
+    } else if (isAnthropic && data.data && Array.isArray(data.data)) {
+      // Anthropic format: { data: [{ id, display_name, type, created_at }], first_id, has_more, last_id }
+      models = data.data.map((item: any) => ({
+        id: item.id,
+        display_name: item.display_name,
+        type: item.type,
+        created_at: item.created_at,
+      }));
     }
 
     return NextResponse.json({ models });

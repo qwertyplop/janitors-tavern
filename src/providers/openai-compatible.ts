@@ -75,14 +75,18 @@ export class OpenAICompatibleProvider extends ChatProvider {
     // Clean headers - don't pass through any identifying info from JanitorAI
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this.config.apiKey}`,
       'Accept': 'text/event-stream',
       'User-Agent': 'JanitorsTavern/1.0',
     };
 
-    // Add Anthropic version header if this is an Anthropic provider
+    // Add authentication header based on provider type
     if (this.isAnthropicProvider()) {
+      // Anthropic uses X-Api-Key header (case-insensitive but follows their docs)
+      headers['X-Api-Key'] = this.config.apiKey;
       headers['anthropic-version'] = '2023-06-01';
+    } else {
+      // OpenAI-compatible providers use Authorization: Bearer
+      headers['Authorization'] = `Bearer ${this.config.apiKey}`;
     }
 
     // Add custom headers from config (user can override)
@@ -95,14 +99,18 @@ export class OpenAICompatibleProvider extends ChatProvider {
   protected getNonStreamHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this.config.apiKey}`,
       'Accept': 'application/json',
       'User-Agent': 'JanitorsTavern/1.0',
     };
 
-    // Add Anthropic version header if this is an Anthropic provider
+    // Add authentication header based on provider type
     if (this.isAnthropicProvider()) {
+      // Anthropic uses X-Api-Key header (case-insensitive but follows their docs)
+      headers['X-Api-Key'] = this.config.apiKey;
       headers['anthropic-version'] = '2023-06-01';
+    } else {
+      // OpenAI-compatible providers use Authorization: Bearer
+      headers['Authorization'] = `Bearer ${this.config.apiKey}`;
     }
 
     return {

@@ -47,7 +47,12 @@ export async function POST(request: NextRequest) {
     };
 
     if (apiKey) {
-      headers['Authorization'] = `Bearer ${apiKey}`;
+      if (isAnthropic) {
+        // Anthropic uses X-Api-Key header instead of Authorization: Bearer
+        headers['X-Api-Key'] = apiKey;
+      } else {
+        headers['Authorization'] = `Bearer ${apiKey}`;
+      }
     }
 
     // Add Anthropic version header if this is an Anthropic provider

@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
+import { useI18n } from '@/components/providers/I18nProvider';
 
 interface PromptBlockEditorProps {
   block: STPromptBlock;
@@ -25,6 +26,7 @@ export function PromptBlockEditor({
   onCancel,
   isNew = false,
 }: PromptBlockEditorProps) {
+  const { t } = useI18n();
   const [editedBlock, setEditedBlock] = useState<STPromptBlock>({ ...block });
 
   const handleChange = <K extends keyof STPromptBlock>(
@@ -45,14 +47,14 @@ export function PromptBlockEditor({
     <Card className="p-4 space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">
-          {isNew ? 'New Prompt Block' : 'Edit Prompt Block'}
+          {isNew ? t.promptBlocks.newPromptBlock : t.promptBlocks.editPromptBlock}
         </h3>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={onCancel}>
-            Cancel
+            {t.promptBlocks.cancelButton}
           </Button>
           <Button size="sm" onClick={handleSave}>
-            {isNew ? 'Add Block' : 'Save'}
+            {isNew ? t.promptBlocks.addBlockButtonEditor : t.common.save}
           </Button>
         </div>
       </div>
@@ -60,34 +62,34 @@ export function PromptBlockEditor({
       {/* Basic Info */}
       <div className="space-y-4">
         <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 border-b pb-2">
-          Basic Information
+          {t.promptBlocks.basicInformation}
         </h4>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="name">Name</Label>
+            <Label htmlFor="name">{t.promptBlocks.blockName}</Label>
             <Input
               id="name"
               value={editedBlock.name}
               onChange={(e) => handleChange('name', e.target.value)}
-              placeholder="Block name (for reference only)"
+              placeholder={t.promptBlocks.namePlaceholder}
             />
             <p className="text-xs text-zinc-500 mt-1">
-              Not sent to the model; for your reference in the Prompt Manager only.
+              {t.promptBlocks.nameDescription}
             </p>
           </div>
 
           <div>
-            <Label htmlFor="role">Role</Label>
+            <Label htmlFor="role">{t.promptBlocks.blockRole}</Label>
             <Select
               value={editedBlock.role}
               onChange={(e) => handleChange('role', e.target.value as PromptBlockRole)}
             >
-              <option value="system">System</option>
-              <option value="user">User</option>
-              <option value="assistant">AI Assistant</option>
+              <option value="system">{t.promptBlocks.system}</option>
+              <option value="user">{t.promptBlocks.user}</option>
+              <option value="assistant">{t.promptBlocks.assistant}</option>
             </Select>
             <p className="text-xs text-zinc-500 mt-1">
-              Which role sends the prompt.
+              {t.promptBlocks.roleDescription}
             </p>
           </div>
         </div>
@@ -95,12 +97,12 @@ export function PromptBlockEditor({
 
       {/* Content */}
       <div>
-        <Label htmlFor="content">Content</Label>
+        <Label htmlFor="content">{t.promptBlocks.blockContent}</Label>
         <Textarea
           id="content"
           value={editedBlock.content}
           onChange={(e) => handleChange('content', e.target.value)}
-          placeholder="Prompt content..."
+          placeholder={t.promptBlocks.contentPlaceholder}
           className="min-h-[200px] font-mono text-sm"
         />
       </div>
@@ -109,27 +111,27 @@ export function PromptBlockEditor({
       {/* Position & Depth */}
       <div className="space-y-3">
         <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 border-b pb-2">
-          Position & Depth
+          {t.promptBlocks.positionDepth}
         </h4>
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <Label htmlFor="injection_position">Position</Label>
+            <Label htmlFor="injection_position">{t.promptBlocks.position}</Label>
             <Select
               value={String(editedBlock.injection_position)}
               onChange={(e) => handleChange('injection_position', parseInt(e.target.value))}
             >
-              <option value="0">Relative</option>
-              <option value="1">In-Chat</option>
+              <option value="0">{t.promptBlocks.positionRelative}</option>
+              <option value="1">{t.promptBlocks.positionInChat}</option>
             </Select>
             <p className="text-xs text-zinc-500 mt-1">
               {isInChatPosition
-                ? 'Sent within Chat History at the specified Depth.'
-                : 'Sent in order with other prompts in the Prompt Manager.'}
+                ? t.promptBlocks.positionDescriptionInChat
+                : t.promptBlocks.positionDescriptionRelative}
             </p>
           </div>
 
           <div>
-            <Label htmlFor="injection_depth">Depth</Label>
+            <Label htmlFor="injection_depth">{t.promptBlocks.depth}</Label>
             <Input
               id="injection_depth"
               type="number"
@@ -140,13 +142,13 @@ export function PromptBlockEditor({
             />
             <p className="text-xs text-zinc-500 mt-1">
               {isInChatPosition
-                ? '0 = after last message, 1 = before last, etc.'
-                : 'Only used when Position is In-Chat.'}
+                ? t.promptBlocks.depthDescriptionInChat
+                : t.promptBlocks.depthDescriptionRelative}
             </p>
           </div>
 
           <div>
-            <Label htmlFor="injection_order">Order</Label>
+            <Label htmlFor="injection_order">{t.promptBlocks.order}</Label>
             <Input
               id="injection_order"
               type="number"
@@ -154,7 +156,7 @@ export function PromptBlockEditor({
               onChange={(e) => handleChange('injection_order', parseInt(e.target.value) || 0)}
             />
             <p className="text-xs text-zinc-500 mt-1">
-              Order for prompts with same Role and Depth.
+              {t.promptBlocks.orderDescription}
             </p>
           </div>
         </div>
@@ -163,14 +165,14 @@ export function PromptBlockEditor({
 
       <div className="pt-2 border-t flex justify-between">
         <Button variant="destructive" size="sm" onClick={onDelete}>
-          Delete Block
+          {t.promptBlocks.deleteBlockButton}
         </Button>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={onCancel}>
-            Cancel
+            {t.promptBlocks.cancelButton}
           </Button>
           <Button size="sm" onClick={handleSave}>
-            {isNew ? 'Add Block' : 'Save Changes'}
+            {isNew ? t.promptBlocks.addBlockButtonEditor : t.promptBlocks.saveChangesButton}
           </Button>
         </div>
       </div>

@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { generateId } from '@/lib/storage';
+import { useI18n } from '@/components/providers/I18nProvider';
 
 interface PromptBlockListProps {
   blocks: STPromptBlock[];
@@ -37,6 +38,7 @@ export function PromptBlockList({
   onChange,
   characterId = 100001,
 }: PromptBlockListProps) {
+  const { t } = useI18n();
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -237,7 +239,7 @@ export function PromptBlockList({
 
   const createEmptyBlock = (): STPromptBlock => ({
     identifier: generateId(),
-    name: 'New Block',
+    name: t.promptBlocks.newBlock,
     role: 'system',
     content: '',
     system_prompt: false,
@@ -256,6 +258,20 @@ export function PromptBlockList({
         return 'bg-purple-100 text-purple-800';
       default:
         return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Helper function to get translated role text
+  const getTranslatedRole = (role: string) => {
+    switch (role) {
+      case 'system':
+        return t.promptBlocks.system;
+      case 'user':
+        return t.promptBlocks.user;
+      case 'assistant':
+        return t.promptBlocks.assistant;
+      default:
+        return role;
     }
   };
 
@@ -290,9 +306,9 @@ export function PromptBlockList({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">
-          Prompt Blocks ({allBlocks.length})
+          {t.promptBlocks.promptBlocksCount.replace('{count}', allBlocks.length.toString())}
         </h3>
-        <Button onClick={() => setIsAddingNew(true)}>Add Block</Button>
+        <Button onClick={() => setIsAddingNew(true)}>{t.promptBlocks.addBlockButton}</Button>
       </div>
 
       {/* Active Blocks Section */}
@@ -301,9 +317,9 @@ export function PromptBlockList({
           <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
             <div className="w-3 h-3 rounded-full bg-green-500"></div>
             <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Active Blocks ({activeBlocks.length})
+              {t.promptBlocks.activeBlocks.replace('{count}', activeBlocks.length.toString())}
             </h4>
-            <p className="text-xs text-gray-500">These blocks are included in the prompt order</p>
+            <p className="text-xs text-gray-500">{t.promptBlocks.activeBlocksDescription}</p>
           </div>
           
           <div className="space-y-2">
@@ -357,17 +373,17 @@ export function PromptBlockList({
                         {block.name || block.identifier}
                       </span>
                       <Badge className={getRoleBadgeColor(block.role)}>
-                        {block.role}
+                        {getTranslatedRole(block.role)}
                       </Badge>
                       {block.marker && (
                         <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-                          Marker
+                          {t.promptBlocks.marker}
                         </Badge>
                       )}
                     </div>
                     {block.marker && (
                       <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
-                        Dynamic content placeholder - cannot be edited
+                        {t.promptBlocks.dynamicContentPlaceholder}
                       </p>
                     )}
                   </div>
@@ -379,7 +395,7 @@ export function PromptBlockList({
                       size="sm"
                       onClick={() => setEditingBlockId(block.identifier)}
                     >
-                      Edit
+                      {t.promptBlocks.editButton}
                     </Button>
                   )}
                 </div>
@@ -394,9 +410,9 @@ export function PromptBlockList({
         <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
           <div className="w-3 h-3 rounded-full bg-gray-400"></div>
           <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Inactive Blocks ({inactiveBlocks.length})
+            {t.promptBlocks.inactiveBlocks.replace('{count}', inactiveBlocks.length.toString())}
           </h4>
-          <p className="text-xs text-gray-500">These blocks are available but not included in the prompt order</p>
+          <p className="text-xs text-gray-500">{t.promptBlocks.inactiveBlocksDescription}</p>
         </div>
         
         {inactiveBlocks.length > 0 ? (
@@ -438,7 +454,7 @@ export function PromptBlockList({
                         'w-6 h-6 rounded border-2 flex items-center justify-center transition-colors cursor-pointer hover:bg-gray-300',
                         'bg-gray-100 border-gray-300 text-gray-600'
                       )}
-                      title="Click to activate this block"
+                      title={t.promptBlocks.activateBlockTitle}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
@@ -452,17 +468,17 @@ export function PromptBlockList({
                           {block.name || block.identifier}
                         </span>
                         <Badge className={getRoleBadgeColor(block.role)}>
-                          {block.role}
+                          {getTranslatedRole(block.role)}
                         </Badge>
                         {block.marker && (
                           <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-                            Marker
+                            {t.promptBlocks.marker}
                           </Badge>
                         )}
                       </div>
                       {block.marker && (
                         <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
-                          Dynamic content placeholder - cannot be edited
+                          {t.promptBlocks.dynamicContentPlaceholder}
                         </p>
                       )}
                     </div>
@@ -474,7 +490,7 @@ export function PromptBlockList({
                         size="sm"
                         onClick={() => setEditingBlockId(block.identifier)}
                       >
-                        Edit
+                        {t.promptBlocks.editButton}
                       </Button>
                     )}
                   </div>
@@ -500,14 +516,14 @@ export function PromptBlockList({
               <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
-              <p className="text-sm text-gray-500">No inactive blocks. Drag active blocks here or add new blocks.</p>
+              <p className="text-sm text-gray-500">{t.promptBlocks.noInactiveBlocks}</p>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setIsAddingNew(true)}
                 className="mt-2"
               >
-                Add New Block
+                {t.promptBlocks.addNewBlockButton}
               </Button>
             </div>
           </Card>
@@ -516,7 +532,7 @@ export function PromptBlockList({
 
       {allBlocks.length === 0 && (
         <Card className="p-8 text-center text-gray-500">
-          No prompt blocks yet. Click "Add Block" to create one.
+          {t.promptBlocks.noBlocksYetMessage}
         </Card>
       )}
     </div>

@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { DEFAULT_SAMPLER_SETTINGS } from '@/lib/storage';
+import { useI18n } from '@/components/providers/I18nProvider';
 
 interface SamplerSettingsPanelProps {
   settings: STSamplerSettings;
@@ -13,71 +14,6 @@ interface SamplerSettingsPanelProps {
   onEnabledChange?: (enabled: Partial<Record<SamplerSettingKey, boolean>>) => void;
 }
 
-interface SliderInputProps {
-  label: string;
-  description?: string;
-  value: number;
-  onChange: (value: number) => void;
-  min: number;
-  max: number;
-  step: number;
-  settingKey: SamplerSettingKey;
-  enabled: boolean;
-  onEnabledChange: (enabled: boolean) => void;
-}
-
-function SliderInput({
-  label,
-  description,
-  value,
-  onChange,
-  min,
-  max,
-  step,
-  settingKey,
-  enabled,
-  onEnabledChange,
-}: SliderInputProps) {
-  return (
-    <div className={`space-y-2 ${!enabled ? 'opacity-50' : ''}`}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={enabled}
-            onChange={(e) => onEnabledChange(e.target.checked)}
-            className="w-4 h-4 rounded border-gray-300"
-            title={enabled ? 'Disable this setting' : 'Enable this setting'}
-          />
-          <Label className="text-sm font-medium">{label}</Label>
-        </div>
-        <Input
-          type="number"
-          value={value}
-          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-          min={min}
-          max={max}
-          step={step}
-          className="w-24 text-right"
-          disabled={!enabled}
-        />
-      </div>
-      {description && (
-        <p className="text-xs text-gray-500">{description}</p>
-      )}
-      <input
-        type="range"
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
-        min={min}
-        max={max}
-        step={step}
-        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-        disabled={!enabled}
-      />
-    </div>
-  );
-}
 
 export function SamplerSettingsPanel({
   settings,
@@ -85,6 +21,7 @@ export function SamplerSettingsPanel({
   enabledSettings,
   onEnabledChange,
 }: SamplerSettingsPanelProps) {
+  const { t } = useI18n();
   const handleChange = <K extends keyof STSamplerSettings>(
     key: K,
     value: STSamplerSettings[K]
@@ -121,19 +58,84 @@ export function SamplerSettingsPanel({
     }
   };
 
+  // SliderInput component inside the main component to access t
+  const SliderInput = ({
+    label,
+    description,
+    value,
+    onChange,
+    min,
+    max,
+    step,
+    settingKey,
+    enabled,
+    onEnabledChange,
+  }: {
+    label: string;
+    description?: string;
+    value: number;
+    onChange: (value: number) => void;
+    min: number;
+    max: number;
+    step: number;
+    settingKey: SamplerSettingKey;
+    enabled: boolean;
+    onEnabledChange: (enabled: boolean) => void;
+  }) => {
+    return (
+      <div className={`space-y-2 ${!enabled ? 'opacity-50' : ''}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={(e) => onEnabledChange(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300"
+              title={enabled ? t.sampler.disableSettingTitle : t.sampler.enableSettingTitle}
+            />
+            <Label className="text-sm font-medium">{label}</Label>
+          </div>
+          <Input
+            type="number"
+            value={value}
+            onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+            min={min}
+            max={max}
+            step={step}
+            className="w-24 text-right"
+            disabled={!enabled}
+          />
+        </div>
+        {description && (
+          <p className="text-xs text-gray-500">{description}</p>
+        )}
+        <input
+          type="range"
+          value={value}
+          onChange={(e) => onChange(parseFloat(e.target.value))}
+          min={min}
+          max={max}
+          step={step}
+          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+          disabled={!enabled}
+        />
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        Uncheck settings to exclude them from the API request (useful if not supported by provider).
+        {t.sampler.excludeSettingsHint}
       </p>
 
       {/* Core Sampling Parameters */}
       <Card className="p-4">
-        <h3 className="text-lg font-semibold mb-4">Core Sampling Parameters</h3>
+        <h3 className="text-lg font-semibold mb-4">{t.sampler.coreSamplingParameters}</h3>
         <div className="space-y-6">
           <SliderInput
-            label="Temperature"
-            description="Controls randomness. Higher values make output more random."
+            label={t.sampler.temperature}
+            description={t.sampler.temperatureDescription}
             value={settings.temperature}
             onChange={(v) => handleChange('temperature', v)}
             min={0}
@@ -145,8 +147,8 @@ export function SamplerSettingsPanel({
           />
 
           <SliderInput
-            label="Top P"
-            description="Nucleus sampling: only consider tokens with cumulative probability above this."
+            label={t.sampler.topP}
+            description={t.sampler.topPDescription}
             value={settings.top_p}
             onChange={(v) => handleChange('top_p', v)}
             min={0}
@@ -158,8 +160,8 @@ export function SamplerSettingsPanel({
           />
 
           <SliderInput
-            label="Top K"
-            description="Only sample from the top K tokens. 0 disables this."
+            label={t.sampler.topK}
+            description={t.sampler.topKDescription}
             value={settings.top_k}
             onChange={(v) => handleChange('top_k', v)}
             min={0}
@@ -171,8 +173,8 @@ export function SamplerSettingsPanel({
           />
 
           <SliderInput
-            label="Top A"
-            description="Consider only tokens with attention above this threshold."
+            label={t.sampler.topA}
+            description={t.sampler.topADescription}
             value={settings.top_a}
             onChange={(v) => handleChange('top_a', v)}
             min={0}
@@ -184,8 +186,8 @@ export function SamplerSettingsPanel({
           />
 
           <SliderInput
-            label="Min P"
-            description="Minimum probability for a token to be considered."
+            label={t.sampler.minP}
+            description={t.sampler.minPDescription}
             value={settings.min_p}
             onChange={(v) => handleChange('min_p', v)}
             min={0}
@@ -200,11 +202,11 @@ export function SamplerSettingsPanel({
 
       {/* Penalty Parameters */}
       <Card className="p-4">
-        <h3 className="text-lg font-semibold mb-4">Penalty Parameters</h3>
+        <h3 className="text-lg font-semibold mb-4">{t.sampler.penaltyParameters}</h3>
         <div className="space-y-6">
           <SliderInput
-            label="Frequency Penalty"
-            description="Penalize tokens based on their frequency in the text so far."
+            label={t.sampler.frequencyPenalty}
+            description={t.sampler.frequencyPenaltyDescription}
             value={settings.frequency_penalty}
             onChange={(v) => handleChange('frequency_penalty', v)}
             min={-2}
@@ -216,8 +218,8 @@ export function SamplerSettingsPanel({
           />
 
           <SliderInput
-            label="Presence Penalty"
-            description="Penalize tokens that have appeared in the text so far."
+            label={t.sampler.presencePenalty}
+            description={t.sampler.presencePenaltyDescription}
             value={settings.presence_penalty}
             onChange={(v) => handleChange('presence_penalty', v)}
             min={-2}
@@ -229,8 +231,8 @@ export function SamplerSettingsPanel({
           />
 
           <SliderInput
-            label="Repetition Penalty"
-            description="Penalize repeated tokens. 1.0 means no penalty."
+            label={t.sampler.repetitionPenalty}
+            description={t.sampler.repetitionPenaltyDescription}
             value={settings.repetition_penalty}
             onChange={(v) => handleChange('repetition_penalty', v)}
             min={0.1}
@@ -245,10 +247,10 @@ export function SamplerSettingsPanel({
 
       {/* Context and Token Limits */}
       <Card className="p-4">
-        <h3 className="text-lg font-semibold mb-4">Context & Token Limits</h3>
+        <h3 className="text-lg font-semibold mb-4">{t.sampler.contextTokenLimits}</h3>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="max_context">Max Context</Label>
+            <Label htmlFor="max_context">{t.sampler.maxContext}</Label>
             <Input
               id="max_context"
               type="number"
@@ -260,7 +262,7 @@ export function SamplerSettingsPanel({
               }}
               min={1}
             />
-            <p className="text-xs text-gray-500">Maximum context window size (internal use)</p>
+            <p className="text-xs text-gray-500">{t.sampler.maxContextWindowHint}</p>
           </div>
 
           <div className={`space-y-2 ${!isEnabled('openai_max_tokens') ? 'opacity-50' : ''}`}>
@@ -271,7 +273,7 @@ export function SamplerSettingsPanel({
                 onChange={(e) => toggleEnabled('openai_max_tokens', e.target.checked)}
                 className="w-4 h-4 rounded border-gray-300"
               />
-              <Label htmlFor="max_tokens">Max Response Tokens</Label>
+              <Label htmlFor="max_tokens">{t.sampler.maxResponseTokens}</Label>
             </div>
             <Input
               id="max_tokens"
@@ -285,14 +287,14 @@ export function SamplerSettingsPanel({
               min={1}
               disabled={!isEnabled('openai_max_tokens')}
             />
-            <p className="text-xs text-gray-500">Maximum tokens in response</p>
+            <p className="text-xs text-gray-500">{t.sampler.maxTokensResponseHint}</p>
           </div>
         </div>
       </Card>
 
       {/* Generation Settings */}
       <Card className="p-4">
-        <h3 className="text-lg font-semibold mb-4">Generation Settings</h3>
+        <h3 className="text-lg font-semibold mb-4">{t.sampler.generationSettings}</h3>
         <div className="grid grid-cols-2 gap-4">
           <div className={`space-y-2 ${!isEnabled('seed') ? 'opacity-50' : ''}`}>
             <div className="flex items-center gap-2">
@@ -302,7 +304,7 @@ export function SamplerSettingsPanel({
                 onChange={(e) => toggleEnabled('seed', e.target.checked)}
                 className="w-4 h-4 rounded border-gray-300"
               />
-              <Label htmlFor="seed">Seed</Label>
+              <Label htmlFor="seed">{t.sampler.seed}</Label>
             </div>
             <Input
               id="seed"
@@ -315,11 +317,11 @@ export function SamplerSettingsPanel({
               }}
               disabled={!isEnabled('seed')}
             />
-            <p className="text-xs text-gray-500">-1 for random. Same seed = reproducible outputs</p>
+            <p className="text-xs text-gray-500">{t.sampler.randomSeedHint}</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="n">Number of Completions (Not tested, probably doesn't work)</Label>
+            <Label htmlFor="n">{t.sampler.numberCompletions}</Label>
             <Input
               id="n"
               type="number"
@@ -332,7 +334,7 @@ export function SamplerSettingsPanel({
               min={1}
               max={10}
             />
-            <p className="text-xs text-gray-500">Number of completions to generate</p>
+            <p className="text-xs text-gray-500">{t.sampler.numberCompletionsHint}</p>
           </div>
         </div>
       </Card>

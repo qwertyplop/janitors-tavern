@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -37,7 +37,48 @@ export default function OfficialProviders({
     return added;
   });
 
+  // Function to refresh added providers status
+  const refreshAddedProviders = () => {
+    const connections = getConnectionPresets();
+    const added = new Set<string>();
+    connections.forEach(conn => {
+      if (conn.id.startsWith('official-')) {
+        const providerId = conn.id.replace('official-', '');
+        added.add(providerId);
+      }
+    });
+    setAddedProviders(added);
+  };
+
+  // Listen for storage changes to update added status
+  useEffect(() => {
+    const handleStorageChange = (event: StorageEvent) => {
+      // Check if connection presets storage changed
+      if (event.key === 'connectionPresets' || event.key === null) {
+        refreshAddedProviders();
+      }
+    };
+
+    // Listen for storage events from other tabs/windows
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Set up polling to check for changes within same tab
+    const pollInterval = setInterval(() => {
+      refreshAddedProviders();
+    }, 2000); // Check every 2 seconds
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(pollInterval);
+    };
+  }, []);
+
   const handleAddProvider = (providerId: string) => {
+    // Safety check: prevent adding already-added providers
+    if (addedProviders.has(providerId)) {
+      return;
+    }
+    
     const provider = OFFICIAL_PROVIDERS.find(p => p.id === providerId);
     if (!provider) return;
 
@@ -121,49 +162,7 @@ export default function OfficialProviders({
                         </p>
                       )}
                       
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        <div className="flex items-center gap-1">
-                          <Badge
-                            variant={provider.apiKeyRequired ? 'default' : 'outline'}
-                            className={cn(
-                              'text-xs',
-                              provider.apiKeyRequired
-                                ? 'bg-amber-500 text-white'
-                                : 'bg-green-500 text-white'
-                            )}
-                          >
-                            {provider.apiKeyRequired
-                              ? t.officialProviders.apiKeyRequired
-                              : 'No API Key'}
-                          </Badge>
-                        </div>
-                        
-                        <div className="flex items-center gap-1">
-                          <Badge
-                            variant={provider.supportsModelsEndpoint ? 'default' : 'outline'}
-                            className={cn(
-                              'text-xs',
-                              provider.supportsModelsEndpoint
-                                ? 'bg-blue-500 text-white'
-                                : 'bg-zinc-500 text-white'
-                            )}
-                          >
-                            {provider.supportsModelsEndpoint
-                              ? t.officialProviders.supportsModels
-                              : t.officialProviders.noModelsSupport}
-                          </Badge>
-                        </div>
-                        
-                        {provider.defaultModel && (
-                          <div className="flex items-center gap-1">
-                            <Badge variant="outline" className="text-xs">
-                              {provider.defaultModel}
-                            </Badge>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                      <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 mb-2">
                         <span className="truncate">{provider.baseUrl}</span>
                       </div>
                     </div>

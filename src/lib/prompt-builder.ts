@@ -359,9 +359,6 @@ export function buildRequestBody(
   if (isEnabled('top_k') && sampler.top_k !== undefined && sampler.top_k > 0) {
     body.top_k = sampler.top_k;
   }
-  if (isEnabled('top_a') && sampler.top_a !== undefined && sampler.top_a > 0) {
-    body.top_a = sampler.top_a;
-  }
   if (isEnabled('min_p') && sampler.min_p !== undefined && sampler.min_p > 0) {
     body.min_p = sampler.min_p;
   }

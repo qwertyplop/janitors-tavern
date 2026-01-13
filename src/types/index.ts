@@ -100,7 +100,6 @@ export interface STSamplerSettings {
   temperature: number;
   top_p: number;
   top_k: number;
-  top_a: number;
   min_p: number;
   frequency_penalty: number;
   presence_penalty: number;
@@ -129,7 +128,6 @@ export interface STChatCompletionPreset {
   presence_penalty: number;
   top_p: number;
   top_k: number;
-  top_a: number;
   min_p: number;
   repetition_penalty: number;
   openai_max_context: number;
@@ -191,7 +189,6 @@ export type SamplerSettingKey =
   | 'temperature'
   | 'top_p'
   | 'top_k'
-  | 'top_a'
   | 'min_p'
   | 'frequency_penalty'
   | 'presence_penalty'

@@ -173,19 +173,6 @@ export function SamplerSettingsPanel({
           />
 
           <SliderInput
-            label={t.sampler.topA}
-            description={t.sampler.topADescription}
-            value={settings.top_a}
-            onChange={(v) => handleChange('top_a', v)}
-            min={0}
-            max={1}
-            step={0.01}
-            settingKey="top_a"
-            enabled={isEnabled('top_a')}
-            onEnabledChange={(e) => toggleEnabled('top_a', e)}
-          />
-
-          <SliderInput
             label={t.sampler.minP}
             description={t.sampler.minPDescription}
             value={settings.min_p}

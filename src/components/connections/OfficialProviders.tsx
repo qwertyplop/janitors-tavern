@@ -91,8 +91,23 @@ export default function OfficialProviders({
       // Create connection preset from provider
       const connectionPreset = officialProviderToConnectionPreset(provider);
       
-      // Add to connections
-      addConnectionPreset(connectionPreset);
+      // Add to connections with the custom ID (official-{providerId})
+      // We need to pass the preset without the id field (since addConnectionPreset expects it omitted)
+      // but we can pass the customId parameter
+      addConnectionPreset(
+        {
+          name: connectionPreset.name,
+          baseUrl: connectionPreset.baseUrl,
+          providerType: connectionPreset.providerType,
+          apiKeyRef: connectionPreset.apiKeyRef,
+          model: connectionPreset.model,
+          promptPostProcessing: connectionPreset.promptPostProcessing,
+          bypassStatusCheck: connectionPreset.bypassStatusCheck,
+          extraHeaders: connectionPreset.extraHeaders,
+          extraQueryParams: connectionPreset.extraQueryParams,
+        },
+        connectionPreset.id // Pass the custom ID
+      );
       
       // Force immediate refresh from storage to ensure consistency
       setTimeout(() => {
@@ -124,7 +139,7 @@ export default function OfficialProviders({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
@@ -141,7 +156,7 @@ export default function OfficialProviders({
         className="overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900"
         style={{ maxHeight }}
       >
-        <div className="p-3 space-y-2">
+        <div className="p-2 space-y-1.5">
           {OFFICIAL_PROVIDERS.map((provider) => {
             const isAdded = addedProviders.has(provider.id);
             
@@ -149,7 +164,7 @@ export default function OfficialProviders({
               <Card
                 key={provider.id}
                 className={cn(
-                  'p-3 transition-colors',
+                  'p-2 transition-colors',
                   isAdded
                     ? 'border-green-500 bg-green-50 dark:bg-green-950'
                     : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
@@ -158,51 +173,51 @@ export default function OfficialProviders({
                 <CardContent className="p-0">
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-1.5 mb-0.5">
                         {provider.icon && (
-                          <span className="text-lg">{provider.icon}</span>
+                          <span className="text-base">{provider.icon}</span>
                         )}
                         <h3 className="font-medium text-sm truncate">
                           {provider.name}
                         </h3>
                         {showAddedStatus && isAdded && (
-                          <Badge className="bg-green-500 text-white text-xs">
+                          <Badge className="bg-green-500 text-white text-xs px-1.5 py-0">
                             {t.officialProviders.added}
                           </Badge>
                         )}
                       </div>
                       
                       {provider.description && (
-                        <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-2">
+                        <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-1">
                           {provider.description}
                         </p>
                       )}
                       
-                      <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+                      <div className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400 mb-1">
                         <span className="truncate">{provider.baseUrl}</span>
                       </div>
                     </div>
                     
-                    <div className="flex flex-col gap-2 ml-3">
+                    <div className="flex flex-col gap-1.5 ml-2">
                       <Button
                         size="sm"
                         variant={isAdded ? "outline" : "default"}
                         onClick={() => handleAddProvider(provider.id)}
                         disabled={isAdded}
                         title={isAdded ? undefined : t.officialProviders.addProviderTooltip}
-                        className="whitespace-nowrap"
+                        className="whitespace-nowrap h-7 text-xs"
                       >
                         {isAdded ? t.officialProviders.added : t.officialProviders.addProvider}
                       </Button>
                       
-                      <div className="flex gap-1">
+                      <div className="flex gap-0.5">
                         {provider.docsUrl && (
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => handleOpenDocs(provider.docsUrl)}
                             title={t.officialProviders.viewDocs}
-                            className="h-7 w-7 p-0"
+                            className="h-6 w-6 p-0 text-xs"
                           >
                             📄
                           </Button>
@@ -214,7 +229,7 @@ export default function OfficialProviders({
                             variant="ghost"
                             onClick={() => handleOpenWebsite(provider.websiteUrl)}
                             title={t.officialProviders.visitWebsite}
-                            className="h-7 w-7 p-0"
+                            className="h-6 w-6 p-0 text-xs"
                           >
                             🌐
                           </Button>

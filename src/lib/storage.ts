@@ -73,7 +73,9 @@ export function addConnectionPreset(
   preset: Omit<ConnectionPreset, 'id' | 'createdAt' | 'updatedAt' | 'promptPostProcessing' | 'bypassStatusCheck' | 'apiKeys'> & {
     promptPostProcessing?: ConnectionPreset['promptPostProcessing'];
     bypassStatusCheck?: boolean;
-  }
+  },
+  /** Optional custom ID. If not provided, a random ID will be generated */
+  customId?: string
 ): ConnectionPreset {
   const now = new Date().toISOString();
   const newPreset: ConnectionPreset = {
@@ -81,7 +83,7 @@ export function addConnectionPreset(
     promptPostProcessing: preset.promptPostProcessing || 'none',
     bypassStatusCheck: preset.bypassStatusCheck || false,
     apiKeys: [], // Initialize empty API keys array
-    id: generateId(),
+    id: customId || generateId(),
     createdAt: now,
     updatedAt: now,
   };

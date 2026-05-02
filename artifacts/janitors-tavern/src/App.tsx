@@ -19,7 +19,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading) return;
-    const isPublicPath = location === '/login' || location === '/register' || location === '/test-storage';
+    const isPublicPath = location === '/login' || location === '/register';
     if (!isAuthenticated && authConfigured && !isPublicPath) {
       const callbackUrl = encodeURIComponent(location);
       setLocation(`/login?callbackUrl=${callbackUrl}`);
@@ -46,8 +46,6 @@ function AppRoutes() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
-      <Route path="/test-storage" component={TestStorage} />
-      <Route path="/test-firebase" component={TestFirebase} />
       <Route>
         {(isAuthenticated || !authConfigured) ? (
           <Layout>
@@ -57,7 +55,7 @@ function AppRoutes() {
               <Route path="/presets" component={Presets} />
               <Route path="/extensions" component={Extensions} />
               <Route path="/settings" component={Settings} />
-              <Route path="/test-storage" component={TestStorage} />
+              <Route path="/diagnostics" component={TestStorage} />
             </Switch>
           </Layout>
         ) : (

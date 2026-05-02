@@ -86,7 +86,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           ))}
 
           <div className="pt-1 border-t border-sidebar-border mt-1">
-            <Link href="/test-storage">
+            <Link href="/diagnostics">
               <div className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 relative group text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
                 collapsed ? 'justify-center' : ''

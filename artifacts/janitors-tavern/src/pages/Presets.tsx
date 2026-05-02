@@ -5,6 +5,57 @@ import type { ChatCompletionPreset, STSamplerSettings, SamplerSettingKey, STProm
 import { DEFAULT_SAMPLER_SETTINGS } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
+const DEFAULT_PROMPT_BLOCKS: STPromptBlock[] = [
+  { identifier: 'main',               name: 'Main Prompt',               role: 'system', content: "Write {{char}}'s next reply in a fictional chat between {{char}} and {{user}}.", marker: false, enabled: true,  injection_position: 0, injection_depth: 4, injection_order: 100 },
+  { identifier: 'nsfw',               name: 'Auxiliary Prompt',          role: 'system', content: '',                                                                               marker: false, enabled: true,  injection_position: 0, injection_depth: 4, injection_order: 100 },
+  { identifier: 'dialogueExamples',   name: 'Chat Examples',             role: 'system', content: '',                                                                               marker: true,  enabled: true,  injection_position: 0, injection_depth: 4, injection_order: 100 },
+  { identifier: 'jailbreak',          name: 'Post-History Instructions', role: 'system', content: '',                                                                               marker: false, enabled: true,  injection_position: 0, injection_depth: 4, injection_order: 100 },
+  { identifier: 'chatHistory',        name: 'Chat History',              role: 'system', content: '',                                                                               marker: true,  enabled: true,  injection_position: 0, injection_depth: 4, injection_order: 100 },
+  { identifier: 'worldInfoAfter',     name: 'World Info (after)',        role: 'system', content: '',                                                                               marker: true,  enabled: true,  injection_position: 0, injection_depth: 4, injection_order: 100 },
+  { identifier: 'worldInfoBefore',    name: 'World Info (before)',       role: 'system', content: '',                                                                               marker: true,  enabled: true,  injection_position: 0, injection_depth: 4, injection_order: 100 },
+  { identifier: 'enhanceDefinitions', name: 'Enhance Definitions',       role: 'system', content: "If you have more knowledge of {{char}}, add to the character's lore and personality to enhance them but keep the Character Sheet's definitions absolute.", marker: false, enabled: false, injection_position: 0, injection_depth: 4, injection_order: 100 },
+  { identifier: 'charDescription',    name: 'Char Description',          role: 'system', content: '',                                                                               marker: true,  enabled: true,  injection_position: 0, injection_depth: 4, injection_order: 100 },
+  { identifier: 'charPersonality',    name: 'Char Personality',          role: 'system', content: '',                                                                               marker: true,  enabled: true,  injection_position: 0, injection_depth: 4, injection_order: 100 },
+  { identifier: 'scenario',           name: 'Scenario',                  role: 'system', content: '',                                                                               marker: true,  enabled: true,  injection_position: 0, injection_depth: 4, injection_order: 100 },
+  { identifier: 'personaDescription', name: 'Persona Description',       role: 'system', content: '',                                                                               marker: true,  enabled: true,  injection_position: 0, injection_depth: 4, injection_order: 100 },
+];
+
+const DEFAULT_PROMPT_ORDER: ChatCompletionPreset['promptOrder'] = [
+  {
+    character_id: 100000,
+    order: [
+      { identifier: 'main',               enabled: true  },
+      { identifier: 'worldInfoBefore',    enabled: true  },
+      { identifier: 'charDescription',    enabled: true  },
+      { identifier: 'charPersonality',    enabled: true  },
+      { identifier: 'scenario',           enabled: true  },
+      { identifier: 'enhanceDefinitions', enabled: false },
+      { identifier: 'nsfw',               enabled: true  },
+      { identifier: 'worldInfoAfter',     enabled: true  },
+      { identifier: 'dialogueExamples',   enabled: true  },
+      { identifier: 'chatHistory',        enabled: true  },
+      { identifier: 'jailbreak',          enabled: true  },
+    ],
+  },
+  {
+    character_id: 100001,
+    order: [
+      { identifier: 'main',               enabled: true  },
+      { identifier: 'worldInfoBefore',    enabled: true  },
+      { identifier: 'personaDescription', enabled: true  },
+      { identifier: 'charDescription',    enabled: true  },
+      { identifier: 'charPersonality',    enabled: true  },
+      { identifier: 'scenario',           enabled: true  },
+      { identifier: 'enhanceDefinitions', enabled: false },
+      { identifier: 'nsfw',               enabled: true  },
+      { identifier: 'worldInfoAfter',     enabled: true  },
+      { identifier: 'dialogueExamples',   enabled: true  },
+      { identifier: 'chatHistory',        enabled: true  },
+      { identifier: 'jailbreak',          enabled: true  },
+    ],
+  },
+];
+
 function createEmptyPreset(): ChatCompletionPreset {
   const now = new Date().toISOString();
   return {
@@ -12,19 +63,30 @@ function createEmptyPreset(): ChatCompletionPreset {
     name: '',
     description: '',
     tags: [],
-    sampler: { ...DEFAULT_SAMPLER_SETTINGS },
+    sampler: {
+      ...DEFAULT_SAMPLER_SETTINGS,
+      temperature: 1,
+      frequency_penalty: 0,
+      presence_penalty: 0,
+      top_p: 1,
+      top_k: 0,
+      min_p: 0,
+      repetition_penalty: 1,
+      openai_max_tokens: 300,
+      seed: -1,
+    },
     samplerEnabled: {},
-    promptBlocks: [],
-    promptOrder: [],
-    formatStrings: { worldInfo: '', scenario: '', personality: '' },
+    promptBlocks: DEFAULT_PROMPT_BLOCKS.map(b => ({ ...b })),
+    promptOrder: DEFAULT_PROMPT_ORDER.map(o => ({ ...o, order: o.order.map(i => ({ ...i })) })),
+    formatStrings: { worldInfo: '{0}', scenario: '{{scenario}}', personality: '{{personality}}' },
     assistantPrefill: '',
     assistantImpersonation: '',
-    providerSettings: { claudeUseSysprompt: true, makersuiteUseSysprompt: true, squashSystemMessages: false, streamOpenai: true },
-    mediaSettings: { imageInlining: false, inlineImageQuality: 'low', videoInlining: false },
+    providerSettings: { claudeUseSysprompt: false, makersuiteUseSysprompt: false, squashSystemMessages: false, streamOpenai: true },
+    mediaSettings: { imageInlining: true, inlineImageQuality: 'low', videoInlining: false },
     advancedSettings: {
       functionCalling: false, showThoughts: false, reasoningEffort: 'auto', enableWebSearch: false,
       requestImages: false, wrapInQuotes: false, namesBehavior: 0, sendIfEmpty: '',
-      biasPresetSelected: 'None', maxContextUnlocked: false,
+      biasPresetSelected: 'Default (none)', maxContextUnlocked: false,
       startReplyWith: { enabled: false, content: '' },
     },
     createdAt: now,

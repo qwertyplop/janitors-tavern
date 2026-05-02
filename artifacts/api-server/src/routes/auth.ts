@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import {
   setupAuth, verifyLogin, getAuthStatus, rotateToken, clearAuth, authState,
 } from '../lib/auth-state.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -51,7 +52,7 @@ router.post('/logout', (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
-router.post('/rotate-token', (req: Request, res: Response) => {
+router.post('/rotate-token', requireAuth, (req: Request, res: Response) => {
   if (!authState.data.isAuthenticated) {
     res.status(400).json({ error: 'No auth configured' });
     return;
@@ -60,7 +61,7 @@ router.post('/rotate-token', (req: Request, res: Response) => {
   res.json({ success: true, token });
 });
 
-router.post('/clear', (req: Request, res: Response) => {
+router.post('/clear', requireAuth, (req: Request, res: Response) => {
   clearAuth();
   res.json({ success: true });
 });

@@ -218,7 +218,7 @@ function ConnectionForm({ preset, onSave, onCancel, onTest }: {
                 value={form.model} onChange={e => set({ model: e.target.value })}
               >
                 <option value="">Select model...</option>
-                {availableModels.map(m => <option key={m} value={m}>{m}</option>)}
+                {availableModels.map((m, i) => <option key={`${m}-${i}`} value={m}>{m}</option>)}
               </select>
             ) : (
               <input

@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { ScrollText, Plus, Pencil, Trash2, Upload, Download, ChevronDown, ChevronUp, Tag, FileText } from 'lucide-react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { ScrollText, Plus, Pencil, Trash2, Upload, Download, ChevronDown, ChevronUp, Tag, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { storage, generateId } from '@/lib/storage';
 import type { ChatCompletionPreset, STSamplerSettings, SamplerSettingKey } from '@/lib/types';
 import { DEFAULT_SAMPLER_SETTINGS } from '@/lib/types';
@@ -364,6 +364,9 @@ function importSillyTavernPreset(jsonStr: string, existingId?: string): ChatComp
   }
 }
 
+type SortKey = 'alpha' | 'date' | 'blocks';
+type SortDir = 'asc' | 'desc';
+
 export default function Presets() {
   const [presets, setPresets] = useState<ChatCompletionPreset[]>([]);
   const [editing, setEditing] = useState<ChatCompletionPreset | null>(null);
@@ -371,10 +374,26 @@ export default function Presets() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [activeId] = useState(() => storage.active.getPresetId());
+  const [sortKey, setSortKey] = useState<SortKey>('date');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => setPresets(storage.presets.getAll()), []);
   useEffect(() => { load(); }, [load]);
+
+  const sortedPresets = useMemo(() => {
+    const sorted = [...presets].sort((a, b) => {
+      if (sortKey === 'alpha') return a.name.localeCompare(b.name);
+      if (sortKey === 'date') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      return a.promptBlocks.length - b.promptBlocks.length;
+    });
+    return sortDir === 'desc' ? sorted.reverse() : sorted;
+  }, [presets, sortKey, sortDir]);
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir(key === 'date' ? 'desc' : 'asc'); }
+  };
 
   const handleSave = (preset: ChatCompletionPreset) => {
     storage.presets.upsert(preset);
@@ -467,7 +486,25 @@ export default function Presets() {
         </div>
       ) : (
         <div className="space-y-3">
-          {presets.map(preset => (
+          {presets.length > 1 && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <ArrowUpDown size={12} className="shrink-0" />
+              <span className="mr-1">Sort:</span>
+              {(['alpha', 'date', 'blocks'] as SortKey[]).map(key => {
+                const label = key === 'alpha' ? 'Alphabetical' : key === 'date' ? 'Date Added' : 'Block Count';
+                const active = sortKey === key;
+                const Icon = active ? (sortDir === 'asc' ? ArrowUp : ArrowDown) : null;
+                return (
+                  <button key={key} onClick={() => handleSort(key)}
+                    className={cn('flex items-center gap-1 px-2.5 py-1 rounded-md border transition-colors',
+                      active ? 'bg-primary/10 border-primary/30 text-primary' : 'border-border hover:border-primary/30 hover:text-foreground')}>
+                    {label}{Icon && <Icon size={10} />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {sortedPresets.map(preset => (
             editing?.id === preset.id ? (
               <PresetForm key={preset.id} preset={editing} onSave={handleSave} onCancel={() => setEditing(null)} />
             ) : (

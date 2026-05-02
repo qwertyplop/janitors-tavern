@@ -119,13 +119,24 @@ function computeSamplerEnabled(sampler: Record<SamplerSettingKey, number>): Part
 const SAMPLER_LABELS: Record<SamplerSettingKey, string> = {
   temperature: 'Temperature', top_p: 'Top P', top_k: 'Top K', min_p: 'Min P',
   frequency_penalty: 'Frequency Penalty', presence_penalty: 'Presence Penalty',
-  repetition_penalty: 'Repetition Penalty', openai_max_tokens: 'Max Tokens', seed: 'Seed',
+  repetition_penalty: 'Repetition Penalty', openai_max_tokens: 'Max Response Tokens', seed: 'Seed',
+};
+const SAMPLER_DESCRIPTIONS: Record<SamplerSettingKey, string> = {
+  temperature: 'Controls randomness. Higher values make output more random.',
+  top_p: 'Nucleus sampling: only consider tokens with cumulative probability above this.',
+  top_k: 'Only sample from the top K tokens. 0 disables this.',
+  min_p: 'Minimum probability for token consideration relative to the most likely token.',
+  frequency_penalty: 'Penalize tokens based on their frequency in the text so far.',
+  presence_penalty: 'Penalize tokens that have appeared in the text so far.',
+  repetition_penalty: 'Penalize repeated tokens. 1.0 means no penalty.',
+  openai_max_tokens: 'Maximum tokens in response.',
+  seed: '-1 for random. Same seed = reproducible outputs.',
 };
 const SAMPLER_RANGES: Record<SamplerSettingKey, { min: number; max: number; step: number }> = {
   temperature: { min: 0, max: 2, step: 0.01 }, top_p: { min: 0, max: 1, step: 0.01 },
   top_k: { min: 0, max: 200, step: 1 }, min_p: { min: 0, max: 1, step: 0.01 },
   frequency_penalty: { min: -2, max: 2, step: 0.01 }, presence_penalty: { min: -2, max: 2, step: 0.01 },
-  repetition_penalty: { min: 0, max: 2, step: 0.01 }, openai_max_tokens: { min: 64, max: 32768, step: 64 },
+  repetition_penalty: { min: 0, max: 2, step: 0.01 }, openai_max_tokens: { min: 1, max: 32768, step: 1 },
   seed: { min: -1, max: 2147483647, step: 1 },
 };
 
@@ -136,25 +147,26 @@ function SamplerSlider({ name, value, enabled, onChange, onToggleEnabled }: {
 }) {
   const { min, max, step } = SAMPLER_RANGES[name];
   return (
-    <div className={cn('p-3 rounded-lg border transition-colors', enabled ? 'border-primary/30 bg-primary/5' : 'border-border bg-muted/20')}>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <input type="checkbox" checked={enabled} onChange={e => onToggleEnabled(name, e.target.checked)} className="accent-primary" id={`sampler-${name}`} />
-          <label htmlFor={`sampler-${name}`} className={cn('text-xs font-medium', enabled ? 'text-foreground' : 'text-muted-foreground')}>{SAMPLER_LABELS[name]}</label>
-        </div>
-        <input
-          type="number" value={value} step={step} min={min} max={max}
-          onChange={e => onChange(name, parseFloat(e.target.value) || 0)}
-          disabled={!enabled}
-          className="w-20 px-2 py-1 rounded bg-input border border-border text-foreground text-xs text-right focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-40"
-        />
+    <div className={cn('py-4 border-b border-border/30 last:border-0 transition-opacity', !enabled && 'opacity-50')}>
+      <div className="flex items-center gap-3 mb-1">
+        <input type="checkbox" id={`sampler-${name}`} checked={enabled}
+          onChange={e => onToggleEnabled(name, e.target.checked)}
+          className="accent-primary shrink-0 cursor-pointer" />
+        <label htmlFor={`sampler-${name}`} className={cn('text-sm font-medium flex-1 cursor-pointer select-none', enabled ? 'text-foreground' : 'text-muted-foreground')}>
+          {SAMPLER_LABELS[name]}
+        </label>
+        {enabled ? (
+          <input type="number" value={value} step={step} min={min} max={max}
+            onChange={e => onChange(name, parseFloat(e.target.value) || 0)}
+            className="w-20 px-2 py-1 rounded bg-input border border-border text-foreground text-sm text-right focus:outline-none focus:ring-1 focus:ring-ring" />
+        ) : (
+          <span className="w-20 text-right text-sm text-muted-foreground tabular-nums">{value}</span>
+        )}
       </div>
-      <input
-        type="range" value={value} step={step} min={min} max={max}
-        onChange={e => onChange(name, parseFloat(e.target.value))}
-        disabled={!enabled}
-        className="w-full h-1.5 rounded-full accent-primary disabled:opacity-40"
-      />
+      <p className="text-[11px] text-muted-foreground ml-6 mb-3">{SAMPLER_DESCRIPTIONS[name]}</p>
+      <input type="range" value={value} step={step} min={min} max={max}
+        onChange={e => { onChange(name, parseFloat(e.target.value)); if (!enabled) onToggleEnabled(name, true); }}
+        className="w-full accent-primary" />
     </div>
   );
 }
@@ -448,16 +460,82 @@ function PresetForm({ preset, onSave, onCancel }: {
 
       <div className="p-5">
         {tab === 'sampler' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {SAMPLER_KEYS.map(key => (
-              <SamplerSlider
-                key={key} name={key}
-                value={form.sampler[key] as number}
-                enabled={form.samplerEnabled?.[key] ?? false}
-                onChange={setSampler}
-                onToggleEnabled={toggleSamplerEnabled}
-              />
-            ))}
+          <div className="space-y-6">
+
+            {/* Core Sampling Parameters */}
+            <div>
+              <h3 className="text-sm font-semibold text-foreground mb-1">Core Sampling Parameters</h3>
+              <div>
+                {(['temperature','top_p','top_k','min_p'] as SamplerSettingKey[]).map(key => (
+                  <SamplerSlider key={key} name={key}
+                    value={form.sampler[key] as number}
+                    enabled={form.samplerEnabled?.[key] ?? false}
+                    onChange={setSampler} onToggleEnabled={toggleSamplerEnabled} />
+                ))}
+              </div>
+            </div>
+
+            {/* Penalty Parameters */}
+            <div>
+              <h3 className="text-sm font-semibold text-foreground mb-1">Penalty Parameters</h3>
+              <div>
+                {(['frequency_penalty','presence_penalty','repetition_penalty'] as SamplerSettingKey[]).map(key => (
+                  <SamplerSlider key={key} name={key}
+                    value={form.sampler[key] as number}
+                    enabled={form.samplerEnabled?.[key] ?? false}
+                    onChange={setSampler} onToggleEnabled={toggleSamplerEnabled} />
+                ))}
+              </div>
+            </div>
+
+            {/* Context & Token Limits */}
+            <div>
+              <h3 className="text-sm font-semibold text-foreground mb-3">Context & Token Limits</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-foreground">Max Context</label>
+                  <input type="number" min={512} max={2000000} step={1}
+                    value={form.sampler.openai_max_context}
+                    onChange={e => set({ sampler: { ...form.sampler, openai_max_context: Number(e.target.value) } })}
+                    className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+                  <p className="text-[11px] text-muted-foreground">Maximum context window size (internal use)</p>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="max-tokens-enabled"
+                      checked={form.samplerEnabled?.openai_max_tokens ?? false}
+                      onChange={e => toggleSamplerEnabled('openai_max_tokens', e.target.checked)}
+                      className="accent-primary cursor-pointer" />
+                    <label htmlFor="max-tokens-enabled" className="text-sm font-medium text-foreground cursor-pointer select-none">Max Response Tokens</label>
+                  </div>
+                  <input type="number" min={1} max={32768} step={1}
+                    value={form.sampler.openai_max_tokens}
+                    onChange={e => setSampler('openai_max_tokens', Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+                  <p className="text-[11px] text-muted-foreground">Maximum tokens in response</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Generation Settings */}
+            <div>
+              <h3 className="text-sm font-semibold text-foreground mb-3">Generation Settings</h3>
+              <div className={cn('space-y-1.5 transition-opacity', !(form.samplerEnabled?.seed ?? false) && 'opacity-60')}>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="seed-enabled"
+                    checked={form.samplerEnabled?.seed ?? false}
+                    onChange={e => toggleSamplerEnabled('seed', e.target.checked)}
+                    className="accent-primary cursor-pointer" />
+                  <label htmlFor="seed-enabled" className="text-sm font-medium text-foreground cursor-pointer select-none">Seed</label>
+                </div>
+                <input type="number" min={-1} max={2147483647} step={1}
+                  value={form.sampler.seed}
+                  onChange={e => setSampler('seed', Number(e.target.value))}
+                  className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+                <p className="text-[11px] text-muted-foreground">-1 for random. Same seed = reproducible outputs.</p>
+              </div>
+            </div>
+
           </div>
         )}
 

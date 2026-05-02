@@ -270,11 +270,20 @@ function PresetForm({ preset, onSave, onCancel }: {
   );
 }
 
-function importSillyTavernPreset(jsonStr: string, existingId?: string): ChatCompletionPreset | null {
+function nameFromFile(fileName: string): string {
+  return fileName
+    .replace(/\.json$/i, '')
+    .replace(/_\d{10,}$/, '')
+    .replace(/_/g, ' ')
+    .trim();
+}
+
+function importSillyTavernPreset(jsonStr: string, existingId?: string, fileName?: string): ChatCompletionPreset | null {
   try {
     const data = JSON.parse(jsonStr);
     const now = new Date().toISOString();
     const id = existingId || generateId();
+    const fallbackName = fileName ? nameFromFile(fileName) : 'Imported Preset';
 
     const promptBlocks: ChatCompletionPreset['promptBlocks'] = [];
     if (data.prompts && Array.isArray(data.prompts)) {
@@ -306,7 +315,7 @@ function importSillyTavernPreset(jsonStr: string, existingId?: string): ChatComp
 
     return {
       id,
-      name: data.name || 'Imported Preset',
+      name: data.name || fallbackName,
       description: data.description || '',
       tags: Array.isArray(data.tags) ? data.tags : [],
       sampler: {
@@ -429,7 +438,7 @@ export default function Presets() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
-      const imported = importSillyTavernPreset(text);
+      const imported = importSillyTavernPreset(text, undefined, file.name);
       if (imported) {
         storage.presets.upsert(imported);
         load();

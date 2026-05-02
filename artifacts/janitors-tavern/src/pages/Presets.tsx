@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { ScrollText, Plus, Pencil, Trash2, Upload, Download, ChevronDown, ChevronUp, Tag, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { ScrollText, Plus, Pencil, Trash2, Upload, Download, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, GripVertical, Lock, X } from 'lucide-react';
 import { storage, generateId } from '@/lib/storage';
 import type { ChatCompletionPreset, STSamplerSettings, SamplerSettingKey, STPromptBlock, RegexScript } from '@/lib/types';
 import { DEFAULT_SAMPLER_SETTINGS } from '@/lib/types';
@@ -76,122 +76,217 @@ function SamplerSlider({ name, value, enabled, onChange, onToggleEnabled }: {
   );
 }
 
+function BlockEditPanel({ block, onUpdate }: { block: STPromptBlock; onUpdate: (u: Partial<STPromptBlock>) => void }) {
+  return (
+    <div className="px-3 pb-3 pt-3 border-t border-border/40 space-y-3 bg-muted/10">
+      <textarea
+        className="w-full px-2.5 py-2 rounded bg-input border border-border text-foreground text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+        rows={6} value={block.content}
+        onChange={e => onUpdate({ content: e.target.value })}
+      />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="space-y-1">
+          <label className="text-[10px] text-muted-foreground">Role</label>
+          <select className="w-full px-2 py-1 rounded bg-input border border-border text-foreground text-xs focus:outline-none"
+            value={block.role} onChange={e => onUpdate({ role: e.target.value as STPromptBlock['role'] })}>
+            <option value="system">system</option>
+            <option value="user">user</option>
+            <option value="assistant">assistant</option>
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] text-muted-foreground">Position</label>
+          <select className="w-full px-2 py-1 rounded bg-input border border-border text-foreground text-xs focus:outline-none"
+            value={block.injection_position} onChange={e => onUpdate({ injection_position: Number(e.target.value) })}>
+            <option value={0}>Relative</option>
+            <option value={1}>In-Chat</option>
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] text-muted-foreground">Depth</label>
+          <input type="number" disabled={block.injection_position !== 1}
+            className="w-full px-2 py-1 rounded bg-input border border-border text-foreground text-xs focus:outline-none disabled:opacity-40"
+            value={block.injection_depth} onChange={e => onUpdate({ injection_depth: Number(e.target.value) })} />
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] text-muted-foreground">Order</label>
+          <input type="number" className="w-full px-2 py-1 rounded bg-input border border-border text-foreground text-xs focus:outline-none"
+            value={block.injection_order ?? 100} onChange={e => onUpdate({ injection_order: Number(e.target.value) })} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PromptBlockList({ blocks, promptOrder, onBlocksChange, onOrderChange }: {
   blocks: ChatCompletionPreset['promptBlocks'];
   promptOrder: ChatCompletionPreset['promptOrder'];
   onBlocksChange: (blocks: ChatCompletionPreset['promptBlocks']) => void;
   onOrderChange: (order: ChatCompletionPreset['promptOrder']) => void;
 }) {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const order = promptOrder ?? [];
   const canonical = order.find(o => o.character_id === 100001) ?? order[order.length - 1];
   const blockMap = new Map(blocks.map(b => [b.identifier, b]));
 
-  type OrderedItem = { block: STPromptBlock; enabled: boolean };
-  const orderedItems: OrderedItem[] = [];
-  const seenIds = new Set<string>();
+  const activeItems = (canonical?.order ?? [])
+    .map(item => ({ item, block: blockMap.get(item.identifier) }))
+    .filter((x): x is { item: typeof x.item; block: STPromptBlock } => !!x.block);
 
-  if (canonical) {
-    for (const item of canonical.order) {
-      const block = blockMap.get(item.identifier);
-      if (block) { orderedItems.push({ block, enabled: item.enabled }); seenIds.add(block.identifier); }
-    }
-  }
-  for (const block of blocks) {
-    if (!seenIds.has(block.identifier)) orderedItems.push({ block, enabled: block.enabled ?? true });
-  }
+  const activeIds = new Set((canonical?.order ?? []).map(i => i.identifier));
+  const inactiveBlocks = blocks.filter(b => !activeIds.has(b.identifier));
+
+  const roleColor = (r: string) => r === 'system' ? 'bg-blue-400' : r === 'user' ? 'bg-green-400' : 'bg-amber-400';
+  const badge = 'text-[10px] px-1.5 py-0.5 rounded border font-medium shrink-0';
+
+  const updateOrder = (newItems: typeof activeItems) =>
+    onOrderChange(order.map(o => o === canonical ? { ...o, order: newItems.map(x => x.item) } : o));
 
   const toggleEnabled = (identifier: string, enabled: boolean) => {
-    onOrderChange(order.map(o => ({ ...o, order: o.order.map(item => item.identifier === identifier ? { ...item, enabled } : item) })));
+    onOrderChange(order.map(o => ({ ...o, order: o.order.map(i => i.identifier === identifier ? { ...i, enabled } : i) })));
     onBlocksChange(blocks.map(b => b.identifier === identifier ? { ...b, enabled } : b));
+  };
+
+  const addToOrder = (identifier: string) => {
+    if (!canonical) return;
+    onOrderChange(order.map(o => o === canonical ? { ...o, order: [...o.order, { identifier, enabled: true }] } : o));
+  };
+
+  const removeFromOrder = (identifier: string) => {
+    if (!canonical) return;
+    onOrderChange(order.map(o => o === canonical ? { ...o, order: o.order.filter(i => i.identifier !== identifier) } : o));
   };
 
   const updateBlock = (identifier: string, updates: Partial<STPromptBlock>) =>
     onBlocksChange(blocks.map(b => b.identifier === identifier ? { ...b, ...updates } : b));
 
-  const roleColor = (role: string) => role === 'system' ? 'bg-blue-400' : role === 'user' ? 'bg-green-400' : 'bg-amber-400';
+  const handleDrop = (targetId: string) => {
+    if (!dragId || dragId === targetId) return;
+    const next = [...activeItems];
+    const from = next.findIndex(x => x.block.identifier === dragId);
+    const to = next.findIndex(x => x.block.identifier === targetId);
+    if (from === -1 || to === -1) return;
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    updateOrder(next);
+    setDragId(null); setDragOverId(null);
+  };
+
+  if (blocks.length === 0) {
+    return (
+      <div className="text-center py-8 text-xs text-muted-foreground border border-dashed border-border rounded-lg">
+        No prompt blocks. Import a SillyTavern preset to populate them.
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-1.5">
-      {orderedItems.length === 0 && (
-        <div className="text-center py-6 text-xs text-muted-foreground border border-dashed border-border rounded-lg">
-          No prompt blocks. Import a SillyTavern preset to populate them.
+    <div className="space-y-5">
+      {/* ── Active blocks ── */}
+      <div>
+        <div className="flex items-center gap-2 mb-2.5">
+          <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+          <span className="text-xs font-semibold text-foreground">Active Blocks ({activeItems.length})</span>
+          <span className="text-[10px] text-muted-foreground">These blocks are included in the prompt order</span>
         </div>
-      )}
-      {orderedItems.map(({ block, enabled }) => {
-        const isMarker = block.marker;
-        const isExpanded = expandedId === block.identifier;
-        return (
-          <div key={block.identifier} className={cn('border rounded-lg overflow-hidden transition-all', isMarker ? 'border-border/40 opacity-60' : enabled ? 'border-border' : 'border-border/40 opacity-50')}>
-            <div className="flex items-center gap-2 px-3 py-2 bg-muted/20 text-sm">
-              {!isMarker && (
-                <input type="checkbox" checked={enabled}
-                  onChange={e => toggleEnabled(block.identifier, e.target.checked)}
-                  onClick={e => e.stopPropagation()}
-                  className="accent-primary shrink-0 cursor-pointer" />
-              )}
-              {isMarker && <span className="w-4 shrink-0" />}
-              <span className={cn('w-2 h-2 rounded-full shrink-0', roleColor(block.role))} />
-              <span className="flex-1 font-medium truncate min-w-0 text-xs">{block.name || block.identifier}</span>
-              {isMarker ? (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground border border-border shrink-0">marker</span>
-              ) : (
-                <>
-                  <span className="text-[10px] text-muted-foreground shrink-0">{block.injection_position === 1 ? 'In-Chat' : 'Relative'}</span>
-                  <span className="text-muted-foreground capitalize text-[10px] shrink-0">{block.role}</span>
-                  <button onClick={() => setExpandedId(isExpanded ? null : block.identifier)} className="text-muted-foreground hover:text-foreground shrink-0">
-                    {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                  </button>
-                </>
-              )}
-            </div>
-            {!isMarker && isExpanded && (
-              <div className="p-3 bg-muted/10 space-y-3 border-t border-border/40">
-                <textarea
-                  className="w-full px-2.5 py-2 rounded bg-input border border-border text-foreground text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring resize-none"
-                  rows={6} value={block.content}
-                  onChange={e => updateBlock(block.identifier, { content: e.target.value })}
-                />
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-muted-foreground">Role</label>
-                    <select className="w-full px-2 py-1 rounded bg-input border border-border text-foreground text-xs focus:outline-none"
-                      value={block.role} onChange={e => updateBlock(block.identifier, { role: e.target.value as STPromptBlock['role'] })}>
-                      <option value="system">system</option>
-                      <option value="user">user</option>
-                      <option value="assistant">assistant</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-muted-foreground">Position</label>
-                    <select className="w-full px-2 py-1 rounded bg-input border border-border text-foreground text-xs focus:outline-none"
-                      value={block.injection_position} onChange={e => updateBlock(block.identifier, { injection_position: Number(e.target.value) })}>
-                      <option value={0}>Relative</option>
-                      <option value={1}>In-Chat</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-muted-foreground">Depth {block.injection_position !== 1 && <span className="opacity-40">(In-Chat only)</span>}</label>
-                    <input type="number" className="w-full px-2 py-1 rounded bg-input border border-border text-foreground text-xs focus:outline-none disabled:opacity-40"
-                      value={block.injection_depth} disabled={block.injection_position !== 1}
-                      onChange={e => updateBlock(block.identifier, { injection_depth: Number(e.target.value) })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-muted-foreground">Order</label>
-                    <input type="number" className="w-full px-2 py-1 rounded bg-input border border-border text-foreground text-xs focus:outline-none"
-                      value={block.injection_order ?? 100}
-                      onChange={e => updateBlock(block.identifier, { injection_order: Number(e.target.value) })} />
-                  </div>
+        <div className="space-y-1">
+          {activeItems.map(({ item, block }) => {
+            const isMarker = block.marker;
+            const isEditing = editingId === block.identifier;
+            const isDragging = dragId === block.identifier;
+            const isDragOver = dragOverId === block.identifier;
+            return (
+              <div key={block.identifier}
+                className={cn('rounded-lg border transition-colors', isDragOver && !isDragging ? 'border-primary/60 bg-primary/5' : 'border-border', isDragging ? 'opacity-30' : '')}
+                onDragOver={e => { e.preventDefault(); setDragOverId(block.identifier); }}
+                onDrop={() => handleDrop(block.identifier)}
+                onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverId(null); }}
+              >
+                <div className="flex items-center gap-2 px-3 py-2.5">
+                  {isMarker ? (
+                    <Lock size={12} className="text-muted-foreground/40 shrink-0" />
+                  ) : (
+                    <GripVertical size={14} className="text-muted-foreground/40 shrink-0 cursor-grab active:cursor-grabbing"
+                      draggable onDragStart={() => setDragId(block.identifier)}
+                      onDragEnd={() => { setDragId(null); setDragOverId(null); }} />
+                  )}
+                  <input type="checkbox" checked={item.enabled} disabled={isMarker}
+                    onChange={e => toggleEnabled(block.identifier, e.target.checked)}
+                    className="accent-primary shrink-0 cursor-pointer disabled:cursor-default" />
+                  <span className={cn('w-2 h-2 rounded-full shrink-0', roleColor(block.role))} />
+                  <span className="flex-1 font-medium text-sm text-foreground min-w-0 truncate">{block.name || block.identifier}</span>
+                  <span className={cn(badge, 'bg-secondary text-secondary-foreground border-secondary-border capitalize')}>{block.role}</span>
+                  {isMarker && <span className={cn(badge, 'bg-amber-500/20 text-amber-400 border-amber-500/30')}>Marker</span>}
+                  {!isMarker && (
+                    <>
+                      <button onClick={() => setEditingId(isEditing ? null : block.identifier)}
+                        className="px-2.5 py-1 rounded border border-border text-xs text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors shrink-0">
+                        {isEditing ? 'Close' : 'Edit'}
+                      </button>
+                      <button onClick={() => removeFromOrder(block.identifier)} title="Remove from order"
+                        className="p-1 rounded text-muted-foreground/50 hover:text-destructive transition-colors shrink-0">
+                        <X size={12} />
+                      </button>
+                    </>
+                  )}
                 </div>
-                {block.forbid_overrides && (
-                  <p className="text-[10px] text-muted-foreground">Forbid overrides: on</p>
+                {isMarker && (
+                  <p className="px-3 pb-2 -mt-1 text-[10px] text-amber-500/60">Dynamic content placeholder — cannot be edited</p>
+                )}
+                {!isMarker && isEditing && (
+                  <BlockEditPanel block={block} onUpdate={u => updateBlock(block.identifier, u)} />
                 )}
               </div>
-            )}
+            );
+          })}
+          {activeItems.length === 0 && (
+            <div className="text-center py-4 text-xs text-muted-foreground border border-dashed border-border rounded-lg">
+              No blocks in the prompt order.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Inactive blocks ── */}
+      {inactiveBlocks.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-2.5">
+            <span className="w-2 h-2 rounded-full bg-muted-foreground/30 shrink-0" />
+            <span className="text-xs font-semibold text-foreground">Inactive Blocks ({inactiveBlocks.length})</span>
+            <span className="text-[10px] text-muted-foreground">Available but not included in the prompt order</span>
           </div>
-        );
-      })}
+          <div className="space-y-1">
+            {inactiveBlocks.map(block => {
+              const isEditing = editingId === block.identifier;
+              return (
+                <div key={block.identifier} className="rounded-lg border border-border/40 bg-muted/5">
+                  <div className="flex items-center gap-2 px-3 py-2.5">
+                    <GripVertical size={14} className="text-muted-foreground/30 shrink-0" />
+                    <button onClick={() => addToOrder(block.identifier)} title="Add to prompt order"
+                      className="w-5 h-5 rounded border border-border flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors shrink-0">
+                      <Plus size={11} />
+                    </button>
+                    <span className={cn('w-2 h-2 rounded-full shrink-0 opacity-50', roleColor(block.role))} />
+                    <span className="flex-1 font-medium text-sm text-foreground/50 min-w-0 truncate">{block.name || block.identifier}</span>
+                    <span className={cn(badge, 'bg-secondary/40 text-secondary-foreground/50 border-secondary-border/40 capitalize')}>{block.role}</span>
+                    {block.marker && <span className={cn(badge, 'bg-amber-500/10 text-amber-400/60 border-amber-500/20')}>Marker</span>}
+                    <button onClick={() => setEditingId(isEditing ? null : block.identifier)}
+                      className="px-2.5 py-1 rounded border border-border/40 text-xs text-muted-foreground/60 hover:text-foreground transition-colors shrink-0">
+                      {isEditing ? 'Close' : 'Edit'}
+                    </button>
+                  </div>
+                  {!block.marker && isEditing && (
+                    <BlockEditPanel block={block} onUpdate={u => updateBlock(block.identifier, u)} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

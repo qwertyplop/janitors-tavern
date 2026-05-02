@@ -686,26 +686,33 @@ function importSillyTavernPreset(jsonStr: string, existingId?: string, fileName?
       assistantPrefill: data.assistant_prefill || '',
       assistantImpersonation: data.assistant_impersonation || '',
       providerSettings: {
-        claudeUseSysprompt: data.claude_use_sysprompt ?? true,
-        makersuiteUseSysprompt: data.makersuite_use_sysprompt ?? true,
+        // ST JSON uses `use_sysprompt` for Claude; newer exports also have `claude_use_sysprompt`
+        claudeUseSysprompt: data.claude_use_sysprompt ?? data.use_sysprompt ?? false,
+        makersuiteUseSysprompt: data.makersuite_use_sysprompt ?? false,
         squashSystemMessages: data.squash_system_messages ?? false,
         streamOpenai: data.stream_openai ?? true,
       },
-      mediaSettings: { imageInlining: false, inlineImageQuality: 'low', videoInlining: false },
+      mediaSettings: {
+        // ST JSON uses `media_inlining` for image inlining
+        imageInlining: data.media_inlining ?? data.image_inlining ?? false,
+        inlineImageQuality: data.inline_image_quality ?? 'low',
+        videoInlining: data.video_inlining ?? false,
+      },
       advancedSettings: {
         functionCalling: data.function_calling ?? false,
         showThoughts: data.show_thoughts ?? false,
-        reasoningEffort: data.reasoning_effort || 'auto',
+        reasoningEffort: data.reasoning_effort ?? 'auto',
         enableWebSearch: data.enable_web_search ?? false,
         requestImages: data.request_images ?? false,
         wrapInQuotes: data.wrap_in_quotes ?? false,
         namesBehavior: data.names_behavior ?? 0,
-        sendIfEmpty: data.send_if_empty || '',
-        biasPresetSelected: data.bias_preset_selected || 'None',
+        sendIfEmpty: data.send_if_empty ?? '',
+        biasPresetSelected: data.bias_preset_selected ?? 'Default (none)',
         maxContextUnlocked: data.max_context_unlocked ?? false,
+        // ST stores "start reply with" as assistant_prefill; enabled when non-empty
         startReplyWith: {
-          enabled: !!data.start_reply_with?.enabled,
-          content: data.start_reply_with?.content || '',
+          enabled: !!(data.assistant_prefill && data.assistant_prefill.length > 0),
+          content: data.assistant_prefill ?? '',
         },
       },
       sourceFileName: data.name,

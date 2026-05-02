@@ -1,10 +1,15 @@
 import type { ConnectionPreset, ChatCompletionPreset, RegexScript, UsageStats } from './types';
+import { getAuthHeaders } from './auth';
 
 const API_BASE = '/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+      ...(options?.headers as Record<string, string> || {}),
+    },
     ...options,
   });
   if (!res.ok) {

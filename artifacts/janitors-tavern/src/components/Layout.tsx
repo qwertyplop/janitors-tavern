@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useRoute } from 'wouter';
-import { LayoutDashboard, Plug, ScrollText, Code2, Settings, ChevronLeft, ChevronRight, Beer, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Plug, ScrollText, Code2, Settings, ChevronLeft, ChevronRight, Beer, Menu, X, LogOut, FlaskConical, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -43,6 +44,7 @@ function NavItem({ path, label, icon: Icon, collapsed }: { path: string; label: 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { logout, username, authConfigured } = useAuth();
 
   useEffect(() => {
     const saved = localStorage.getItem('jt.sidebarCollapsed');
@@ -82,9 +84,48 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {navItems.map(item => (
             <NavItem key={item.path} {...item} collapsed={collapsed} />
           ))}
+
+          <div className="pt-1 border-t border-sidebar-border mt-1">
+            <Link href="/test-storage">
+              <div className={cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 relative group text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                collapsed ? 'justify-center' : ''
+              )}>
+                <FlaskConical size={18} className="shrink-0" />
+                {!collapsed && <span className="text-sm font-medium truncate">Diagnostics</span>}
+                {collapsed && (
+                  <div className="absolute left-full ml-2 px-2 py-1 bg-popover border border-popover-border text-popover-foreground text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                    Diagnostics
+                  </div>
+                )}
+              </div>
+            </Link>
+          </div>
         </nav>
 
-        <div className="p-2 border-t border-sidebar-border">
+        {authConfigured && (
+          <div className={cn('p-2 border-t border-sidebar-border space-y-1')}>
+            {!collapsed && username && (
+              <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground">
+                <User size={12} />
+                <span className="truncate">{username}</span>
+              </div>
+            )}
+            <button
+              onClick={logout}
+              className={cn(
+                'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-destructive/10 hover:text-destructive transition-colors text-xs',
+                collapsed ? 'justify-center' : ''
+              )}
+              title="Sign out"
+            >
+              <LogOut size={14} />
+              {!collapsed && <span>Sign Out</span>}
+            </button>
+          </div>
+        )}
+
+        <div className={cn('p-2', authConfigured ? '' : 'border-t border-sidebar-border')}>
           <button
             onClick={toggleCollapse}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors text-xs"

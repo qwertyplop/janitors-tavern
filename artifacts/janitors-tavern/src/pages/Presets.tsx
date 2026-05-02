@@ -75,7 +75,7 @@ function createEmptyPreset(): ChatCompletionPreset {
       openai_max_tokens: 300,
       seed: -1,
     },
-    samplerEnabled: {},
+    samplerEnabled: computeSamplerEnabled({ temperature: 1, top_p: 1, top_k: 0, min_p: 0, frequency_penalty: 0, presence_penalty: 0, repetition_penalty: 1, openai_max_tokens: 300, seed: -1 }),
     promptBlocks: DEFAULT_PROMPT_BLOCKS.map(b => ({ ...b })),
     promptOrder: DEFAULT_PROMPT_ORDER.map(o => ({ ...o, order: o.order.map(i => ({ ...i })) })),
     formatStrings: { worldInfo: '{0}', scenario: '{{scenario}}', personality: '{{personality}}' },
@@ -95,6 +95,27 @@ function createEmptyPreset(): ChatCompletionPreset {
 }
 
 const SAMPLER_KEYS: SamplerSettingKey[] = ['temperature','top_p','top_k','min_p','frequency_penalty','presence_penalty','repetition_penalty','openai_max_tokens','seed'];
+
+// Neutral/no-op values for each sampler. If a preset's value differs → enabled, otherwise → disabled.
+const SAMPLER_NEUTRAL: Record<SamplerSettingKey, number> = {
+  temperature: 1,
+  top_p: 1,
+  top_k: 0,
+  min_p: 0,
+  frequency_penalty: 0,
+  presence_penalty: 0,
+  repetition_penalty: 1,
+  openai_max_tokens: DEFAULT_SAMPLER_SETTINGS.openai_max_tokens,
+  seed: -1,
+};
+
+function computeSamplerEnabled(sampler: Record<SamplerSettingKey, number>): Partial<Record<SamplerSettingKey, boolean>> {
+  const out: Partial<Record<SamplerSettingKey, boolean>> = {};
+  for (const key of SAMPLER_KEYS) {
+    out[key] = sampler[key] !== SAMPLER_NEUTRAL[key];
+  }
+  return out;
+}
 const SAMPLER_LABELS: Record<SamplerSettingKey, string> = {
   temperature: 'Temperature', top_p: 'Top P', top_k: 'Top K', min_p: 'Min P',
   frequency_penalty: 'Frequency Penalty', presence_penalty: 'Presence Penalty',
@@ -674,7 +695,17 @@ function importSillyTavernPreset(jsonStr: string, existingId?: string, fileName?
         seed: data.seed ?? DEFAULT_SAMPLER_SETTINGS.seed,
         n: data.n ?? DEFAULT_SAMPLER_SETTINGS.n,
       },
-      samplerEnabled: data.samplerEnabled || {},
+      samplerEnabled: computeSamplerEnabled({
+        temperature: data.temperature ?? DEFAULT_SAMPLER_SETTINGS.temperature,
+        top_p: data.top_p ?? DEFAULT_SAMPLER_SETTINGS.top_p,
+        top_k: data.top_k ?? DEFAULT_SAMPLER_SETTINGS.top_k,
+        min_p: data.min_p ?? DEFAULT_SAMPLER_SETTINGS.min_p,
+        frequency_penalty: data.frequency_penalty ?? DEFAULT_SAMPLER_SETTINGS.frequency_penalty,
+        presence_penalty: data.presence_penalty ?? DEFAULT_SAMPLER_SETTINGS.presence_penalty,
+        repetition_penalty: data.repetition_penalty ?? DEFAULT_SAMPLER_SETTINGS.repetition_penalty,
+        openai_max_tokens: data.openai_max_tokens ?? DEFAULT_SAMPLER_SETTINGS.openai_max_tokens,
+        seed: data.seed ?? DEFAULT_SAMPLER_SETTINGS.seed,
+      }),
       promptBlocks,
       promptOrder,
       regexScripts: regexScripts.length > 0 ? regexScripts : undefined,

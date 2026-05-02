@@ -9,7 +9,7 @@ import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import TestStorage from './pages/TestStorage';
-import TestFirebase from './pages/TestFirebase';
+import RequestInspector from './pages/RequestInspector';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { storage } from './lib/storage';
 
@@ -56,6 +56,7 @@ function AppRoutes() {
               <Route path="/extensions" component={Extensions} />
               <Route path="/settings" component={Settings} />
               <Route path="/diagnostics" component={TestStorage} />
+              <Route path="/inspector" component={RequestInspector} />
             </Switch>
           </Layout>
         ) : (

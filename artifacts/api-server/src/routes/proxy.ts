@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { serverState, recordUsage, calculateMessageTokens, extractTokenCountsFromResponse, extractTokenCountsFromStreamChunk } from '../lib/server-state.js';
+import { serverState, recordUsage, calculateMessageTokens, estimateTokens, extractTokenCountsFromResponse, extractTokenCountsFromStreamChunk } from '../lib/server-state.js';
 import { verifyJanitorApiKey, authState as _authState } from '../lib/auth-state.js';
 import { parseJanitorRequest, janitorDataToMacroContext } from '../lib/janitor-parser.js';
 import { buildMessages } from '../lib/prompt-builder.js';
@@ -234,6 +234,127 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key',
 };
+
+router.options('/preview', (req: Request, res: Response) => {
+  res.set(CORS_HEADERS).status(200).end();
+});
+
+router.post('/preview', async (req: Request, res: Response) => {
+  res.set(CORS_HEADERS);
+  try {
+    const body = req.body as {
+      messages?: ChatMessage[];
+      model?: string;
+      connectionPreset?: ConnectionPreset;
+      chatCompletionPreset?: ChatCompletionPreset;
+    };
+
+    if (!body.messages || body.messages.length === 0) {
+      res.status(400).json({ error: 'Messages are required' });
+      return;
+    }
+
+    const connectionPreset = body.connectionPreset || serverState.activeConnectionPreset;
+    const chatCompletionPreset = body.chatCompletionPreset || serverState.activeChatCompletionPreset;
+
+    let postProcessingMode: PromptPostProcessingMode;
+    if (connectionPreset?.promptPostProcessing && connectionPreset.promptPostProcessing !== 'none') {
+      postProcessingMode = connectionPreset.promptPostProcessing;
+    } else if (serverState.defaultPostProcessing && serverState.defaultPostProcessing !== 'none') {
+      postProcessingMode = serverState.defaultPostProcessing;
+    } else {
+      postProcessingMode = 'none';
+    }
+
+    const janitorRequest = {
+      messages: body.messages,
+      model: body.model || connectionPreset?.model || '',
+      stream: false as const,
+    };
+
+    const janitorData = parseJanitorRequest(janitorRequest);
+    const macroContext = janitorDataToMacroContext(janitorData);
+    const regexScripts = serverState.activeRegexScripts.filter(s => !s.disabled);
+
+    let processedMessages: OutputMessage[];
+    if (chatCompletionPreset) {
+      processedMessages = buildMessages(chatCompletionPreset, janitorData, macroContext);
+    } else {
+      processedMessages = body.messages.map(msg => ({
+        role: msg.role,
+        content: processMacros(msg.content, macroContext),
+      }));
+    }
+
+    if (regexScripts.length > 0) {
+      const inputScripts = regexScripts.filter(s => s.placement.includes(1));
+      if (inputScripts.length > 0) {
+        processedMessages = processedMessages.map(msg => ({
+          ...msg,
+          content: applyRegexScripts(msg.content, inputScripts, macroContext, 1, undefined, msg.role),
+        }));
+      }
+    }
+
+    if (postProcessingMode !== 'none') {
+      processedMessages = applyPostProcessing(processedMessages, postProcessingMode, {
+        strictPlaceholderMessage: serverState.strictPlaceholderMessage,
+      });
+    }
+
+    const samplerParams = chatCompletionPreset?.sampler ?? DEFAULT_SAMPLER_SETTINGS;
+    const samplerEnabled = chatCompletionPreset?.samplerEnabled ?? {};
+
+    const isEnabled = (key: string): boolean => {
+      const enabled = samplerEnabled as Record<string, boolean | undefined>;
+      if (enabled[key] !== undefined) return enabled[key] === true;
+      if (key === 'openai_max_tokens') return true;
+      const value = (samplerParams as Record<string, unknown>)[key];
+      const defaultValue = (DEFAULT_SAMPLER_SETTINGS as Record<string, unknown>)[key];
+      return value !== defaultValue;
+    };
+
+    const buildParams: Record<string, unknown> = {};
+    if (isEnabled('temperature')) buildParams.temperature = samplerParams.temperature;
+    if (isEnabled('top_p')) buildParams.top_p = samplerParams.top_p;
+    if (isEnabled('openai_max_tokens')) buildParams.max_tokens = samplerParams.openai_max_tokens;
+    if (isEnabled('frequency_penalty')) buildParams.frequency_penalty = samplerParams.frequency_penalty;
+    if (isEnabled('presence_penalty')) buildParams.presence_penalty = samplerParams.presence_penalty;
+    if (isEnabled('top_k') && samplerParams.top_k > 0) buildParams.top_k = samplerParams.top_k;
+    if (isEnabled('min_p') && samplerParams.min_p > 0) buildParams.min_p = samplerParams.min_p;
+    if (isEnabled('repetition_penalty') && samplerParams.repetition_penalty !== 1) buildParams.repetition_penalty = samplerParams.repetition_penalty;
+    if (isEnabled('seed') && samplerParams.seed !== -1) buildParams.seed = samplerParams.seed;
+
+    const messagesWithTokens = processedMessages.map(msg => ({
+      role: msg.role,
+      content: msg.content,
+      tokens: estimateTokens(msg.content) + 4,
+    }));
+
+    const totalTokens = messagesWithTokens.reduce((acc, m) => acc + m.tokens, 0);
+    const byRole: Record<string, number> = {};
+    for (const m of messagesWithTokens) {
+      byRole[m.role] = (byRole[m.role] || 0) + m.tokens;
+    }
+
+    res.json({
+      messages: messagesWithTokens,
+      samplerParams: buildParams,
+      postProcessingMode,
+      model: connectionPreset?.model || body.model || '(not set)',
+      baseUrl: connectionPreset?.baseUrl || '(not set)',
+      presetName: chatCompletionPreset?.name || null,
+      connectionName: connectionPreset?.name || null,
+      totalMessages: messagesWithTokens.length,
+      totalTokens,
+      byRole,
+      inputMessageCount: body.messages.length,
+    });
+  } catch (error) {
+    console.error('[Preview] Error:', error);
+    res.status(500).json({ error: `Preview error: ${error instanceof Error ? error.message : 'Unknown error'}` });
+  }
+});
 
 router.options('/chat-completion', (req: Request, res: Response) => {
   res.set(CORS_HEADERS).status(200).end();

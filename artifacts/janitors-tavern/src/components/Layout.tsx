@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useRoute } from 'wouter';
-import { LayoutDashboard, Plug, ScrollText, Code2, Settings, ChevronLeft, ChevronRight, Beer, Menu, X, LogOut, FlaskConical, User } from 'lucide-react';
+import { LayoutDashboard, Plug, ScrollText, Code2, Settings, ChevronLeft, ChevronRight, Beer, Menu, X, LogOut, FlaskConical, ScanSearch, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -85,7 +85,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <NavItem key={item.path} {...item} collapsed={collapsed} />
           ))}
 
-          <div className="pt-1 border-t border-sidebar-border mt-1">
+          <div className="pt-1 border-t border-sidebar-border mt-1 space-y-0.5">
+            <Link href="/inspector">
+              <div className={cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 relative group text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                collapsed ? 'justify-center' : ''
+              )}>
+                <ScanSearch size={18} className="shrink-0" />
+                {!collapsed && <span className="text-sm font-medium truncate">Request Inspector</span>}
+                {collapsed && (
+                  <div className="absolute left-full ml-2 px-2 py-1 bg-popover border border-popover-border text-popover-foreground text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                    Request Inspector
+                  </div>
+                )}
+              </div>
+            </Link>
             <Link href="/diagnostics">
               <div className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 relative group text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',

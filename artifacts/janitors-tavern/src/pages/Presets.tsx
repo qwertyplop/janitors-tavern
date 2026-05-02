@@ -189,6 +189,7 @@ function PromptBlockList({ blocks, promptOrder, onBlocksChange, onOrderChange }:
   const [editingId, setEditingId] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const dragAllowed = useRef(false);
 
   const order = promptOrder ?? [];
   const canonical = order.find(o => o.character_id === 100001) ?? order[order.length - 1];
@@ -254,7 +255,7 @@ function PromptBlockList({ blocks, promptOrder, onBlocksChange, onOrderChange }:
           <span className="text-xs font-semibold text-foreground">Active Blocks ({activeItems.length})</span>
           <span className="text-[10px] text-muted-foreground">These blocks are included in the prompt order</span>
         </div>
-        <div className="space-y-1">
+        <div className={cn('space-y-1', dragId ? 'select-none' : '')}>
           {activeItems.map(({ item, block }) => {
             const isMarker = block.marker;
             const isEditing = editingId === block.identifier;
@@ -262,18 +263,26 @@ function PromptBlockList({ blocks, promptOrder, onBlocksChange, onOrderChange }:
             const isDragOver = dragOverId === block.identifier;
             return (
               <div key={block.identifier}
+                draggable={!isMarker}
                 className={cn('rounded-lg border transition-colors', isDragOver && !isDragging ? 'border-primary/60 bg-primary/5' : 'border-border', isDragging ? 'opacity-30' : '')}
-                onDragOver={e => { e.preventDefault(); setDragOverId(block.identifier); }}
-                onDrop={() => handleDrop(block.identifier)}
+                onDragStart={e => {
+                  if (!dragAllowed.current) { e.preventDefault(); return; }
+                  e.dataTransfer.effectAllowed = 'move';
+                  setDragId(block.identifier);
+                }}
+                onDragEnd={() => { dragAllowed.current = false; setDragId(null); setDragOverId(null); }}
+                onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverId(block.identifier); }}
+                onDrop={e => { e.preventDefault(); handleDrop(block.identifier); }}
                 onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverId(null); }}
               >
                 <div className="flex items-center gap-2 px-3 py-2.5">
                   {isMarker ? (
                     <Lock size={12} className="text-muted-foreground/40 shrink-0" />
                   ) : (
-                    <GripVertical size={14} className="text-muted-foreground/40 shrink-0 cursor-grab active:cursor-grabbing"
-                      draggable onDragStart={() => setDragId(block.identifier)}
-                      onDragEnd={() => { setDragId(null); setDragOverId(null); }} />
+                    <GripVertical size={14}
+                      className="text-muted-foreground/50 shrink-0 cursor-grab active:cursor-grabbing touch-none"
+                      onMouseDown={() => { dragAllowed.current = true; }}
+                      onMouseUp={() => { dragAllowed.current = false; }} />
                   )}
                   <input type="checkbox" checked={item.enabled} disabled={isMarker}
                     onChange={e => toggleEnabled(block.identifier, e.target.checked)}

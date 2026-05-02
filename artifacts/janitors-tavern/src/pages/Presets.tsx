@@ -459,37 +459,117 @@ function PresetForm({ preset, onSave, onCancel }: {
         )}
 
         {tab === 'advanced' && (
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Start Reply With</label>
-              <div className="flex items-center gap-2 mb-2">
-                <input type="checkbox" id="startReplyEnabled" checked={form.advancedSettings.startReplyWith.enabled}
+          <div className="space-y-7">
+
+            {/* ── Provider Settings ── */}
+            <div>
+              <h3 className="text-sm font-semibold text-foreground mb-0.5">Provider Settings</h3>
+              <p className="text-[11px] text-muted-foreground mb-3">Settings specific to different API providers</p>
+              <div className="space-y-2">
+                {([
+                  { key: 'claudeUseSysprompt',      label: 'Use Claude System Prompt',    desc: 'Merge system messages into a separate system instruction field (Claude)' },
+                  { key: 'makersuiteUseSysprompt',   label: 'Use MakerSuite System Prompt', desc: 'Merge system messages into a separate system instruction field (Gemini)' },
+                  { key: 'squashSystemMessages',     label: 'Squash System Messages',       desc: 'Combine consecutive System messages into a single message (deprecated)' },
+                ] as { key: keyof typeof form.providerSettings; label: string; desc: string }[]).map(({ key, label, desc }) => (
+                  <label key={key} className={cn('flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                    (form.providerSettings[key] as boolean) ? 'border-primary/30 bg-primary/5' : 'border-border hover:border-border/80')}>
+                    <input type="checkbox" checked={form.providerSettings[key] as boolean}
+                      onChange={e => set({ providerSettings: { ...form.providerSettings, [key]: e.target.checked } })}
+                      className="accent-primary mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-xs font-medium text-foreground">{label}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-2.5 italic">
+                Note: Streaming is controlled by the JanitorAI request, not preset settings.
+              </p>
+            </div>
+
+            {/* ── Reasoning Settings ── */}
+            <div>
+              <h3 className="text-sm font-semibold text-foreground mb-0.5">Reasoning Settings</h3>
+              <p className="text-[11px] text-muted-foreground mb-3">Settings for models that support reasoning/thinking modes</p>
+              <div className="flex items-start gap-4">
+                <div className="flex-1 space-y-1">
+                  <label className="text-xs font-medium text-foreground">Reasoning Effort</label>
+                  <select className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    value={form.advancedSettings.reasoningEffort}
+                    onChange={e => set({ advancedSettings: { ...form.advancedSettings, reasoningEffort: e.target.value as 'auto' | 'low' | 'medium' | 'high' } })}>
+                    <option value="auto">Auto</option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                  <p className="text-[11px] text-muted-foreground">
+                    {form.advancedSettings.reasoningEffort === 'auto' ? 'Let the model decide' :
+                     form.advancedSettings.reasoningEffort === 'low'  ? 'Faster, less thorough reasoning' :
+                     form.advancedSettings.reasoningEffort === 'medium' ? 'Balanced reasoning depth' :
+                     'Maximum reasoning depth (slower)'}
+                  </p>
+                </div>
+                <label className={cn('flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors min-w-[180px]',
+                  form.advancedSettings.showThoughts ? 'border-primary/30 bg-primary/5' : 'border-border hover:border-border/80')}>
+                  <input type="checkbox" checked={form.advancedSettings.showThoughts}
+                    onChange={e => set({ advancedSettings: { ...form.advancedSettings, showThoughts: e.target.checked } })}
+                    className="accent-primary mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-xs font-medium text-foreground">Show Thoughts</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Display model reasoning in responses</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* ── Advanced Features ── */}
+            <div>
+              <h3 className="text-sm font-semibold text-foreground mb-0.5">Advanced Features</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {([
+                  { key: 'functionCalling',  label: 'Enable Function Calling', desc: 'Allow model to call functions/tools' },
+                  { key: 'enableWebSearch',  label: 'Enable Web Search',        desc: 'Enrich prompts with search results' },
+                  { key: 'wrapInQuotes',     label: 'Wrap in Quotes',           desc: 'Wrap user messages in hidden quotation marks (deprecated)' },
+                  { key: 'maxContextUnlocked', label: 'Unlock Max Context',     desc: 'Allow higher context limits' },
+                ] as { key: keyof typeof form.advancedSettings; label: string; desc: string }[]).map(({ key, label, desc }) => (
+                  <label key={key} className={cn('flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                    (form.advancedSettings[key] as boolean) ? 'border-primary/30 bg-primary/5' : 'border-border hover:border-border/80')}>
+                    <input type="checkbox" checked={form.advancedSettings[key] as boolean}
+                      onChange={e => set({ advancedSettings: { ...form.advancedSettings, [key]: e.target.checked } })}
+                      className="accent-primary mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-xs font-medium text-foreground">{label}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Start Reply With ── */}
+            <div>
+              <h3 className="text-sm font-semibold text-foreground mb-0.5">Start Reply With</h3>
+              <p className="text-[11px] text-muted-foreground mb-3">Prepend text to the beginning of every AI response. Useful for forcing a specific format or style.</p>
+              <label className={cn('flex items-center gap-2 mb-3 cursor-pointer')}>
+                <input type="checkbox" checked={form.advancedSettings.startReplyWith.enabled}
                   onChange={e => set({ advancedSettings: { ...form.advancedSettings, startReplyWith: { ...form.advancedSettings.startReplyWith, enabled: e.target.checked } } })}
                   className="accent-primary" />
-                <label htmlFor="startReplyEnabled" className="text-xs text-muted-foreground">Enable start reply with</label>
-              </div>
-              {form.advancedSettings.startReplyWith.enabled && (
-                <input className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                <span className="text-xs font-medium text-foreground">Enable Start Reply With</span>
+              </label>
+              <div className="space-y-1">
+                <label className="text-[11px] text-muted-foreground">Content to prepend</label>
+                <textarea
+                  className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none disabled:opacity-40"
+                  rows={3}
+                  disabled={!form.advancedSettings.startReplyWith.enabled}
                   value={form.advancedSettings.startReplyWith.content}
                   onChange={e => set({ advancedSettings: { ...form.advancedSettings, startReplyWith: { ...form.advancedSettings.startReplyWith, content: e.target.value } } })}
-                  placeholder="*" />
-              )}
+                  placeholder="Text to prepend to AI responses ..."
+                />
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                ['claudeUseSysprompt', 'Claude Use Sysprompt'],
-                ['squashSystemMessages', 'Squash System Messages'],
-                ['streamOpenai', 'Stream (OpenAI)'],
-              ].map(([key, label]) => (
-                <div key={key} className="flex items-center gap-2">
-                  <input type="checkbox" id={`adv-${key}`}
-                    checked={form.providerSettings[key as keyof typeof form.providerSettings] as boolean}
-                    onChange={e => set({ providerSettings: { ...form.providerSettings, [key]: e.target.checked } })}
-                    className="accent-primary" />
-                  <label htmlFor={`adv-${key}`} className="text-xs text-muted-foreground">{label}</label>
-                </div>
-              ))}
-            </div>
+
           </div>
         )}
       </div>

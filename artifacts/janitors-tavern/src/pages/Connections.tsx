@@ -211,10 +211,10 @@ function ConnectionForm({ preset, onSave, onCancel, onTest }: {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Model *</label>
-          <div className="flex gap-2">
+          <div className="flex gap-2 min-w-0">
             {availableModels.length > 0 ? (
               <select
-                className="flex-1 px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 value={form.model} onChange={e => set({ model: e.target.value })}
               >
                 <option value="">Select model...</option>

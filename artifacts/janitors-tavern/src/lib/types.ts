@@ -152,6 +152,7 @@ export interface RegexScript {
   roles?: ('assistant' | 'user' | 'system')[];
   disabled: boolean;
   markdownOnly: boolean;
+  promptOnly?: boolean;
   runOnEdit: boolean;
   substituteRegex: 0 | 1 | 2;
   minDepth: number | null;

@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { ScrollText, Plus, Pencil, Trash2, Upload, Download, ChevronDown, ChevronUp, Tag, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { storage, generateId } from '@/lib/storage';
-import type { ChatCompletionPreset, STSamplerSettings, SamplerSettingKey } from '@/lib/types';
+import type { ChatCompletionPreset, STSamplerSettings, SamplerSettingKey, STPromptBlock, RegexScript } from '@/lib/types';
 import { DEFAULT_SAMPLER_SETTINGS } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -76,49 +76,122 @@ function SamplerSlider({ name, value, enabled, onChange, onToggleEnabled }: {
   );
 }
 
-function PromptBlockList({ blocks, onChange }: {
+function PromptBlockList({ blocks, promptOrder, onBlocksChange, onOrderChange }: {
   blocks: ChatCompletionPreset['promptBlocks'];
-  onChange: (blocks: ChatCompletionPreset['promptBlocks']) => void;
+  promptOrder: ChatCompletionPreset['promptOrder'];
+  onBlocksChange: (blocks: ChatCompletionPreset['promptBlocks']) => void;
+  onOrderChange: (order: ChatCompletionPreset['promptOrder']) => void;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  const order = promptOrder ?? [];
+  const canonical = order.find(o => o.character_id === 100001) ?? order[order.length - 1];
+  const blockMap = new Map(blocks.map(b => [b.identifier, b]));
+
+  type OrderedItem = { block: STPromptBlock; enabled: boolean };
+  const orderedItems: OrderedItem[] = [];
+  const seenIds = new Set<string>();
+
+  if (canonical) {
+    for (const item of canonical.order) {
+      const block = blockMap.get(item.identifier);
+      if (block) { orderedItems.push({ block, enabled: item.enabled }); seenIds.add(block.identifier); }
+    }
+  }
+  for (const block of blocks) {
+    if (!seenIds.has(block.identifier)) orderedItems.push({ block, enabled: block.enabled ?? true });
+  }
+
+  const toggleEnabled = (identifier: string, enabled: boolean) => {
+    onOrderChange(order.map(o => ({ ...o, order: o.order.map(item => item.identifier === identifier ? { ...item, enabled } : item) })));
+    onBlocksChange(blocks.map(b => b.identifier === identifier ? { ...b, enabled } : b));
+  };
+
+  const updateBlock = (identifier: string, updates: Partial<STPromptBlock>) =>
+    onBlocksChange(blocks.map(b => b.identifier === identifier ? { ...b, ...updates } : b));
+
+  const roleColor = (role: string) => role === 'system' ? 'bg-blue-400' : role === 'user' ? 'bg-green-400' : 'bg-amber-400';
+
   return (
-    <div className="space-y-2">
-      {blocks.length === 0 && (
+    <div className="space-y-1.5">
+      {orderedItems.length === 0 && (
         <div className="text-center py-6 text-xs text-muted-foreground border border-dashed border-border rounded-lg">
           No prompt blocks. Import a SillyTavern preset to populate them.
         </div>
       )}
-      {blocks.map((block, i) => (
-        <div key={block.identifier} className="border border-border rounded-lg overflow-hidden">
-          <div
-            className="flex items-center gap-3 px-3 py-2 bg-muted/20 hover:bg-muted/30 cursor-pointer text-sm"
-            onClick={() => setExpandedId(expandedId === block.identifier ? null : block.identifier)}
-          >
-            <span className={cn('w-2 h-2 rounded-full shrink-0', block.role === 'system' ? 'bg-blue-400' : block.role === 'user' ? 'bg-green-400' : 'bg-amber-400')} />
-            <span className="flex-1 font-medium truncate">{block.name || block.identifier}</span>
-            <span className="text-xs text-muted-foreground capitalize">{block.role}</span>
-            {expandedId === block.identifier ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-          </div>
-          {expandedId === block.identifier && (
-            <div className="p-3 bg-muted/10">
-              <textarea
-                className="w-full px-2.5 py-2 rounded bg-input border border-border text-foreground text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring resize-none"
-                rows={6} value={block.content}
-                onChange={e => { const newBlocks = [...blocks]; newBlocks[i] = { ...block, content: e.target.value }; onChange(newBlocks); }}
-              />
-              <div className="flex gap-2 mt-2">
-                <select className="px-2 py-1 rounded bg-input border border-border text-foreground text-xs focus:outline-none"
-                  value={block.role} onChange={e => { const nb = [...blocks]; nb[i] = { ...block, role: e.target.value as 'system' | 'user' | 'assistant' }; onChange(nb); }}>
-                  <option value="system">system</option>
-                  <option value="user">user</option>
-                  <option value="assistant">assistant</option>
-                </select>
-              </div>
+      {orderedItems.map(({ block, enabled }) => {
+        const isMarker = block.marker;
+        const isExpanded = expandedId === block.identifier;
+        return (
+          <div key={block.identifier} className={cn('border rounded-lg overflow-hidden transition-all', isMarker ? 'border-border/40 opacity-60' : enabled ? 'border-border' : 'border-border/40 opacity-50')}>
+            <div className="flex items-center gap-2 px-3 py-2 bg-muted/20 text-sm">
+              {!isMarker && (
+                <input type="checkbox" checked={enabled}
+                  onChange={e => toggleEnabled(block.identifier, e.target.checked)}
+                  onClick={e => e.stopPropagation()}
+                  className="accent-primary shrink-0 cursor-pointer" />
+              )}
+              {isMarker && <span className="w-4 shrink-0" />}
+              <span className={cn('w-2 h-2 rounded-full shrink-0', roleColor(block.role))} />
+              <span className="flex-1 font-medium truncate min-w-0 text-xs">{block.name || block.identifier}</span>
+              {isMarker ? (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground border border-border shrink-0">marker</span>
+              ) : (
+                <>
+                  <span className="text-[10px] text-muted-foreground shrink-0">{block.injection_position === 1 ? 'In-Chat' : 'Relative'}</span>
+                  <span className="text-muted-foreground capitalize text-[10px] shrink-0">{block.role}</span>
+                  <button onClick={() => setExpandedId(isExpanded ? null : block.identifier)} className="text-muted-foreground hover:text-foreground shrink-0">
+                    {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                  </button>
+                </>
+              )}
             </div>
-          )}
-        </div>
-      ))}
+            {!isMarker && isExpanded && (
+              <div className="p-3 bg-muted/10 space-y-3 border-t border-border/40">
+                <textarea
+                  className="w-full px-2.5 py-2 rounded bg-input border border-border text-foreground text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+                  rows={6} value={block.content}
+                  onChange={e => updateBlock(block.identifier, { content: e.target.value })}
+                />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-muted-foreground">Role</label>
+                    <select className="w-full px-2 py-1 rounded bg-input border border-border text-foreground text-xs focus:outline-none"
+                      value={block.role} onChange={e => updateBlock(block.identifier, { role: e.target.value as STPromptBlock['role'] })}>
+                      <option value="system">system</option>
+                      <option value="user">user</option>
+                      <option value="assistant">assistant</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-muted-foreground">Position</label>
+                    <select className="w-full px-2 py-1 rounded bg-input border border-border text-foreground text-xs focus:outline-none"
+                      value={block.injection_position} onChange={e => updateBlock(block.identifier, { injection_position: Number(e.target.value) })}>
+                      <option value={0}>Relative</option>
+                      <option value={1}>In-Chat</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-muted-foreground">Depth {block.injection_position !== 1 && <span className="opacity-40">(In-Chat only)</span>}</label>
+                    <input type="number" className="w-full px-2 py-1 rounded bg-input border border-border text-foreground text-xs focus:outline-none disabled:opacity-40"
+                      value={block.injection_depth} disabled={block.injection_position !== 1}
+                      onChange={e => updateBlock(block.identifier, { injection_depth: Number(e.target.value) })} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-muted-foreground">Order</label>
+                    <input type="number" className="w-full px-2 py-1 rounded bg-input border border-border text-foreground text-xs focus:outline-none"
+                      value={block.injection_order ?? 100}
+                      onChange={e => updateBlock(block.identifier, { injection_order: Number(e.target.value) })} />
+                  </div>
+                </div>
+                {block.forbid_overrides && (
+                  <p className="text-[10px] text-muted-foreground">Forbid overrides: on</p>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -218,7 +291,12 @@ function PresetForm({ preset, onSave, onCancel }: {
                 value={form.assistantPrefill} onChange={e => set({ assistantPrefill: e.target.value })}
                 placeholder="Prefill the assistant's first message..." />
             </div>
-            <PromptBlockList blocks={form.promptBlocks} onChange={blocks => set({ promptBlocks: blocks })} />
+            <PromptBlockList
+              blocks={form.promptBlocks}
+              promptOrder={form.promptOrder}
+              onBlocksChange={blocks => set({ promptBlocks: blocks })}
+              onOrderChange={order => set({ promptOrder: order })}
+            />
           </div>
         )}
 
@@ -295,9 +373,10 @@ function importSillyTavernPreset(jsonStr: string, existingId?: string, fileName?
           content: p.content || '',
           system_prompt: p.system_prompt ?? false,
           marker: p.marker ?? false,
+          enabled: p.enabled ?? true,
           injection_position: p.injection_position ?? 0,
-          injection_depth: p.injection_depth ?? 0,
-          injection_order: p.injection_order,
+          injection_depth: p.injection_depth ?? 4,
+          injection_order: p.injection_order ?? 100,
           forbid_overrides: p.forbid_overrides ?? false,
         });
       }
@@ -307,11 +386,37 @@ function importSillyTavernPreset(jsonStr: string, existingId?: string, fileName?
     if (data.prompt_order && Array.isArray(data.prompt_order)) {
       for (const o of data.prompt_order) {
         promptOrder.push({
-          character_id: o.character_id || 100001,
-          order: Array.isArray(o.order) ? o.order : [],
+          character_id: o.character_id ?? 100001,
+          order: Array.isArray(o.order) ? o.order.map((item: { identifier: string; enabled?: boolean }) => ({
+            identifier: item.identifier,
+            enabled: item.enabled ?? true,
+          })) : [],
         });
       }
     }
+
+    const rawScripts: unknown[] = data.extensions?.regex_scripts ?? data.regex_scripts ?? [];
+    const regexScripts: RegexScript[] = Array.isArray(rawScripts) ? rawScripts.map((s: unknown, idx: number) => {
+      const sc = s as Record<string, unknown>;
+      return {
+        id: (sc.id as string) || generateId(),
+        scriptName: (sc.scriptName as string) || `Script ${idx + 1}`,
+        findRegex: (sc.findRegex as string) || '',
+        replaceString: (sc.replaceString as string) || '',
+        trimStrings: Array.isArray(sc.trimStrings) ? sc.trimStrings as string[] : [],
+        placement: Array.isArray(sc.placement) ? sc.placement as number[] : [2],
+        disabled: (sc.disabled as boolean) ?? false,
+        markdownOnly: (sc.markdownOnly as boolean) ?? true,
+        promptOnly: (sc.promptOnly as boolean) ?? false,
+        runOnEdit: (sc.runOnEdit as boolean) ?? true,
+        substituteRegex: (sc.substituteRegex as 0 | 1 | 2) ?? 0,
+        minDepth: sc.minDepth !== undefined ? sc.minDepth as number | null : null,
+        maxDepth: sc.maxDepth !== undefined ? sc.maxDepth as number | null : null,
+        order: idx,
+        createdAt: now,
+        updatedAt: now,
+      };
+    }) : [];
 
     return {
       id,
@@ -334,6 +439,7 @@ function importSillyTavernPreset(jsonStr: string, existingId?: string, fileName?
       samplerEnabled: data.samplerEnabled || {},
       promptBlocks,
       promptOrder,
+      regexScripts: regexScripts.length > 0 ? regexScripts : undefined,
       formatStrings: {
         worldInfo: data.world_info_format || '',
         scenario: data.scenario_format || '',

@@ -9,6 +9,7 @@ import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import TestStorage from './pages/TestStorage';
+import TestFirebase from './pages/TestFirebase';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { storage } from './lib/storage';
 
@@ -46,6 +47,7 @@ function AppRoutes() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/test-storage" component={TestStorage} />
+      <Route path="/test-firebase" component={TestFirebase} />
       <Route>
         {(isAuthenticated || !authConfigured) ? (
           <Layout>

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import {
   setupAuth, verifyLogin, getAuthStatus, rotateToken, clearAuth, authState,
+  getJanitorApiKey, rotateJanitorApiKey,
 } from '../lib/auth-state.js';
 import { requireAuth } from '../middleware/auth.js';
 
@@ -50,6 +51,15 @@ router.post('/login', (req: Request, res: Response) => {
 
 router.post('/logout', (req: Request, res: Response) => {
   res.json({ success: true });
+});
+
+router.get('/api-key', requireAuth, (req: Request, res: Response) => {
+  res.json({ apiKey: getJanitorApiKey() });
+});
+
+router.post('/api-key/rotate', requireAuth, (req: Request, res: Response) => {
+  const key = rotateJanitorApiKey();
+  res.json({ success: true, apiKey: key });
 });
 
 router.post('/rotate-token', requireAuth, (req: Request, res: Response) => {

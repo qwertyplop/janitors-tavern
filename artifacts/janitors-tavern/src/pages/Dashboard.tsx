@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'wouter';
 import {
   Activity, Plug, ScrollText, Code2, ChevronRight, CheckCircle2, AlertCircle,
-  TrendingUp, Coins, RefreshCw, Copy, Check, Zap, Info
+  RefreshCw, Copy, Check, Zap, Info, KeyRound, Eye, EyeOff
 } from 'lucide-react';
 import { storage } from '@/lib/storage';
 import { api } from '@/lib/api';
@@ -48,7 +48,67 @@ function ProxyUrlCard({ url }: { url: string }) {
         </button>
       </div>
       <p className="text-xs text-muted-foreground">
-        In JanitorAI → Settings → Custom AI → API URL. Leave the API key field empty or use any placeholder.
+        In JanitorAI → Settings → Custom AI → API URL.
+      </p>
+    </div>
+  );
+}
+
+function ApiKeyCard({ apiKey, onRotate }: { apiKey: string | null; onRotate: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [rotating, setRotating] = useState(false);
+
+  const handleRotate = async () => {
+    if (!confirm('Regenerate the API key? The old key will stop working immediately.')) return;
+    setRotating(true);
+    await onRotate();
+    setRotating(false);
+    setRevealed(true);
+  };
+
+  const displayKey = apiKey
+    ? (revealed ? apiKey : `${apiKey.slice(0, 8)}${'•'.repeat(24)}${apiKey.slice(-4)}`)
+    : '...';
+
+  return (
+    <div className="bg-accent/30 border border-accent-border rounded-xl p-4 flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <KeyRound size={14} className="text-primary" />
+        <span className="text-xs font-semibold text-primary uppercase tracking-wide">API Key</span>
+        <span className="text-xs text-muted-foreground ml-auto">Paste this in JanitorAI API key field</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <code className="flex-1 text-sm font-mono text-foreground bg-background border border-border rounded-lg px-3 py-2 truncate select-all">
+          {displayKey}
+        </code>
+        <button
+          onClick={() => setRevealed(r => !r)}
+          className="p-2 rounded-lg bg-muted/40 hover:bg-muted/70 text-muted-foreground border border-border transition-colors shrink-0"
+          title={revealed ? 'Hide key' : 'Reveal key'}
+        >
+          {revealed ? <EyeOff size={13} /> : <Eye size={13} />}
+        </button>
+        <button
+          onClick={() => apiKey && copyToClipboard(apiKey, setCopied)}
+          disabled={!apiKey}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-xs font-medium transition-colors shrink-0 disabled:opacity-50"
+        >
+          {copied ? <Check size={13} /> : <Copy size={13} />}
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+        <button
+          onClick={handleRotate}
+          disabled={rotating || !apiKey}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-muted/40 hover:bg-muted/70 text-muted-foreground border border-border text-xs font-medium transition-colors shrink-0 disabled:opacity-50"
+          title="Regenerate API key"
+        >
+          <RefreshCw size={13} className={rotating ? 'animate-spin' : ''} />
+          {rotating ? '' : 'Regenerate'}
+        </button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        In JanitorAI → Settings → Custom AI → API Key. Required for every request to the proxy.
       </p>
     </div>
   );
@@ -65,6 +125,7 @@ export default function Dashboard() {
   const [activationError, setActivationError] = useState<string | null>(null);
   const [activationSuccess, setActivationSuccess] = useState(false);
   const [loadingStats, setLoadingStats] = useState(true);
+  const [janitorApiKey, setJanitorApiKey] = useState<string | null>(null);
 
   const proxyUrl = `${window.location.protocol}//${window.location.host}/api/proxy/chat-completion`;
 
@@ -87,12 +148,39 @@ export default function Dashboard() {
     }
   }, []);
 
+  const loadApiKey = useCallback(async () => {
+    try {
+      const res = await api.apiKey.get();
+      setJanitorApiKey(res.apiKey);
+    } catch {
+      // Auth may not be configured — key is still available publicly on the health endpoint
+      // Try fetching it directly
+      try {
+        const res = await fetch('/api/auth/api-key');
+        if (res.ok) {
+          const data = await res.json() as { apiKey: string };
+          setJanitorApiKey(data.apiKey);
+        }
+      } catch {}
+    }
+  }, []);
+
+  const handleRotateApiKey = useCallback(async () => {
+    try {
+      const res = await api.apiKey.rotate();
+      setJanitorApiKey(res.apiKey);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to rotate key');
+    }
+  }, []);
+
   useEffect(() => {
     loadData();
     loadStats();
+    loadApiKey();
     const interval = setInterval(loadStats, 30000);
     return () => clearInterval(interval);
-  }, [loadData, loadStats]);
+  }, [loadData, loadStats, loadApiKey]);
 
   const activeConnection = connections.find(c => c.id === activeConnectionId) || null;
   const activePreset = presets.find(p => p.id === activePresetId) || null;
@@ -147,6 +235,7 @@ export default function Dashboard() {
       </div>
 
       <ProxyUrlCard url={proxyUrl} />
+      <ApiKeyCard apiKey={janitorApiKey} onRotate={handleRotateApiKey} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-card border border-card-border rounded-xl p-4 space-y-3">

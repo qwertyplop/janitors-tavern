@@ -71,4 +71,10 @@ export const api = {
     getModels: (data: { baseUrl: string; apiKey: string }): Promise<ModelsResult> =>
       request<ModelsResult>(`/proxy/models?baseUrl=${encodeURIComponent(data.baseUrl)}&apiKey=${encodeURIComponent(data.apiKey)}`),
   },
+
+  apiKey: {
+    get: (): Promise<{ apiKey: string }> => request('/auth/api-key'),
+    rotate: (): Promise<{ success: boolean; apiKey: string }> =>
+      request('/auth/api-key/rotate', { method: 'POST' }),
+  },
 };

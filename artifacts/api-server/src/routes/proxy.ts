@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { serverState, recordUsage, calculateMessageTokens, extractTokenCountsFromResponse, extractTokenCountsFromStreamChunk } from '../lib/server-state.js';
+import { verifyJanitorApiKey, authState as _authState } from '../lib/auth-state.js';
 import { parseJanitorRequest, janitorDataToMacroContext } from '../lib/janitor-parser.js';
 import { buildMessages } from '../lib/prompt-builder.js';
 import { processMacros } from '../lib/macros.js';
@@ -254,6 +255,18 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
     };
 
     res.set(CORS_HEADERS);
+
+    // Validate JanitorAI API key if one is configured
+    const storedKey = _authState.data.janitorApiKey;
+    if (storedKey) {
+      const incomingKey =
+        req.headers['x-api-key'] as string ||
+        (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : undefined);
+      if (!incomingKey || !verifyJanitorApiKey(incomingKey)) {
+        res.status(401).json({ error: 'Invalid or missing API key. Set the API key shown on your Janitor\'s Tavern dashboard in the JanitorAI API key field.' });
+        return;
+      }
+    }
 
     if (!body.messages || body.messages.length === 0) {
       res.status(400).json({ error: 'Messages are required' });

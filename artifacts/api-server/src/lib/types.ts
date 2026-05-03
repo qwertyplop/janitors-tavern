@@ -210,6 +210,26 @@ export interface UsageStats {
   lastUpdated: string;
 }
 
+export type RequestLogStatus = 'success' | 'error';
+
+export interface RequestLogEntry {
+  id: string;
+  timestamp: string;
+  model: string;
+  connectionName: string;
+  presetName: string | null;
+  inputTokens: number;
+  outputTokens: number;
+  status: RequestLogStatus;
+  error: string | null;
+  stream: boolean;
+  durationMs: number;
+  rawInputMessageCount: number;
+  processedMessageCount: number;
+  processedMessages: Array<{ role: string; content: string }>;
+  responseContent: string | null;
+}
+
 export const DEFAULT_SAMPLER_SETTINGS: STSamplerSettings = {
   temperature: 1,
   top_p: 1,

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { serverState, recordUsage, recordKeyUsage, calculateMessageTokens, estimateTokens, extractTokenCountsFromResponse, extractTokenCountsFromStreamChunk, selectKeyRoundRobin, advanceToNextKey } from '../lib/server-state.js';
+import { serverState, recordUsage, recordKeyUsage, calculateMessageTokens, estimateTokens, extractTokenCountsFromResponse, extractTokenCountsFromStreamChunk, selectKeyRoundRobin, advanceToNextKey, addRequestLog } from '../lib/server-state.js';
 import { verifyJanitorApiKey, authState as _authState } from '../lib/auth-state.js';
 import { parseJanitorRequest, janitorDataToMacroContext } from '../lib/janitor-parser.js';
 import { buildMessages } from '../lib/prompt-builder.js';
@@ -364,6 +364,12 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
   const requestId = generateRequestId();
   const startTime = Date.now();
 
+  let _logModel = '';
+  let _logConnectionName = '';
+  let _logPresetName: string | null = null;
+  let _logProcessedMessages: OutputMessage[] = [];
+  let _logRawInputMessageCount = 0;
+
   try {
     const body = req.body as {
       messages?: ChatMessage[];
@@ -431,10 +437,15 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
       return;
     }
 
+    _logModel = connectionPreset.model;
+    _logConnectionName = connectionPreset.name;
+    _logPresetName = chatCompletionPreset?.name ?? null;
+    _logRawInputMessageCount = body.messages?.length ?? 0;
+
     const janitorRequest = {
       messages: body.messages,
       model: body.model || connectionPreset.model,
-      stream: body.stream,
+      stream: body.stream as boolean | undefined,
       temperature: body.temperature,
       max_tokens: body.max_tokens,
     };
@@ -478,6 +489,8 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
         strictPlaceholderMessage: serverState.strictPlaceholderMessage,
       });
     }
+
+    _logProcessedMessages = processedMessages;
 
     const samplerParams = chatCompletionPreset?.sampler ?? DEFAULT_SAMPLER_SETTINGS;
     const samplerEnabled = chatCompletionPreset?.samplerEnabled ?? {};
@@ -551,11 +564,13 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
 
       if (!upstreamRes.ok) {
         const errorText = await upstreamRes.text();
+        addRequestLog({ id: requestId, timestamp: new Date().toISOString(), model: _logModel, connectionName: _logConnectionName, presetName: _logPresetName, inputTokens: inputTokensEstimate, outputTokens: 0, status: 'error', error: `Provider error: ${upstreamRes.status} - ${errorText}`, stream: true, durationMs: Date.now() - startTime, rawInputMessageCount: _logRawInputMessageCount, processedMessageCount: _logProcessedMessages.length, processedMessages: _logProcessedMessages, responseContent: errorText });
         res.status(upstreamRes.status).json({ error: `Provider error: ${upstreamRes.status} - ${errorText}` });
         return;
       }
 
       if (!upstreamRes.body) {
+        addRequestLog({ id: requestId, timestamp: new Date().toISOString(), model: _logModel, connectionName: _logConnectionName, presetName: _logPresetName, inputTokens: inputTokensEstimate, outputTokens: 0, status: 'error', error: 'No response body from provider', stream: true, durationMs: Date.now() - startTime, rawInputMessageCount: _logRawInputMessageCount, processedMessageCount: _logProcessedMessages.length, processedMessages: _logProcessedMessages, responseContent: null });
         res.status(500).json({ error: 'No response body from provider' });
         return;
       }
@@ -603,6 +618,7 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
       }
 
       recordUsage(inputTokensEstimate, outputTokens);
+      addRequestLog({ id: requestId, timestamp: new Date().toISOString(), model: _logModel, connectionName: _logConnectionName, presetName: _logPresetName, inputTokens: inputTokensEstimate, outputTokens, status: 'success', error: null, stream: true, durationMs: Date.now() - startTime, rawInputMessageCount: _logRawInputMessageCount, processedMessageCount: _logProcessedMessages.length, processedMessages: _logProcessedMessages, responseContent: null });
       res.end();
       return;
     }
@@ -649,6 +665,7 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
     } catch {}
     recordUsage(inputTokensEstimate, outputTokens);
 
+    let responseContent: string | null = null;
     try {
       let responseJson = JSON.parse(rawBody);
       if (isAnthropic && responseJson.type === 'message' && Array.isArray(responseJson.content)) {
@@ -663,15 +680,22 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
           content = applyRegexScripts(content, outputScripts, macroContext, 2, undefined, 'assistant');
         }
         responseJson.choices[0].message.content = content;
+        responseContent = content;
       }
 
+      addRequestLog({ id: requestId, timestamp: new Date().toISOString(), model: _logModel, connectionName: _logConnectionName, presetName: _logPresetName, inputTokens: inputTokensEstimate, outputTokens, status: upstreamRes.ok ? 'success' : 'error', error: upstreamRes.ok ? null : `Provider error: ${upstreamRes.status}`, stream: false, durationMs: Date.now() - startTime, rawInputMessageCount: _logRawInputMessageCount, processedMessageCount: _logProcessedMessages.length, processedMessages: _logProcessedMessages, responseContent });
       res.status(upstreamRes.status).json(responseJson);
     } catch {
+      addRequestLog({ id: requestId, timestamp: new Date().toISOString(), model: _logModel, connectionName: _logConnectionName, presetName: _logPresetName, inputTokens: inputTokensEstimate, outputTokens, status: upstreamRes.ok ? 'success' : 'error', error: upstreamRes.ok ? null : `Provider error: ${upstreamRes.status}`, stream: false, durationMs: Date.now() - startTime, rawInputMessageCount: _logRawInputMessageCount, processedMessageCount: _logProcessedMessages.length, processedMessages: _logProcessedMessages, responseContent: rawBody.slice(0, 500) });
       res.status(upstreamRes.status).set('Content-Type', 'application/json').send(rawBody);
     }
   } catch (error) {
     console.error('[Proxy] Error:', error);
-    res.status(500).json({ error: `Proxy error: ${error instanceof Error ? error.message : 'Unknown error'}` });
+    const errMsg = error instanceof Error ? error.message : 'Unknown error';
+    try {
+      addRequestLog({ id: requestId, timestamp: new Date().toISOString(), model: _logModel, connectionName: _logConnectionName, presetName: _logPresetName, inputTokens: 0, outputTokens: 0, status: 'error', error: `Proxy error: ${errMsg}`, stream: false, durationMs: Date.now() - startTime, rawInputMessageCount: _logRawInputMessageCount, processedMessageCount: _logProcessedMessages.length, processedMessages: _logProcessedMessages, responseContent: null });
+    } catch {}
+    res.status(500).json({ error: `Proxy error: ${errMsg}` });
   }
 });
 

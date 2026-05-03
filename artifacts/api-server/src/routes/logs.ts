@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
+import { requestLog } from '../lib/server-state.js';
 
 const router = Router();
 
@@ -24,6 +25,15 @@ router.get('/', (req: Request, res: Response) => {
 router.delete('/', (req: Request, res: Response) => {
   inMemoryLogs.length = 0;
   res.json({ success: true, message: 'In-memory logs cleared.' });
+});
+
+router.get('/requests', (req: Request, res: Response) => {
+  res.json({ logs: requestLog });
+});
+
+router.delete('/requests', (req: Request, res: Response) => {
+  requestLog.length = 0;
+  res.json({ success: true });
 });
 
 export default router;

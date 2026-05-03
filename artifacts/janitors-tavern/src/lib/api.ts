@@ -1,4 +1,4 @@
-import type { ConnectionPreset, ChatCompletionPreset, RegexScript, UsageStats } from './types';
+import type { ConnectionPreset, ChatCompletionPreset, RegexScript, UsageStats, RequestLogEntry } from './types';
 import { getAuthHeaders } from './auth';
 
 const API_BASE = '/api';
@@ -81,5 +81,10 @@ export const api = {
   keyStats: {
     get: (): Promise<{ keyStats: Array<{ keyId: string; name: string; usageCount: number; isLastUsed: boolean }> }> =>
       request('/settings/key-stats'),
+  },
+
+  logs: {
+    get: (): Promise<{ logs: RequestLogEntry[] }> => request('/logs/requests'),
+    clear: (): Promise<{ success: boolean }> => request('/logs/requests', { method: 'DELETE' }),
   },
 };

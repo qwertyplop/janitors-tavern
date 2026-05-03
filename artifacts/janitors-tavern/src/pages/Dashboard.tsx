@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'wouter';
 import {
-  Activity, Plug, ScrollText, Code2, ChevronRight, CheckCircle2, AlertCircle,
-  RefreshCw, Copy, Check, Zap, Info, KeyRound, Eye, EyeOff
+  Activity, Plug, ScrollText, ChevronRight, CheckCircle2, AlertCircle,
+  RefreshCw, Copy, Check, Zap, Info, KeyRound, Eye, EyeOff, Terminal, XCircle, Wifi, WifiOff, ChevronDown, ChevronUp, MessageSquare
 } from 'lucide-react';
 import { storage } from '@/lib/storage';
 import { api } from '@/lib/api';
-import type { ConnectionPreset, ChatCompletionPreset, UsageStats } from '@/lib/types';
+import type { ConnectionPreset, ChatCompletionPreset, UsageStats, RequestLogEntry } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 function copyToClipboard(text: string, setCopied: (v: boolean) => void) {
@@ -114,6 +114,145 @@ function ApiKeyCard({ apiKey, onRotate }: { apiKey: string | null; onRotate: () 
   );
 }
 
+function formatRelativeTime(isoString: string): string {
+  const diff = Date.now() - new Date(isoString).getTime();
+  if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`;
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  return `${Math.floor(diff / 3600000)}h ago`;
+}
+
+function roleColor(role: string) {
+  if (role === 'system') return 'text-yellow-500';
+  if (role === 'assistant') return 'text-blue-400';
+  return 'text-green-400';
+}
+
+function LogEntryRow({ entry }: { entry: RequestLogEntry }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="flex flex-col">
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="px-4 py-3 flex flex-col gap-1 text-left hover:bg-muted/20 transition-colors w-full"
+      >
+        <div className="flex items-center gap-2 flex-wrap">
+          {entry.status === 'success' ? (
+            <CheckCircle2 size={13} className="text-green-500 shrink-0" />
+          ) : (
+            <XCircle size={13} className="text-destructive shrink-0" />
+          )}
+          <span className="text-xs font-mono font-medium text-foreground truncate max-w-[200px]" title={entry.model}>
+            {entry.model || '—'}
+          </span>
+          <span className="text-xs text-muted-foreground">{entry.connectionName}</span>
+          {entry.presetName && (
+            <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-md">{entry.presetName}</span>
+          )}
+          <span className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
+            {entry.stream ? <Wifi size={11} /> : <WifiOff size={11} />}
+            {entry.stream ? 'stream' : 'sync'}
+            {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+          </span>
+        </div>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+          <span>In: <span className="text-foreground font-medium">{entry.inputTokens.toLocaleString()}</span> tok</span>
+          <span>Out: <span className="text-foreground font-medium">{entry.outputTokens.toLocaleString()}</span> tok</span>
+          <span title={`${entry.rawInputMessageCount} raw → ${entry.processedMessageCount} processed`}>
+            Msgs: <span className="text-foreground font-medium">{entry.rawInputMessageCount}</span>
+            {entry.rawInputMessageCount !== entry.processedMessageCount && (
+              <span className="text-primary"> → {entry.processedMessageCount}</span>
+            )}
+          </span>
+          <span>{entry.durationMs}ms</span>
+          <span className="ml-auto">{formatRelativeTime(entry.timestamp)}</span>
+        </div>
+        {entry.error && (
+          <div className="flex items-start gap-1.5 mt-1 text-xs text-destructive bg-destructive/10 rounded-lg px-2.5 py-1.5">
+            <AlertCircle size={11} className="shrink-0 mt-0.5" />
+            <span className="break-all">{entry.error}</span>
+          </div>
+        )}
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-3 space-y-2 border-t border-border/50 bg-muted/10">
+          <div className="pt-2">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <MessageSquare size={11} className="text-muted-foreground" />
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Processed Messages ({entry.processedMessageCount})</span>
+            </div>
+            <div className="space-y-1.5 max-h-64 overflow-y-auto">
+              {entry.processedMessages.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">No messages captured</p>
+              ) : (
+                entry.processedMessages.map((msg, i) => (
+                  <div key={i} className="rounded-lg bg-background border border-border p-2">
+                    <span className={`text-xs font-semibold uppercase tracking-wide ${roleColor(msg.role)}`}>{msg.role}</span>
+                    <pre className="text-xs text-foreground mt-1 whitespace-pre-wrap break-all font-sans leading-relaxed max-h-32 overflow-y-auto">
+                      {msg.content}
+                    </pre>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {entry.responseContent !== null && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <MessageSquare size={11} className="text-muted-foreground" />
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Response</span>
+              </div>
+              <div className="rounded-lg bg-background border border-border p-2">
+                <pre className="text-xs text-foreground whitespace-pre-wrap break-all font-sans leading-relaxed max-h-48 overflow-y-auto">
+                  {entry.responseContent}
+                </pre>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RequestLogPanel({ logs, loading, onRefresh }: { logs: RequestLogEntry[]; loading: boolean; onRefresh: () => void }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Terminal size={16} className="text-primary" />
+          <h2 className="text-sm font-semibold text-foreground">Request Log</h2>
+          <span className="text-xs text-muted-foreground">(last 20)</span>
+        </div>
+        <button
+          onClick={onRefresh}
+          disabled={loading}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+          Refresh
+        </button>
+      </div>
+
+      {logs.length === 0 ? (
+        <div className="bg-card border border-card-border rounded-xl p-6 text-center">
+          <Terminal size={20} className="text-muted-foreground mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">No requests yet. Send a message in JanitorAI to see logs here.</p>
+        </div>
+      ) : (
+        <div className="bg-card border border-card-border rounded-xl overflow-hidden">
+          <div className="divide-y divide-border">
+            {logs.map(entry => (
+              <LogEntryRow key={entry.id} entry={entry} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [connections, setConnections] = useState<ConnectionPreset[]>([]);
   const [presets, setPresets] = useState<ChatCompletionPreset[]>([]);
@@ -126,6 +265,8 @@ export default function Dashboard() {
   const [activationSuccess, setActivationSuccess] = useState(false);
   const [loadingStats, setLoadingStats] = useState(true);
   const [janitorApiKey, setJanitorApiKey] = useState<string | null>(null);
+  const [logs, setLogs] = useState<RequestLogEntry[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
 
   const proxyUrl = `${window.location.protocol}//${window.location.host}/api/proxy/chat-completion`;
 
@@ -174,13 +315,29 @@ export default function Dashboard() {
     }
   }, []);
 
+  const loadLogs = useCallback(async () => {
+    setLoadingLogs(true);
+    try {
+      const res = await api.logs.get();
+      setLogs(res.logs);
+    } catch {
+      // silently ignore
+    } finally {
+      setLoadingLogs(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadData();
     loadStats();
     loadApiKey();
-    const interval = setInterval(loadStats, 30000);
+    loadLogs();
+    const interval = setInterval(() => {
+      loadStats();
+      loadLogs();
+    }, 15000);
     return () => clearInterval(interval);
-  }, [loadData, loadStats, loadApiKey]);
+  }, [loadData, loadStats, loadApiKey, loadLogs]);
 
   const activeConnection = connections.find(c => c.id === activeConnectionId) || null;
   const activePreset = presets.find(p => p.id === activePresetId) || null;
@@ -389,6 +546,8 @@ export default function Dashboard() {
           <StatCard label="Today's Tokens" value={loadingStats ? '...' : dailyTokens >= 1000 ? `${(dailyTokens / 1000).toFixed(1)}k` : dailyTokens} />
         </div>
       </div>
+
+      <RequestLogPanel logs={logs} loading={loadingLogs} onRefresh={loadLogs} />
 
       <div className="bg-card border border-card-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">

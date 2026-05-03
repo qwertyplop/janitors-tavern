@@ -1,4 +1,4 @@
-import type { ServerState, ConnectionPreset, ChatCompletionPreset, RegexScript, PromptPostProcessingMode, UsageStats } from './types.js';
+import type { ServerState, ConnectionPreset, ChatCompletionPreset, RegexScript, PromptPostProcessingMode, UsageStats, RequestLogEntry } from './types.js';
 
 const RESET_HOUR_UTC = 7;
 
@@ -99,6 +99,30 @@ export function getTimeUntilReset(): { hours: number; minutes: number } {
     hours: Math.floor(diffMs / (1000 * 60 * 60)),
     minutes: Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60)),
   };
+}
+
+const MAX_LOG_ENTRIES = 20;
+const MAX_MSG_CONTENT_CHARS = 4000;
+const MAX_RESPONSE_CHARS = 4000;
+export const requestLog: RequestLogEntry[] = [];
+
+export function addRequestLog(entry: RequestLogEntry): void {
+  const truncated: RequestLogEntry = {
+    ...entry,
+    processedMessages: entry.processedMessages.map(m => ({
+      role: m.role,
+      content: m.content.length > MAX_MSG_CONTENT_CHARS
+        ? m.content.slice(0, MAX_MSG_CONTENT_CHARS) + '\n…[truncated]'
+        : m.content,
+    })),
+    responseContent: entry.responseContent !== null && entry.responseContent.length > MAX_RESPONSE_CHARS
+      ? entry.responseContent.slice(0, MAX_RESPONSE_CHARS) + '\n…[truncated]'
+      : entry.responseContent,
+  };
+  requestLog.unshift(truncated);
+  if (requestLog.length > MAX_LOG_ENTRIES) {
+    requestLog.splice(MAX_LOG_ENTRIES);
+  }
 }
 
 export const keyUsageCounts = new Map<string, number>();

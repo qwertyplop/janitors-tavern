@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { serverState, checkAndResetDailyStats, getTimeUntilReset } from '../lib/server-state.js';
+import { serverState, checkAndResetDailyStats, getTimeUntilReset, getKeyStats } from '../lib/server-state.js';
 import type { ConnectionPreset, ChatCompletionPreset, RegexScript, PromptPostProcessingMode } from '../lib/types.js';
 
 const router = Router();
@@ -70,6 +70,15 @@ router.post('/stats/reset', (req: Request, res: Response) => {
     lastUpdated: new Date().toISOString(),
   };
   res.json({ success: true, stats: serverState.stats });
+});
+
+router.get('/key-stats', (req: Request, res: Response) => {
+  const conn = serverState.activeConnectionPreset;
+  if (!conn) {
+    res.json({ keyStats: [] });
+    return;
+  }
+  res.json({ keyStats: getKeyStats(conn) });
 });
 
 export default router;

@@ -100,3 +100,54 @@ export function getTimeUntilReset(): { hours: number; minutes: number } {
     minutes: Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60)),
   };
 }
+
+export const keyUsageCounts = new Map<string, number>();
+export const roundRobinIndex = new Map<string, number>();
+export const lastUsedKeyId = new Map<string, string>();
+
+export function recordKeyUsage(connectionId: string, keyId: string): void {
+  keyUsageCounts.set(keyId, (keyUsageCounts.get(keyId) || 0) + 1);
+  lastUsedKeyId.set(connectionId, keyId);
+}
+
+export function selectKeyRoundRobin(connectionPreset: ConnectionPreset): { keyId: string; apiKey: string } | null {
+  const keys = connectionPreset.apiKeys;
+  if (!keys || keys.length === 0) return null;
+
+  if (keys.length === 1) {
+    const k = keys[0];
+    recordKeyUsage(connectionPreset.id, k.id);
+    return { keyId: k.id, apiKey: k.value };
+  }
+
+  const currentIndex = roundRobinIndex.get(connectionPreset.id) || 0;
+  const nextIndex = currentIndex % keys.length;
+  roundRobinIndex.set(connectionPreset.id, nextIndex + 1);
+
+  const k = keys[nextIndex];
+  recordKeyUsage(connectionPreset.id, k.id);
+  return { keyId: k.id, apiKey: k.value };
+}
+
+export function advanceToNextKey(connectionPreset: ConnectionPreset, currentKeyId: string): { keyId: string; apiKey: string } | null {
+  const keys = connectionPreset.apiKeys;
+  if (!keys || keys.length <= 1) return null;
+
+  const currentIdx = keys.findIndex(k => k.id === currentKeyId);
+  const nextIdx = (currentIdx + 1) % keys.length;
+  roundRobinIndex.set(connectionPreset.id, nextIdx + 1);
+
+  const k = keys[nextIdx];
+  recordKeyUsage(connectionPreset.id, k.id);
+  return { keyId: k.id, apiKey: k.value };
+}
+
+export function getKeyStats(connectionPreset: ConnectionPreset): Array<{ keyId: string; name: string; usageCount: number; isLastUsed: boolean }> {
+  const lastKey = lastUsedKeyId.get(connectionPreset.id);
+  return (connectionPreset.apiKeys || []).map(k => ({
+    keyId: k.id,
+    name: k.name,
+    usageCount: keyUsageCounts.get(k.id) || 0,
+    isLastUsed: k.id === lastKey,
+  }));
+}

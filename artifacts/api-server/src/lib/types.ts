@@ -37,6 +37,7 @@ export interface ConnectionPreset {
   extraHeaders?: Record<string, string>;
   extraQueryParams?: Record<string, string>;
   lastTestedAt?: string;
+  roundRobinEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
 }

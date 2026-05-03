@@ -77,4 +77,9 @@ export const api = {
     rotate: (): Promise<{ success: boolean; apiKey: string }> =>
       request('/auth/api-key/rotate', { method: 'POST' }),
   },
+
+  keyStats: {
+    get: (): Promise<{ keyStats: Array<{ keyId: string; name: string; usageCount: number; isLastUsed: boolean }> }> =>
+      request('/settings/key-stats'),
+  },
 };

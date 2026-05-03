@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { serverState, recordUsage, calculateMessageTokens, estimateTokens, extractTokenCountsFromResponse, extractTokenCountsFromStreamChunk } from '../lib/server-state.js';
+import { serverState, recordUsage, recordKeyUsage, calculateMessageTokens, estimateTokens, extractTokenCountsFromResponse, extractTokenCountsFromStreamChunk, selectKeyRoundRobin, advanceToNextKey } from '../lib/server-state.js';
 import { verifyJanitorApiKey, authState as _authState } from '../lib/auth-state.js';
 import { parseJanitorRequest, janitorDataToMacroContext } from '../lib/janitor-parser.js';
 import { buildMessages } from '../lib/prompt-builder.js';
@@ -403,13 +403,27 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
     }
 
     let apiKey = '';
+    let selectedKeyId: string | undefined;
     if (connectionPreset.apiKeyRef === 'env' && connectionPreset.apiKeyEnvVar) {
       apiKey = process.env[connectionPreset.apiKeyEnvVar] || '';
+    } else if (
+      connectionPreset.apiKeys &&
+      connectionPreset.apiKeys.length > 1 &&
+      (connectionPreset.roundRobinEnabled || !connectionPreset.selectedKeyId)
+    ) {
+      const rrKey = selectKeyRoundRobin(connectionPreset);
+      apiKey = rrKey?.apiKey || '';
+      selectedKeyId = rrKey?.keyId;
     } else {
       const selectedKey = connectionPreset.selectedKeyId
         ? connectionPreset.apiKeys?.find(k => k.id === connectionPreset.selectedKeyId)
         : null;
-      apiKey = selectedKey?.value || connectionPreset.apiKeys?.[0]?.value || '';
+      const resolvedKey = selectedKey || connectionPreset.apiKeys?.[0] || null;
+      apiKey = resolvedKey?.value || '';
+      selectedKeyId = resolvedKey?.id;
+      if (selectedKeyId) {
+        recordKeyUsage(connectionPreset.id, selectedKeyId);
+      }
     }
 
     if (!apiKey) {
@@ -493,9 +507,11 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
 
     const model = connectionPreset.model;
     const baseUrl = connectionPreset.baseUrl;
-    const headers = getAuthHeaders(baseUrl, apiKey, connectionPreset.extraHeaders);
+    let activeHeaders = getAuthHeaders(baseUrl, apiKey, connectionPreset.extraHeaders);
     const inputTokensEstimate = calculateMessageTokens(processedMessages);
     const isAnthropic = isAnthropicUrl(baseUrl);
+
+    const keyName = connectionPreset.apiKeys?.find(k => k.id === selectedKeyId)?.name || selectedKeyId || 'env';
 
     if (body.stream === true) {
       let requestBody: Record<string, unknown>;
@@ -508,11 +524,30 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
         endpoint = buildExtraQueryUrl(baseUrl, '/chat/completions', connectionPreset.extraQueryParams);
       }
 
-      const upstreamRes = await fetch(endpoint, {
+      let upstreamRes = await fetch(endpoint, {
         method: 'POST',
-        headers: { ...headers, Accept: 'text/event-stream' },
+        headers: { ...activeHeaders, Accept: 'text/event-stream' },
         body: JSON.stringify(requestBody),
       });
+
+      let activeApiKey = apiKey;
+      let activeKeyId = selectedKeyId;
+      let activeKeyName = keyName;
+
+      if (upstreamRes.status === 429 && connectionPreset.roundRobinEnabled && selectedKeyId) {
+        const nextKey = advanceToNextKey(connectionPreset, selectedKeyId);
+        if (nextKey) {
+          activeApiKey = nextKey.apiKey;
+          activeKeyId = nextKey.keyId;
+          activeKeyName = connectionPreset.apiKeys?.find(k => k.id === nextKey.keyId)?.name || nextKey.keyId;
+          activeHeaders = getAuthHeaders(baseUrl, activeApiKey, connectionPreset.extraHeaders);
+          upstreamRes = await fetch(endpoint, {
+            method: 'POST',
+            headers: { ...activeHeaders, Accept: 'text/event-stream' },
+            body: JSON.stringify(requestBody),
+          });
+        }
+      }
 
       if (!upstreamRes.ok) {
         const errorText = await upstreamRes.text();
@@ -528,6 +563,7 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Key-Used', activeKeyName);
 
       const reader = upstreamRes.body.getReader();
       const decoder = new TextDecoder();
@@ -581,11 +617,28 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
       endpoint = buildExtraQueryUrl(baseUrl, '/chat/completions', connectionPreset.extraQueryParams);
     }
 
-    const upstreamRes = await fetch(endpoint, {
+    let upstreamRes = await fetch(endpoint, {
       method: 'POST',
-      headers: { ...headers, Accept: 'application/json' },
+      headers: { ...activeHeaders, Accept: 'application/json' },
       body: JSON.stringify(requestBody),
     });
+
+    let activeKeyName = keyName;
+
+    if (upstreamRes.status === 429 && connectionPreset.roundRobinEnabled && selectedKeyId) {
+      const nextKey = advanceToNextKey(connectionPreset, selectedKeyId);
+      if (nextKey) {
+        activeKeyName = connectionPreset.apiKeys?.find(k => k.id === nextKey.keyId)?.name || nextKey.keyId;
+        const retryHeaders = getAuthHeaders(baseUrl, nextKey.apiKey, connectionPreset.extraHeaders);
+        upstreamRes = await fetch(endpoint, {
+          method: 'POST',
+          headers: { ...retryHeaders, Accept: 'application/json' },
+          body: JSON.stringify(requestBody),
+        });
+      }
+    }
+
+    res.setHeader('X-Key-Used', activeKeyName);
 
     const rawBody = await upstreamRes.text();
 

@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import {
   Plus, Plug, Pencil, Trash2, CheckCircle2, AlertCircle, RefreshCw,
-  ChevronDown, ChevronUp, Eye, EyeOff, X, ExternalLink, Loader2
+  ChevronDown, ChevronUp, Eye, EyeOff, X, Loader2, RotateCcw
 } from 'lucide-react';
 import { storage, generateId } from '@/lib/storage';
 import { api } from '@/lib/api';
@@ -32,22 +32,36 @@ function emptyConnection(): ConnectionPreset {
   };
 }
 
-function ApiKeyRow({ apiKey, onDelete, onSelect, isSelected, showValue }: {
+function ApiKeyRow({ apiKey, onDelete, onSelect, isSelected, showValue, roundRobinEnabled, usageCount, isLastUsed }: {
   apiKey: ApiKey;
   onDelete: () => void;
   onSelect: () => void;
   isSelected: boolean;
   showValue: boolean;
+  roundRobinEnabled?: boolean;
+  usageCount?: number;
+  isLastUsed?: boolean;
 }) {
   return (
-    <div className={cn('flex items-center gap-2 p-2.5 rounded-lg border text-sm', isSelected ? 'border-primary/40 bg-primary/5' : 'border-border')}>
-      <button onClick={onSelect} className={cn('w-4 h-4 rounded-full border-2 shrink-0 transition-colors', isSelected ? 'border-primary bg-primary' : 'border-muted-foreground hover:border-primary')}>
-        {isSelected && <div className="w-full h-full rounded-full bg-primary-foreground scale-50" />}
-      </button>
+    <div className={cn('flex items-center gap-2 p-2.5 rounded-lg border text-sm', isSelected && !roundRobinEnabled ? 'border-primary/40 bg-primary/5' : 'border-border')}>
+      {!roundRobinEnabled && (
+        <button onClick={onSelect} className={cn('w-4 h-4 rounded-full border-2 shrink-0 transition-colors', isSelected ? 'border-primary bg-primary' : 'border-muted-foreground hover:border-primary')}>
+          {isSelected && <div className="w-full h-full rounded-full bg-primary-foreground scale-50" />}
+        </button>
+      )}
+      {roundRobinEnabled && (
+        <div className="w-4 h-4 flex items-center justify-center shrink-0">
+          <RotateCcw size={12} className="text-primary opacity-60" />
+        </div>
+      )}
       <div className="flex-1 min-w-0">
-        <div className="font-medium truncate">{apiKey.name || 'Unnamed key'}</div>
+        <div className="flex items-center gap-2">
+          <span className="font-medium truncate">{apiKey.name || 'Unnamed key'}</span>
+          {isLastUsed && <span className="text-xs bg-primary/15 text-primary border border-primary/30 px-1.5 py-0.5 rounded-full shrink-0">last used</span>}
+        </div>
         <div className="text-xs text-muted-foreground font-mono truncate">
           {showValue ? apiKey.value : `${apiKey.value.slice(0, 4)}${'•'.repeat(Math.min(20, apiKey.value.length - 4))}${apiKey.value.slice(-4)}`}
+          {usageCount !== undefined && usageCount > 0 && <span className="ml-2 not-mono">{usageCount} use{usageCount !== 1 ? 's' : ''}</span>}
         </div>
       </div>
       <button onClick={onDelete} className="text-muted-foreground hover:text-destructive transition-colors shrink-0">
@@ -57,11 +71,12 @@ function ApiKeyRow({ apiKey, onDelete, onSelect, isSelected, showValue }: {
   );
 }
 
-function ConnectionForm({ preset, onSave, onCancel, onTest }: {
+function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
   preset: ConnectionPreset;
   onSave: (p: ConnectionPreset) => void;
   onCancel: () => void;
   onTest: (p: ConnectionPreset) => Promise<void>;
+  keyStats?: Array<{ keyId: string; name: string; usageCount: number; isLastUsed: boolean }>;
 }) {
   const [form, setForm] = useState<ConnectionPreset>(preset);
   const [newKeyName, setNewKeyName] = useState('');
@@ -169,22 +184,47 @@ function ConnectionForm({ preset, onSave, onCancel, onTest }: {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <label className="text-xs font-medium text-muted-foreground">API Keys</label>
-          <button onClick={() => setShowKeys(!showKeys)} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
-            {showKeys ? <EyeOff size={12} /> : <Eye size={12} />}
-            {showKeys ? 'Hide values' : 'Show values'}
-          </button>
+          <div className="flex items-center gap-3">
+            {form.apiKeys.length > 1 && (
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+                <input
+                  type="checkbox"
+                  checked={!!form.roundRobinEnabled}
+                  onChange={e => set({ roundRobinEnabled: e.target.checked })}
+                  className="accent-primary"
+                />
+                <RotateCcw size={11} />
+                Round-robin rotation
+              </label>
+            )}
+            <button onClick={() => setShowKeys(!showKeys)} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+              {showKeys ? <EyeOff size={12} /> : <Eye size={12} />}
+              {showKeys ? 'Hide values' : 'Show values'}
+            </button>
+          </div>
         </div>
+        {form.roundRobinEnabled && form.apiKeys.length > 1 && (
+          <p className="text-xs text-primary/80 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
+            Keys will be used in rotation automatically. On a 429 rate-limit error, the next key is tried immediately.
+          </p>
+        )}
         <div className="space-y-2">
-          {form.apiKeys.map(key => (
-            <ApiKeyRow
-              key={key.id}
-              apiKey={key}
-              onDelete={() => removeKey(key.id)}
-              onSelect={() => set({ selectedKeyId: key.id })}
-              isSelected={form.selectedKeyId === key.id}
-              showValue={showKeys}
-            />
-          ))}
+          {form.apiKeys.map(key => {
+            const stat = keyStats?.find(s => s.keyId === key.id);
+            return (
+              <ApiKeyRow
+                key={key.id}
+                apiKey={key}
+                onDelete={() => removeKey(key.id)}
+                onSelect={() => set({ selectedKeyId: key.id })}
+                isSelected={form.selectedKeyId === key.id}
+                showValue={showKeys}
+                roundRobinEnabled={!!(form.roundRobinEnabled && form.apiKeys.length > 1)}
+                usageCount={stat?.usageCount}
+                isLastUsed={stat?.isLastUsed}
+              />
+            );
+          })}
         </div>
         <div className="flex gap-2">
           <input
@@ -321,9 +361,23 @@ export default function Connections() {
   const [showNew, setShowNew] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [activeId] = useState(() => storage.active.getConnectionId());
+  const [keyStats, setKeyStats] = useState<Array<{ keyId: string; name: string; usageCount: number; isLastUsed: boolean }>>([]);
 
   const load = useCallback(() => setConnections(storage.connections.getAll()), []);
   useEffect(() => { load(); }, [load]);
+
+  const fetchKeyStats = useCallback(async () => {
+    try {
+      const result = await api.keyStats.get();
+      setKeyStats(result.keyStats);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    fetchKeyStats();
+    const interval = setInterval(fetchKeyStats, 5000);
+    return () => clearInterval(interval);
+  }, [fetchKeyStats]);
 
   const handleSave = (preset: ConnectionPreset) => {
     storage.connections.upsert(preset);
@@ -343,6 +397,8 @@ export default function Connections() {
       setTimeout(() => setDeleteConfirm(null), 3000);
     }
   };
+
+  const lastUsedKey = keyStats.find(s => s.isLastUsed);
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -382,7 +438,14 @@ export default function Connections() {
         <div className="space-y-3">
           {connections.map(conn => (
             editing?.id === conn.id ? (
-              <ConnectionForm key={conn.id} preset={editing} onSave={handleSave} onCancel={() => setEditing(null)} onTest={async () => {}} />
+              <ConnectionForm
+                key={conn.id}
+                preset={editing}
+                onSave={handleSave}
+                onCancel={() => setEditing(null)}
+                onTest={async () => {}}
+                keyStats={conn.id === activeId ? keyStats : undefined}
+              />
             ) : (
               <div key={conn.id} className={cn('bg-card border rounded-xl p-4 transition-all', conn.id === activeId ? 'border-primary/40' : 'border-card-border')}>
                 <div className="flex items-start gap-3">
@@ -399,10 +462,19 @@ export default function Connections() {
                       <span>{conn.model || 'No model'}</span>
                       <span>·</span>
                       <span>{conn.apiKeys.length} key{conn.apiKeys.length !== 1 ? 's' : ''}</span>
+                      {conn.roundRobinEnabled && conn.apiKeys.length > 1 && (
+                        <><span>·</span><span className="flex items-center gap-1 text-primary"><RotateCcw size={11} />Round-robin</span></>
+                      )}
                       <span>·</span>
                       <span>{POST_PROCESSING_LABELS[conn.promptPostProcessing]}</span>
                       {conn.lastTestedAt && <><span>·</span><span className="text-green-600 dark:text-green-400">Tested</span></>}
                     </div>
+                    {conn.id === activeId && lastUsedKey && (
+                      <div className="mt-1.5 text-xs text-muted-foreground">
+                        Last request used: <span className="text-foreground font-medium">{lastUsedKey.name}</span>
+                        {lastUsedKey.usageCount > 0 && <span className="text-muted-foreground"> ({lastUsedKey.usageCount} use{lastUsedKey.usageCount !== 1 ? 's' : ''})</span>}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <button onClick={() => setEditing(conn)} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors" title="Edit">

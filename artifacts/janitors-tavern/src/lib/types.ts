@@ -183,10 +183,38 @@ export interface AppSettings {
   };
 }
 
+export interface StructuredOutputPreset {
+  id: string;
+  name: string;
+  enabled: boolean;
+  hidePrefillInDisplay: boolean;
+  minCharsAfterPrefix: number;
+  newlineToken: string;
+  antiSlopBanList: string;
+  continueOverlapChars: number;
+  overridePrefillEnabled: boolean;
+  overridePrefillText: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const DEFAULT_SO_PRESET: Omit<StructuredOutputPreset, 'id' | 'name' | 'createdAt' | 'updatedAt'> = {
+  enabled: false,
+  hidePrefillInDisplay: true,
+  minCharsAfterPrefix: 80,
+  newlineToken: '\\n',
+  antiSlopBanList: '',
+  continueOverlapChars: 14,
+  overridePrefillEnabled: false,
+  overridePrefillText: '',
+};
+
 export const STORAGE_KEYS = {
   CONNECTION_PRESETS: 'jt.connectionPresets',
   CHAT_COMPLETION_PRESETS: 'jt.chatCompletionPresets',
   REGEX_SCRIPTS: 'jt.regexScripts',
+  STRUCTURED_OUTPUT_PRESETS: 'jt.structuredOutputPresets',
+  ACTIVE_STRUCTURED_OUTPUT_PRESET_ID: 'jt.activeStructuredOutputPresetId',
   SETTINGS: 'jt.settings',
   ACTIVE_CONNECTION_ID: 'jt.activeConnectionId',
   ACTIVE_PRESET_ID: 'jt.activePresetId',

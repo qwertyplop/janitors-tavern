@@ -51,6 +51,7 @@ export const api = {
       activeConnectionPreset: ConnectionPreset | null;
       activeChatCompletionPreset: ChatCompletionPreset | null;
       activeRegexScripts: RegexScript[];
+      activeStructuredOutputPreset: import('./types').StructuredOutputPreset | null;
       defaultPostProcessing: string;
       strictPlaceholderMessage: string;
       logging: Record<string, boolean>;

@@ -3,6 +3,7 @@ import type {
   ChatCompletionPreset,
   RegexScript,
   AppSettings,
+  StructuredOutputPreset,
 } from './types';
 import { STORAGE_KEYS, DEFAULT_APP_SETTINGS } from './types';
 
@@ -78,6 +79,36 @@ export const storage = {
     delete: (id: string): void => {
       const all = storage.regexScripts.getAll().filter(s => s.id !== id);
       storage.regexScripts.save(all);
+    },
+  },
+
+  structuredOutputPresets: {
+    getAll: (): StructuredOutputPreset[] => getItem<StructuredOutputPreset[]>(STORAGE_KEYS.STRUCTURED_OUTPUT_PRESETS, []),
+    save: (presets: StructuredOutputPreset[]): void => setItem(STORAGE_KEYS.STRUCTURED_OUTPUT_PRESETS, presets),
+    get: (id: string): StructuredOutputPreset | null => {
+      const all = storage.structuredOutputPresets.getAll();
+      return all.find(p => p.id === id) || null;
+    },
+    upsert: (preset: StructuredOutputPreset): void => {
+      const all = storage.structuredOutputPresets.getAll();
+      const idx = all.findIndex(p => p.id === preset.id);
+      if (idx >= 0) all[idx] = preset;
+      else all.push(preset);
+      storage.structuredOutputPresets.save(all);
+    },
+    delete: (id: string): void => {
+      const all = storage.structuredOutputPresets.getAll().filter(p => p.id !== id);
+      storage.structuredOutputPresets.save(all);
+    },
+    getActiveId: (): string | null => localStorage.getItem(STORAGE_KEYS.ACTIVE_STRUCTURED_OUTPUT_PRESET_ID),
+    setActiveId: (id: string | null): void => {
+      if (id) localStorage.setItem(STORAGE_KEYS.ACTIVE_STRUCTURED_OUTPUT_PRESET_ID, id);
+      else localStorage.removeItem(STORAGE_KEYS.ACTIVE_STRUCTURED_OUTPUT_PRESET_ID);
+    },
+    getActive: (): StructuredOutputPreset | null => {
+      const id = storage.structuredOutputPresets.getActiveId();
+      if (!id) return null;
+      return storage.structuredOutputPresets.get(id);
     },
   },
 

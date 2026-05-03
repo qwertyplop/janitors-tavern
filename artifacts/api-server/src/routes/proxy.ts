@@ -6,6 +6,7 @@ import { parseJanitorRequest, janitorDataToMacroContext } from '../lib/janitor-p
 import { buildMessages } from '../lib/prompt-builder.js';
 import { processMacros } from '../lib/macros.js';
 import { applyRegexScripts } from '../lib/regex-processor.js';
+import { applyStructuredOutput, unwrapSOResponse, SOStreamProcessor } from '../lib/structured-output.js';
 import type { ConnectionPreset, ChatCompletionPreset, ChatMessage, PromptPostProcessingMode } from '../lib/types.js';
 import { DEFAULT_SAMPLER_SETTINGS } from '../lib/types.js';
 
@@ -492,6 +493,14 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
 
     _logProcessedMessages = processedMessages;
 
+    const soPreset = serverState.activeStructuredOutputPreset;
+    const soResult = (soPreset?.enabled)
+      ? applyStructuredOutput(processedMessages, soPreset)
+      : null;
+    if (soResult) {
+      processedMessages = soResult.messages as typeof processedMessages;
+    }
+
     const samplerParams = chatCompletionPreset?.sampler ?? DEFAULT_SAMPLER_SETTINGS;
     const samplerEnabled = chatCompletionPreset?.samplerEnabled ?? {};
 
@@ -535,6 +544,9 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
       } else {
         requestBody = buildOpenAIRequest(processedMessages, model, buildParams, true);
         endpoint = buildExtraQueryUrl(baseUrl, '/chat/completions', connectionPreset.extraQueryParams);
+      }
+      if (soResult) {
+        requestBody.response_format = soResult.responseFormat;
       }
 
       let upstreamRes = await fetch(endpoint, {
@@ -584,6 +596,8 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
       const decoder = new TextDecoder();
       let outputTokens = 0;
 
+      const soProcessor = soResult ? new SOStreamProcessor(soResult.hidePrefillLength) : null;
+
       try {
         while (true) {
           const { done, value } = await reader.read();
@@ -597,6 +611,32 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
 
           const tokenCounts = extractTokenCountsFromStreamChunk(text);
           if (tokenCounts) outputTokens = tokenCounts.completionTokens;
+
+          if (soProcessor) {
+            const lines = text.split('\n');
+            let modifiedText = '';
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) { modifiedText += line + '\n'; continue; }
+              const data = line.slice(6).trim();
+              if (data === '[DONE]') { modifiedText += line + '\n'; continue; }
+              try {
+                const chunk = JSON.parse(data) as Record<string, unknown>;
+                const choices = chunk.choices as Array<{ delta?: { content?: string } }> | undefined;
+                const delta = choices?.[0]?.delta?.content;
+                if (typeof delta === 'string') {
+                  const processed = soProcessor.processContentDelta(delta);
+                  choices![0].delta!.content = processed;
+                  modifiedText += 'data: ' + JSON.stringify(chunk) + '\n';
+                } else {
+                  modifiedText += line + '\n';
+                }
+              } catch {
+                modifiedText += line + '\n';
+              }
+            }
+            res.write(modifiedText);
+            continue;
+          }
 
           if (startReplyContent && text.includes('"delta"') && text.includes('"content"')) {
             const contentMatch = text.match(/("content":\s*")([^"]*)(")/);
@@ -631,6 +671,9 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
     } else {
       requestBody = buildOpenAIRequest(processedMessages, model, buildParams, false);
       endpoint = buildExtraQueryUrl(baseUrl, '/chat/completions', connectionPreset.extraQueryParams);
+    }
+    if (soResult) {
+      requestBody.response_format = soResult.responseFormat;
     }
 
     let upstreamRes = await fetch(endpoint, {
@@ -673,8 +716,12 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
       }
 
       if (responseJson.choices?.[0]?.message?.content) {
-        let content = responseJson.choices[0].message.content;
-        if (startReplyContent) content = startReplyContent + content;
+        let content = responseJson.choices[0].message.content as string;
+        if (soResult) {
+          content = unwrapSOResponse(content, soResult.hidePrefillLength);
+        } else {
+          if (startReplyContent) content = startReplyContent + content;
+        }
         const outputScripts = regexScripts.filter(s => s.placement.includes(2));
         if (outputScripts.length > 0) {
           content = applyRegexScripts(content, outputScripts, macroContext, 2, undefined, 'assistant');

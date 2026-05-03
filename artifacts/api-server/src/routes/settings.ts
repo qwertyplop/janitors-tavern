@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { serverState, checkAndResetDailyStats, getTimeUntilReset, getKeyStats } from '../lib/server-state.js';
-import type { ConnectionPreset, ChatCompletionPreset, RegexScript, PromptPostProcessingMode } from '../lib/types.js';
+import type { ConnectionPreset, ChatCompletionPreset, RegexScript, StructuredOutputPreset, PromptPostProcessingMode } from '../lib/types.js';
 
 const router = Router();
 
@@ -10,6 +10,7 @@ router.get('/', (req: Request, res: Response) => {
   res.json({
     activeConnectionPreset: serverState.activeConnectionPreset,
     activeChatCompletionPreset: serverState.activeChatCompletionPreset,
+    activeStructuredOutputPreset: serverState.activeStructuredOutputPreset,
     defaultPostProcessing: serverState.defaultPostProcessing,
     strictPlaceholderMessage: serverState.strictPlaceholderMessage,
     logging: serverState.logging,
@@ -23,6 +24,7 @@ router.post('/', (req: Request, res: Response) => {
     activeConnectionPreset?: ConnectionPreset | null;
     activeChatCompletionPreset?: ChatCompletionPreset | null;
     activeRegexScripts?: RegexScript[];
+    activeStructuredOutputPreset?: StructuredOutputPreset | null;
     defaultPostProcessing?: PromptPostProcessingMode;
     strictPlaceholderMessage?: string;
     logging?: {
@@ -41,6 +43,9 @@ router.post('/', (req: Request, res: Response) => {
   }
   if ('activeRegexScripts' in body && Array.isArray(body.activeRegexScripts)) {
     serverState.activeRegexScripts = body.activeRegexScripts;
+  }
+  if ('activeStructuredOutputPreset' in body) {
+    serverState.activeStructuredOutputPreset = body.activeStructuredOutputPreset ?? null;
   }
   if (body.defaultPostProcessing !== undefined) {
     serverState.defaultPostProcessing = body.defaultPostProcessing;

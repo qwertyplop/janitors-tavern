@@ -1,8 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Code2, Plus, Pencil, Trash2, Upload, Download, GripVertical, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Code2, Plus, Pencil, Trash2, Upload, Download, GripVertical, ToggleLeft, ToggleRight, Layers, ChevronDown } from 'lucide-react';
 import { storage, generateId } from '@/lib/storage';
-import type { RegexScript } from '@/lib/types';
+import type { RegexScript, StructuredOutputPreset } from '@/lib/types';
+import { DEFAULT_SO_PRESET } from '@/lib/types';
+import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+
+// ─── Regex Scripts ────────────────────────────────────────────────────────────
 
 const PLACEMENT_LABELS: Record<number, string> = {
   0: 'User input',
@@ -243,7 +247,9 @@ function ScriptForm({ script, onSave, onCancel }: {
   );
 }
 
-export default function Extensions() {
+// ─── Regex Scripts Tab ────────────────────────────────────────────────────────
+
+function RegexScriptsTab() {
   const [scripts, setScripts] = useState<RegexScript[]>([]);
   const [editing, setEditing] = useState<RegexScript | null>(null);
   const [showNew, setShowNew] = useState(false);
@@ -303,12 +309,9 @@ export default function Extensions() {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Extensions</h1>
-          <p className="text-sm text-muted-foreground mt-1">Regex scripts that transform messages before they are sent or after they are received.</p>
-        </div>
+        <p className="text-sm text-muted-foreground">Scripts that transform messages before they are sent or after they are received.</p>
         {!showNew && !editing && (
           <div className="flex gap-2 shrink-0">
             <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
@@ -387,6 +390,359 @@ export default function Extensions() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Structured Output Tab ────────────────────────────────────────────────────
+
+function ToggleSwitch({ checked, onChange, label, description }: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  description?: string;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+      </div>
+      <button
+        onClick={() => onChange(!checked)}
+        className={cn('relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none', checked ? 'bg-primary' : 'bg-muted')}
+      >
+        <span className={cn('pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform', checked ? 'translate-x-4' : 'translate-x-0')} />
+      </button>
+    </div>
+  );
+}
+
+function emptySOPreset(name: string): StructuredOutputPreset {
+  const now = new Date().toISOString();
+  return { id: generateId(), name, ...DEFAULT_SO_PRESET, createdAt: now, updatedAt: now };
+}
+
+const SLOT_DOCS = [
+  { slot: '[[keep]]', desc: 'Hide-prefill boundary — text before is hidden from output' },
+  { slot: '[[free]]', desc: 'Free-form text (any content)' },
+  { slot: '[[line]]', desc: 'Single line of text' },
+  { slot: '[[w:N]]', desc: 'Exactly N words' },
+  { slot: '[[w:N-M]]', desc: 'N to M words' },
+  { slot: '[[emotion]]', desc: 'One of ~30 emotion words' },
+  { slot: '[[name]]', desc: 'A proper name' },
+  { slot: '[[opt:a|b|c]]', desc: 'One of the listed options' },
+  { slot: '[[re:pattern]]', desc: 'Custom regex pattern' },
+  { slot: '[[end]]', desc: 'Stop the pattern here' },
+];
+
+function StructuredOutputTab() {
+  const [presets, setPresets] = useState<StructuredOutputPreset[]>([]);
+  const [activeId, setActiveIdState] = useState<string | null>(null);
+  const [form, setForm] = useState<StructuredOutputPreset | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [showDocs, setShowDocs] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [showNewForm, setShowNewForm] = useState(false);
+
+  const loadPresets = useCallback(() => {
+    const all = storage.structuredOutputPresets.getAll();
+    setPresets(all);
+    const id = storage.structuredOutputPresets.getActiveId();
+    setActiveIdState(id);
+    if (id) {
+      const found = all.find(p => p.id === id);
+      setForm(found ?? null);
+    } else {
+      setForm(null);
+    }
+  }, []);
+
+  useEffect(() => { loadPresets(); }, [loadPresets]);
+
+  const setField = <K extends keyof StructuredOutputPreset>(key: K, val: StructuredOutputPreset[K]) => {
+    if (!form) return;
+    setForm(f => f ? { ...f, [key]: val, updatedAt: new Date().toISOString() } : f);
+  };
+
+  const handleSelectPreset = (id: string) => {
+    storage.structuredOutputPresets.setActiveId(id);
+    const preset = presets.find(p => p.id === id) ?? null;
+    setActiveIdState(id);
+    setForm(preset);
+    setSaveStatus('idle');
+    setDeleteConfirm(false);
+  };
+
+  const handleCreatePreset = () => {
+    if (!newName.trim()) return;
+    const preset = emptySOPreset(newName.trim());
+    storage.structuredOutputPresets.upsert(preset);
+    storage.structuredOutputPresets.setActiveId(preset.id);
+    setPresets(storage.structuredOutputPresets.getAll());
+    setActiveIdState(preset.id);
+    setForm(preset);
+    setNewName('');
+    setShowNewForm(false);
+    setSaveStatus('idle');
+  };
+
+  const handleSave = async () => {
+    if (!form) return;
+    setSaveStatus('saving');
+    try {
+      storage.structuredOutputPresets.upsert(form);
+      await api.settings.update({ activeStructuredOutputPreset: form.enabled ? form : null });
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch {
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    }
+  };
+
+  const handleDelete = () => {
+    if (!form || !activeId) return;
+    if (!deleteConfirm) { setDeleteConfirm(true); setTimeout(() => setDeleteConfirm(false), 3000); return; }
+    storage.structuredOutputPresets.delete(activeId);
+    storage.structuredOutputPresets.setActiveId(null);
+    api.settings.update({ activeStructuredOutputPreset: null }).catch(() => {});
+    loadPresets();
+    setDeleteConfirm(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start justify-between gap-4">
+        <p className="text-sm text-muted-foreground">
+          Force the AI to follow a structured prefill template using JSON Schema response format.
+          Based on the <span className="font-mono text-xs bg-muted/60 px-1 rounded">StructuredPrefill</span> technique.
+        </p>
+        <button
+          onClick={() => setShowDocs(v => !v)}
+          className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-secondary-border text-xs font-medium transition-colors">
+          Slot reference <ChevronDown size={12} className={cn('transition-transform', showDocs && 'rotate-180')} />
+        </button>
+      </div>
+
+      {showDocs && (
+        <div className="bg-card border border-card-border rounded-xl p-4 space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground mb-3">Available template slots — use in the assistant prefill or override text</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5">
+            {SLOT_DOCS.map(({ slot, desc }) => (
+              <div key={slot} className="flex items-start gap-2 text-xs">
+                <code className="shrink-0 bg-muted/60 px-1.5 py-0.5 rounded font-mono text-primary/80">{slot}</code>
+                <span className="text-muted-foreground">{desc}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="bg-card border border-card-border rounded-xl p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <label className="text-xs font-medium text-muted-foreground">Active Preset</label>
+          <button onClick={() => setShowNewForm(v => !v)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-secondary-border text-xs font-medium transition-colors">
+            <Plus size={11} /> New
+          </button>
+        </div>
+
+        {showNewForm && (
+          <div className="flex gap-2">
+            <input
+              autoFocus
+              className="flex-1 px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleCreatePreset(); if (e.key === 'Escape') { setShowNewForm(false); setNewName(''); } }}
+              placeholder="Preset name..."
+            />
+            <button onClick={handleCreatePreset} disabled={!newName.trim()}
+              className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-40">
+              Create
+            </button>
+            <button onClick={() => { setShowNewForm(false); setNewName(''); }}
+              className="px-3 py-2 rounded-lg bg-secondary text-secondary-foreground border border-secondary-border text-sm">
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {presets.length === 0 ? (
+          <div className="text-center py-8">
+            <Layers size={24} className="mx-auto mb-2 text-muted-foreground opacity-40" />
+            <p className="text-sm text-muted-foreground">No presets yet.</p>
+            <button onClick={() => setShowNewForm(true)} className="mt-2 text-primary text-xs hover:underline">Create one to get started</button>
+          </div>
+        ) : (
+          <div className="relative">
+            <select
+              value={activeId ?? ''}
+              onChange={e => handleSelectPreset(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none appearance-none pr-8">
+              <option value="" disabled>Select a preset…</option>
+              {presets.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          </div>
+        )}
+      </div>
+
+      {form && (
+        <>
+          <div className="bg-card border border-card-border rounded-xl p-5 space-y-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-foreground">{form.name}</h3>
+              <button onClick={handleDelete}
+                className={cn('px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors', deleteConfirm ? 'bg-destructive/20 text-destructive border-destructive/40' : 'bg-secondary text-muted-foreground border-secondary-border hover:text-destructive hover:border-destructive/40')}>
+                {deleteConfirm ? 'Confirm delete?' : 'Delete preset'}
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Preset Name</label>
+              <input className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                value={form.name} onChange={e => setField('name', e.target.value)} />
+            </div>
+
+            <div className="space-y-4 border-t border-border pt-4">
+              <ToggleSwitch
+                checked={form.enabled}
+                onChange={v => setField('enabled', v)}
+                label="Enable Structured Output"
+                description="Sends a JSON Schema response_format and unwraps the structured response."
+              />
+              <ToggleSwitch
+                checked={form.hidePrefillInDisplay}
+                onChange={v => setField('hidePrefillInDisplay', v)}
+                label="Hide prefill from output"
+                description="Strips the literal prefill prefix from the final response shown to the user."
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-border pt-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Min chars after prefix</label>
+                <input type="number" min={0}
+                  className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  value={form.minCharsAfterPrefix}
+                  onChange={e => setField('minCharsAfterPrefix', Math.max(0, parseInt(e.target.value) || 0))} />
+                <p className="text-xs text-muted-foreground">Minimum characters of generated content after the prefill literals.</p>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Newline token</label>
+                <input className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                  value={form.newlineToken}
+                  onChange={e => setField('newlineToken', e.target.value)}
+                  placeholder="\n" />
+                <p className="text-xs text-muted-foreground">Token the model uses for newlines in the pattern (usually <code className="font-mono">\n</code>).</p>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Continue overlap chars</label>
+                <input type="number" min={0}
+                  className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  value={form.continueOverlapChars}
+                  onChange={e => setField('continueOverlapChars', Math.max(0, parseInt(e.target.value) || 0))} />
+                <p className="text-xs text-muted-foreground">Overlap with previous response when continuing generation.</p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 border-t border-border pt-4">
+              <label className="text-xs font-medium text-muted-foreground">Anti-slop ban list</label>
+              <textarea
+                className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+                rows={4}
+                value={form.antiSlopBanList}
+                onChange={e => setField('antiSlopBanList', e.target.value)}
+                placeholder={"word1\nword2\nphrase to ban"}
+              />
+              <p className="text-xs text-muted-foreground">One word or phrase per line. The model is prevented from using these via a negative lookahead in the pattern.</p>
+            </div>
+
+            <div className="space-y-3 border-t border-border pt-4">
+              <ToggleSwitch
+                checked={form.overridePrefillEnabled}
+                onChange={v => setField('overridePrefillEnabled', v)}
+                label="Override prefill text"
+                description="Use a custom prefill template instead of the assistant's last message."
+              />
+              {form.overridePrefillEnabled && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Prefill template</label>
+                  <textarea
+                    className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+                    rows={6}
+                    value={form.overridePrefillText}
+                    onChange={e => setField('overridePrefillText', e.target.value)}
+                    placeholder={"*[[emotion]]* [[name]] said, \"[[free]]\""}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Use <code className="font-mono text-primary/80">[[slot]]</code> markers to define structured regions. The literal text is used as the prefill, slots become regex patterns.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3">
+            {saveStatus === 'saved' && <span className="text-xs text-green-500">Saved and applied to server</span>}
+            {saveStatus === 'error' && <span className="text-xs text-destructive">Failed to apply — changes saved locally</span>}
+            <button
+              onClick={handleSave}
+              disabled={saveStatus === 'saving'}
+              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">
+              {saveStatus === 'saving' ? 'Saving…' : 'Save & Apply'}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
+type Tab = 'regex' | 'structured-output';
+
+export default function Extensions() {
+  const [activeTab, setActiveTab] = useState<Tab>('regex');
+
+  const tabs: { id: Tab; label: string }[] = [
+    { id: 'regex', label: 'Regex Scripts' },
+    { id: 'structured-output', label: 'Structured Output' },
+  ];
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Extensions</h1>
+        <p className="text-sm text-muted-foreground mt-1">Tools that transform and structure AI responses.</p>
+      </div>
+
+      <div className="flex border-b border-border">
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={cn(
+              'px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
+              activeTab === tab.id
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            )}>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div>
+        {activeTab === 'regex' && <RegexScriptsTab />}
+        {activeTab === 'structured-output' && <StructuredOutputTab />}
+      </div>
     </div>
   );
 }

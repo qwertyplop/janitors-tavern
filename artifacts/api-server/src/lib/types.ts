@@ -191,10 +191,26 @@ export interface LoggingSettings {
   logRawRequestBody: boolean;
 }
 
+export interface StructuredOutputPreset {
+  id: string;
+  name: string;
+  enabled: boolean;
+  hidePrefillInDisplay: boolean;
+  minCharsAfterPrefix: number;
+  newlineToken: string;
+  antiSlopBanList: string;
+  continueOverlapChars: number;
+  overridePrefillEnabled: boolean;
+  overridePrefillText: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ServerState {
   activeConnectionPreset: ConnectionPreset | null;
   activeChatCompletionPreset: ChatCompletionPreset | null;
   activeRegexScripts: RegexScript[];
+  activeStructuredOutputPreset: StructuredOutputPreset | null;
   defaultPostProcessing: PromptPostProcessingMode;
   strictPlaceholderMessage: string;
   logging: LoggingSettings;

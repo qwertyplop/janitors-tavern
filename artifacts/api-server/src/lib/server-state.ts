@@ -26,6 +26,7 @@ export const serverState: ServerState = {
   activeConnectionPreset: null,
   activeChatCompletionPreset: null,
   activeRegexScripts: [],
+  activeStructuredOutputPreset: null,
   defaultPostProcessing: 'none',
   strictPlaceholderMessage: '[Start a new chat]',
   logging: {

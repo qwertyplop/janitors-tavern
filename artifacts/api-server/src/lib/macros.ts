@@ -242,6 +242,7 @@ export function processMacros(content: string, context: MacroContext = {}): stri
     if (macroLower.startsWith('incglobalvar::')) return incVar(context.variables, macroContent.slice(14), true);
     if (macroLower.startsWith('decglobalvar::')) return decVar(context.variables, macroContent.slice(14), true);
     if (macroLower.startsWith('var::')) return getVar(context.variables, macroContent.slice(5).split('::')[0], false);
+    if (macroLower === 'setvar' || macroLower === 'getvar') return '';
 
     if (macroLower.startsWith('reverse:')) {
       const c = macroContent.slice(8);

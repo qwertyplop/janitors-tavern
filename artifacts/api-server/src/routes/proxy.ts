@@ -597,6 +597,8 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
       let outputTokens = 0;
 
       const soProcessor = soResult ? new SOStreamProcessor(soResult.hidePrefillLength) : null;
+      const outputScripts = regexScripts.filter(s => s.placement.includes(2));
+      let startReplyInjected = false;
 
       try {
         while (true) {
@@ -638,17 +640,39 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
             continue;
           }
 
-          if (startReplyContent && text.includes('"delta"') && text.includes('"content"')) {
-            const contentMatch = text.match(/("content":\s*")([^"]*)(")/);
-            if (contentMatch) {
-              const outputScripts = regexScripts.filter(s => s.placement.includes(2));
-              let newContent = startReplyContent + contentMatch[2];
-              if (outputScripts.length > 0) {
-                newContent = applyRegexScripts(newContent, outputScripts, macroContext, 2, undefined, 'assistant');
+          // Per-chunk post-processing: parse each SSE line, apply startReplyContent
+          // (first chunk only) and output regex scripts to every content delta.
+          if (startReplyContent || outputScripts.length > 0) {
+            const lines = text.split('\n');
+            let modifiedText = '';
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) { modifiedText += line + '\n'; continue; }
+              const data = line.slice(6).trim();
+              if (data === '[DONE]') { modifiedText += line + '\n'; continue; }
+              try {
+                const chunk = JSON.parse(data) as Record<string, unknown>;
+                const choices = chunk.choices as Array<{ delta?: { content?: string } }> | undefined;
+                const delta = choices?.[0]?.delta?.content;
+                if (typeof delta === 'string' && delta.length > 0) {
+                  let processed = delta;
+                  if (startReplyContent && !startReplyInjected) {
+                    processed = startReplyContent + processed;
+                    startReplyInjected = true;
+                  }
+                  if (outputScripts.length > 0) {
+                    processed = applyRegexScripts(processed, outputScripts, macroContext, 2, undefined, 'assistant');
+                  }
+                  choices![0].delta!.content = processed;
+                  modifiedText += 'data: ' + JSON.stringify(chunk) + '\n';
+                } else {
+                  modifiedText += line + '\n';
+                }
+              } catch {
+                modifiedText += line + '\n';
               }
-              const escaped = newContent.replace(/"/g, '\\"').replace(/\n/g, '\\n');
-              text = text.replace(/("content":\s*")([^"]*)(")/,  `$1${escaped}$3`);
             }
+            res.write(modifiedText);
+            continue;
           }
 
           res.write(text);

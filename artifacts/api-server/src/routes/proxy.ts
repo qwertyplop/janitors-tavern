@@ -371,6 +371,20 @@ router.post('/preview', async (req: Request, res: Response) => {
     if (isEnabled('repetition_penalty') && samplerParams.repetition_penalty !== 1) buildParams.repetition_penalty = samplerParams.repetition_penalty;
     if (isEnabled('seed') && samplerParams.seed !== -1) buildParams.seed = samplerParams.seed;
 
+    const requestBody = chatCompletionPreset
+      ? {
+          model: body.model || connectionPreset?.model || '',
+          messages: processedMessages,
+          stream: false,
+          ...buildParams,
+        }
+      : {
+          messages: processedMessages,
+          model: body.model || connectionPreset?.model || '',
+          stream: false,
+          ...buildParams,
+        };
+
     const messagesWithTokens = processedMessages.map(msg => ({
       role: msg.role,
       content: msg.content,
@@ -391,6 +405,7 @@ router.post('/preview', async (req: Request, res: Response) => {
       baseUrl: connectionPreset?.baseUrl || '(not set)',
       presetName: chatCompletionPreset?.name || null,
       connectionName: connectionPreset?.name || null,
+      requestBody,
       totalMessages: messagesWithTokens.length,
       totalTokens,
       byRole,

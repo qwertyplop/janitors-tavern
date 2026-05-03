@@ -43,6 +43,13 @@ interface PreviewResult {
   inputMessageCount: number;
 }
 
+interface SelectedConnection {
+  id: string;
+  name: string;
+  includeBodyParams?: string;
+  excludeBodyParams?: string;
+}
+
 function parseInlineBodyParams(raw: string | undefined): Record<string, unknown> {
   if (!raw || !raw.trim()) return {};
   const result: Record<string, unknown> = {};
@@ -122,8 +129,11 @@ function MessageRow({ msg, index }: { msg: PreviewMessage; index: number }) {
 }
 
 export default function RequestInspector() {
+  const connections = storage.connections.getAll();
   const presets = storage.presets.getAll();
+  const activeConnection = storage.connections.get(storage.active.getConnectionId() || '') as SelectedConnection | null;
   const [selectedPresetId, setSelectedPresetId] = useState<string>('active');
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string>('active');
   const [requestJson, setRequestJson] = useState<string>(MOCK_REQUEST);
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [result, setResult] = useState<PreviewResult | null>(null);
@@ -134,6 +144,11 @@ export default function RequestInspector() {
     if (selectedPresetId === 'active') return storage.presets.getAll().find(p => p.id === storage.active.getPresetId()) ?? null;
     return storage.presets.get(selectedPresetId);
   }, [selectedPresetId]);
+  const connectionPreview = useMemo(() => {
+    if (selectedConnectionId === 'none') return null;
+    if (selectedConnectionId === 'active') return activeConnection;
+    return connections.find(c => c.id === selectedConnectionId) ?? null;
+  }, [activeConnection, connections, selectedConnectionId]);
 
   function validateJson(val: string) {
     setRequestJson(val);
@@ -158,6 +173,10 @@ export default function RequestInspector() {
     if (selectedPresetId !== 'active') {
       const preset = storage.presets.get(selectedPresetId);
       if (preset) parsed.chatCompletionPreset = preset;
+    }
+    if (selectedConnectionId !== 'none') {
+      const connection = selectedConnectionId === 'active' ? activeConnection : storage.connections.get(selectedConnectionId);
+      if (connection) parsed.connectionPreset = connection;
     }
 
     setLoading(true);
@@ -261,6 +280,48 @@ export default function RequestInspector() {
             </button>
           </div>
 
+          <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+            <h2 className="text-sm font-semibold text-foreground">Simulate with Connection</h2>
+            <select
+              value={selectedConnectionId}
+              onChange={e => setSelectedConnectionId(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              <option value="active">Active connection (server state)</option>
+              {connections.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+              <option value="none">No connection override</option>
+            </select>
+            <p className="text-[11px] text-muted-foreground">
+              {selectedConnectionId === 'active'
+                ? 'Will use the currently active connection on the server.'
+                : selectedConnectionId === 'none'
+                ? 'No connection preset will be attached.'
+                : `Will inject the "${connections.find(c => c.id === selectedConnectionId)?.name}" connection.`}
+            </p>
+          </div>
+
+          {connectionPreview && (
+            <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+              <h2 className="text-sm font-semibold text-foreground">Connection Workflow</h2>
+              <div className="grid grid-cols-1 gap-2 text-xs">
+                <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/40">
+                  <span className="text-muted-foreground">Connection:</span>
+                  <span className="font-medium text-foreground truncate">{connectionPreview.name}</span>
+                </div>
+                <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/40">
+                  <span className="text-muted-foreground">Body include:</span>
+                  <span className="font-mono text-foreground truncate">{connectionPreview.includeBodyParams ? 'set' : 'none'}</span>
+                </div>
+                <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/40">
+                  <span className="text-muted-foreground">Body exclude:</span>
+                  <span className="font-mono text-foreground truncate">{connectionPreview.excludeBodyParams ? 'set' : 'none'}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {presetPreview && (
             <div className="rounded-xl border border-border bg-card p-4 space-y-3">
               <h2 className="text-sm font-semibold text-foreground">Preset Workflow</h2>
@@ -268,14 +329,6 @@ export default function RequestInspector() {
                 <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/40">
                   <span className="text-muted-foreground">Preset:</span>
                   <span className="font-medium text-foreground truncate">{presetPreview.name}</span>
-                </div>
-                <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/40">
-                  <span className="text-muted-foreground">Body include:</span>
-                  <span className="font-mono text-foreground truncate">{presetPreview.includeBodyParams ? 'set' : 'none'}</span>
-                </div>
-                <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/40">
-                  <span className="text-muted-foreground">Body exclude:</span>
-                  <span className="font-mono text-foreground truncate">{presetPreview.excludeBodyParams ? 'set' : 'none'}</span>
                 </div>
               </div>
             </div>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, Download, Upload, Trash2, Moon, Sun, Monitor, AlertTriangle, RefreshCw, CheckCircle2, BookOpen } from 'lucide-react';
 import { storage } from '@/lib/storage';
 import { api } from '@/lib/api';
-import type { AppSettings, PromptPostProcessingMode } from '@/lib/types';
+import type { AppSettings, PromptPostProcessingMode, UILanguage } from '@/lib/types';
 import { POST_PROCESSING_LABELS, POST_PROCESSING_TIPS } from '@/lib/types';
 import { useTheme } from '@/hooks/useTheme';
 import { cn } from '@/lib/utils';
@@ -10,6 +10,11 @@ import { cn } from '@/lib/utils';
 const POST_PROCESSING_MODES: PromptPostProcessingMode[] = [
   'none','merge','merge-tools','semi-strict','semi-strict-tools',
   'strict','strict-tools','single-user','anthropic','anthropic-merge-consecutives'
+];
+
+const LANGUAGE_OPTIONS: Array<{ value: UILanguage; label: string }> = [
+  { value: 'en', label: 'English' },
+  { value: 'ru', label: 'Russian' },
 ];
 
 export default function Settings() {
@@ -125,6 +130,19 @@ export default function Settings() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-medium text-muted-foreground">UI Language</label>
+          <select
+            className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            value={settings.uiLanguage}
+            onChange={e => updateSettings({ uiLanguage: e.target.value as UILanguage })}
+          >
+            {LANGUAGE_OPTIONS.map(option => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
         </div>
 
         <div className="flex items-center justify-between pt-1">

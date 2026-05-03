@@ -198,35 +198,43 @@ export function applyStructuredOutput(
 }
 
 export function unwrapSOResponse(rawContent: string, hidePrefillLength: number): string {
+  // Strip markdown code fences some models wrap JSON in
+  let content = rawContent.trim();
+  const mdFence = content.match(/^```(?:\w+)?\s*\n?([\s\S]*?)\n?```\s*$/);
+  if (mdFence) content = mdFence[1].trim();
+
   let value = rawContent;
   try {
-    const parsed = JSON.parse(rawContent) as Record<string, unknown>;
+    const parsed = JSON.parse(content) as Record<string, unknown>;
     if (parsed && typeof parsed.value === 'string') {
       value = parsed.value;
     }
   } catch {
-    const match = rawContent.match(/"value"\s*:\s*"([\s\S]*?)"\s*\}?\s*$/);
-    if (match) {
-      try {
-        value = JSON.parse('"' + match[1] + '"') as string;
-      } catch {
-        value = match[1]
-          .replace(/\\n/g, '\n')
-          .replace(/\\"/g, '"')
-          .replace(/\\\\/g, '\\')
-          .replace(/\\t/g, '\t');
-      }
+    // Fallback for partial / slightly-malformed JSON.
+    // Use decodeJsonStringPartial so escaped characters (\" \n \\) are handled
+    // correctly even inside the fallback path.
+    const keyMatch = /\"value\"\s*:\s*\"/.exec(content);
+    if (keyMatch) {
+      const rawValueStr = content.slice(keyMatch.index + keyMatch[0].length);
+      const { decoded } = decodeJsonStringPartial(rawValueStr);
+      if (decoded.length > 0) value = decoded;
     }
   }
+
   if (hidePrefillLength > 0 && value.length > hidePrefillLength) {
     return value.slice(hidePrefillLength);
   }
   return value;
 }
 
+// Regex that finds "value": " allowing any whitespace around the colon.
+// Matches both `"value":"` and `"value" : "` etc.
+const VALUE_KEY_RE = /\"value\"\s*:\s*\"/;
+
 export class SOStreamProcessor {
   private accContent = '';
   private inValue = false;
+  private valueStart = 0;   // index in accContent where the value string begins
   private emittedDecoded = 0;
   private totalDecoded = 0;
   readonly hidePrefillLength: number;
@@ -239,15 +247,13 @@ export class SOStreamProcessor {
     this.accContent += delta;
 
     if (!this.inValue) {
-      const valuePrefix = '"value":"';
-      const idx = this.accContent.indexOf(valuePrefix);
-      if (idx === -1) return '';
+      const match = VALUE_KEY_RE.exec(this.accContent);
+      if (!match) return '';
+      this.valueStart = match.index + match[0].length;
       this.inValue = true;
     }
 
-    const valuePrefix = '"value":"';
-    const valuePrefixIdx = this.accContent.indexOf(valuePrefix);
-    const rawValueStr = this.accContent.slice(valuePrefixIdx + valuePrefix.length);
+    const rawValueStr = this.accContent.slice(this.valueStart);
     const { decoded } = decodeJsonStringPartial(rawValueStr);
 
     const newDecoded = decoded.slice(this.emittedDecoded);

@@ -423,18 +423,192 @@ function emptySOPreset(name: string): StructuredOutputPreset {
   return { id: generateId(), name, ...DEFAULT_SO_PRESET, createdAt: now, updatedAt: now };
 }
 
-const SLOT_DOCS = [
-  { slot: '[[keep]]', desc: 'Hide-prefill boundary — text before is hidden from output' },
-  { slot: '[[free]]', desc: 'Free-form text (any content)' },
-  { slot: '[[line]]', desc: 'Single line of text' },
-  { slot: '[[w:N]]', desc: 'Exactly N words' },
-  { slot: '[[w:N-M]]', desc: 'N to M words' },
-  { slot: '[[emotion]]', desc: 'One of ~30 emotion words' },
-  { slot: '[[name]]', desc: 'A proper name' },
-  { slot: '[[opt:a|b|c]]', desc: 'One of the listed options' },
-  { slot: '[[re:pattern]]', desc: 'Custom regex pattern' },
-  { slot: '[[end]]', desc: 'Stop the pattern here' },
+interface SlotDoc {
+  slot: string;
+  desc: string;
+  explanation: string;
+  template: string;
+  output: string;
+  note?: string;
+}
+
+const SLOT_DOCS: SlotDoc[] = [
+  {
+    slot: '[[keep]]',
+    desc: 'Hide-prefill boundary',
+    explanation:
+      'Marks the boundary between the hidden anchor and the visible output. Everything before [[keep]] is sent to the model as the assistant prefill so it continues from that point — but that prefix is stripped from the final response shown to the user.',
+    template: '*She smiled.*[[keep]] Her voice was [[free]].',
+    output: 'Her voice was warm and gentle.',
+    note: 'The text "*She smiled.*" never appears in the chat — only what follows [[keep]] is shown.',
+  },
+  {
+    slot: '[[free]]',
+    desc: 'Free-form text (any content)',
+    explanation:
+      'Matches any sequence of characters — the model can write whatever it likes here. Use it for open-ended paragraphs, dialogue, or descriptions where you want no length or word constraint.',
+    template: '"[[free]]" she whispered.',
+    output: '"I never meant to hurt you" she whispered.',
+  },
+  {
+    slot: '[[line]]',
+    desc: 'Single line of text',
+    explanation:
+      'Like [[free]] but restricted to a single line — the pattern stops at the first newline. Ideal for dialogue lines or short descriptions that must not spill onto a new paragraph.',
+    template: 'She replied: "[[line]]"',
+    output: 'She replied: "Meet me at the east gate."',
+  },
+  {
+    slot: '[[w:N]]',
+    desc: 'Exactly N words',
+    explanation:
+      'Forces the model to write exactly N words in that slot. Each word is matched as a non-whitespace token. Perfect for tight formatting where you need a fixed-length phrase.',
+    template: 'Her reaction: [[w:4]].',
+    output: 'Her reaction: she froze completely still.',
+    note: 'Replace N with any positive integer, e.g. [[w:6]].',
+  },
+  {
+    slot: '[[w:N-M]]',
+    desc: 'N to M words (range)',
+    explanation:
+      'Like [[w:N]] but allows a range of word counts. More flexible than an exact count while still enforcing approximate length.',
+    template: 'His answer was [[w:2-5]].',
+    output: 'His answer was short and evasive.',
+    note: 'Both ends are inclusive. [[w:1-3]] allows one, two, or three words.',
+  },
+  {
+    slot: '[[emotion]]',
+    desc: 'One emotion word',
+    explanation:
+      'Constrains the slot to one of ~30 common emotion words — anger, joy, fear, surprise, melancholy, etc. Great for mood or tone tags that anchor the narrative register.',
+    template: 'The mood in the room: [[emotion]].',
+    output: 'The mood in the room: apprehensive.',
+  },
+  {
+    slot: '[[name]]',
+    desc: 'A proper name',
+    explanation:
+      'Matches a single capitalized word, enforcing that a proper name (character, place) appears at that position. Useful when you want a name without specifying which one.',
+    template: '[[name]] stepped forward from the crowd.',
+    output: 'Lyria stepped forward from the crowd.',
+  },
+  {
+    slot: '[[opt:a|b|c]]',
+    desc: 'One of the listed options',
+    explanation:
+      'The model must choose exactly one of the pipe-separated options. The options are matched as a regex alternation. Ideal for categorical choices, tone flags, or single-word mood selectors.',
+    template: 'She felt [[opt:happy|sad|angry|afraid]] about it.',
+    output: 'She felt afraid about it.',
+    note: 'Options can be multi-word: [[opt:deeply happy|vaguely sad]].',
+  },
+  {
+    slot: '[[re:pattern]]',
+    desc: 'Custom regex pattern',
+    explanation:
+      'Inserts a raw regex pattern directly into the compiled JSON Schema pattern. Gives full control when the built-in slots are not expressive enough. The pattern is used verbatim — make sure it is valid regex.',
+    template: 'Score: [[re:[1-9]|10]]/10.',
+    output: 'Score: 8/10.',
+    note: 'Keep patterns simple and avoid capturing groups — the outer schema already wraps everything.',
+  },
+  {
+    slot: '[[end]]',
+    desc: 'Stop the pattern here',
+    explanation:
+      'Terminates the compiled regex — no content is matched after this point. The model is forced to stop at this boundary. Use it to cap responses cleanly after a specific phrase or closing mark.',
+    template: '"[[line]]."[[end]]',
+    output: '"I\'ll be waiting." (model stops here)',
+    note: 'Anything after [[end]] in your template is ignored by the pattern builder.',
+  },
 ];
+
+function HighlightSlot({ text, slot }: { text: string; slot: string }) {
+  const idx = text.indexOf(slot);
+  if (idx === -1) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <span className="bg-primary/20 text-primary rounded px-0.5 font-semibold">{slot}</span>
+      {text.slice(idx + slot.length)}
+    </>
+  );
+}
+
+function SlotReference() {
+  const [open, setOpen] = useState<string | null>(null);
+  const active = SLOT_DOCS.find(d => d.slot === open) ?? null;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">Click any slot to see a full explanation and example.</p>
+      <div className="flex flex-wrap gap-1.5">
+        {SLOT_DOCS.map(({ slot, desc }) => (
+          <button
+            key={slot}
+            onClick={() => setOpen(o => o === slot ? null : slot)}
+            title={desc}
+            className={cn(
+              'px-2 py-1 rounded-lg text-xs font-mono border transition-all',
+              open === slot
+                ? 'bg-primary/15 text-primary border-primary/40 shadow-sm'
+                : 'bg-muted/50 text-muted-foreground border-border hover:border-primary/30 hover:text-foreground hover:bg-muted/80'
+            )}
+          >
+            {slot}
+          </button>
+        ))}
+      </div>
+
+      {active && (
+        <div className="bg-card border border-card-border rounded-xl p-4 space-y-4 animate-in fade-in slide-in-from-top-1 duration-150">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <code className="text-sm font-mono font-bold text-primary">{active.slot}</code>
+              <span className="ml-2 text-xs text-muted-foreground">{active.desc}</span>
+            </div>
+            <button
+              onClick={() => setOpen(null)}
+              className="text-muted-foreground hover:text-foreground transition-colors text-xs px-1.5 py-0.5 rounded hover:bg-muted"
+            >
+              ✕
+            </button>
+          </div>
+
+          <p className="text-sm text-foreground leading-relaxed">{active.explanation}</p>
+
+          {active.note && (
+            <div className="flex items-start gap-2 bg-primary/5 border border-primary/15 rounded-lg px-3 py-2">
+              <span className="text-primary text-xs font-semibold shrink-0 mt-0.5">Note</span>
+              <p className="text-xs text-muted-foreground">{active.note}</p>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Visual example</p>
+            <div className="space-y-1.5 text-xs font-mono">
+              <div className="flex items-start gap-2">
+                <span className="text-muted-foreground w-16 shrink-0 pt-1.5 not-mono text-xs font-sans">Template</span>
+                <div className="flex-1 bg-muted/40 border border-border rounded-lg px-3 py-2 text-foreground leading-relaxed">
+                  <HighlightSlot text={active.template} slot={active.slot} />
+                </div>
+              </div>
+              <div className="flex items-center gap-2 pl-[4.5rem] text-muted-foreground text-xs">
+                <div className="h-px flex-1 bg-border" />
+                <span>model fills slots</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-muted-foreground w-16 shrink-0 pt-1.5 not-mono text-xs font-sans">Output</span>
+                <div className="flex-1 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2 text-foreground leading-relaxed">
+                  {active.output}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function StructuredOutputTab() {
   const [presets, setPresets] = useState<StructuredOutputPreset[]>([]);
@@ -527,16 +701,8 @@ function StructuredOutputTab() {
       </div>
 
       {showDocs && (
-        <div className="bg-card border border-card-border rounded-xl p-4 space-y-2">
-          <p className="text-xs font-semibold text-muted-foreground mb-3">Available template slots — use in the assistant prefill or override text</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5">
-            {SLOT_DOCS.map(({ slot, desc }) => (
-              <div key={slot} className="flex items-start gap-2 text-xs">
-                <code className="shrink-0 bg-muted/60 px-1.5 py-0.5 rounded font-mono text-primary/80">{slot}</code>
-                <span className="text-muted-foreground">{desc}</span>
-              </div>
-            ))}
-          </div>
+        <div className="bg-card border border-card-border rounded-xl p-4">
+          <SlotReference />
         </div>
       )}
 

@@ -87,6 +87,10 @@ function applyBodyOverrides(body: Record<string, unknown>, includeRaw?: string, 
   return next;
 }
 
+function stripSetVarMacros(content: string): string {
+  return content.replace(/\{\{\s*set(?:global)?var::[^{}]+\}\}/gi, '');
+}
+
 const ROLE_STYLES: Record<string, { badge: string; bar: string; label: string }> = {
   system:    { badge: 'bg-violet-500/15 text-violet-400 border border-violet-500/30', bar: 'bg-violet-500', label: 'SYSTEM' },
   user:      { badge: 'bg-blue-500/15 text-blue-400 border border-blue-400/30',       bar: 'bg-blue-500',   label: 'USER' },
@@ -447,7 +451,7 @@ export default function RequestInspector() {
                 <p className="text-[11px] text-muted-foreground mb-3">Preset processed, STScript parsed, structured output processed, input regex parsed.</p>
                 <div>
                   {result.messages.map((msg, i) => (
-                    <MessageRow key={i} msg={msg} index={i} />
+                    <MessageRow key={i} msg={{ ...msg, content: stripSetVarMacros(msg.content) }} index={i} />
                   ))}
                 </div>
               </div>

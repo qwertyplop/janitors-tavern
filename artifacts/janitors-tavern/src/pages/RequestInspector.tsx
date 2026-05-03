@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScanSearch, Play, RefreshCw, ChevronDown, ChevronUp, AlertCircle, Cpu, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { storage } from '@/lib/storage';
@@ -36,10 +36,48 @@ interface PreviewResult {
   baseUrl: string;
   presetName: string | null;
   connectionName: string | null;
+  requestBody: Record<string, unknown>;
   totalMessages: number;
   totalTokens: number;
   byRole: Record<string, number>;
   inputMessageCount: number;
+}
+
+function parseInlineBodyParams(raw: string | undefined): Record<string, unknown> {
+  if (!raw || !raw.trim()) return {};
+  const result: Record<string, unknown> = {};
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const idx = trimmed.indexOf(':');
+    if (idx === -1) continue;
+    const key = trimmed.slice(0, idx).trim();
+    const value = trimmed.slice(idx + 1).trim();
+    if (!key) continue;
+    try {
+      result[key] = JSON.parse(value);
+    } catch {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+function parseBodyExclusions(raw: string | undefined): string[] {
+  if (!raw || !raw.trim()) return [];
+  return raw
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith('#'))
+    .map(line => line.startsWith('-') ? line.slice(1).trim() : line)
+    .filter(Boolean);
+}
+
+function applyBodyOverrides(body: Record<string, unknown>, includeRaw?: string, excludeRaw?: string): Record<string, unknown> {
+  const next = { ...body };
+  for (const key of parseBodyExclusions(excludeRaw)) delete next[key];
+  Object.assign(next, parseInlineBodyParams(includeRaw));
+  return next;
 }
 
 const ROLE_STYLES: Record<string, { badge: string; bar: string; label: string }> = {
@@ -91,6 +129,11 @@ export default function RequestInspector() {
   const [result, setResult] = useState<PreviewResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const presetPreview = useMemo(() => {
+    if (selectedPresetId === 'none') return null;
+    if (selectedPresetId === 'active') return storage.presets.getAll().find(p => p.id === storage.active.getPresetId()) ?? null;
+    return storage.presets.get(selectedPresetId);
+  }, [selectedPresetId]);
 
   function validateJson(val: string) {
     setRequestJson(val);
@@ -146,7 +189,7 @@ export default function RequestInspector() {
           <h1 className="text-xl font-bold text-foreground">Request Inspector</h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          Preview what the proxy will send to the upstream model — message structure, roles, and token estimates.
+          Preview what the proxy will send to the upstream model — request body, message structure, roles, and token estimates.
         </p>
       </div>
 
@@ -217,6 +260,26 @@ export default function RequestInspector() {
               )}
             </button>
           </div>
+
+          {presetPreview && (
+            <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+              <h2 className="text-sm font-semibold text-foreground">Preset Workflow</h2>
+              <div className="grid grid-cols-1 gap-2 text-xs">
+                <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/40">
+                  <span className="text-muted-foreground">Preset:</span>
+                  <span className="font-medium text-foreground truncate">{presetPreview.name}</span>
+                </div>
+                <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/40">
+                  <span className="text-muted-foreground">Body include:</span>
+                  <span className="font-mono text-foreground truncate">{presetPreview.includeBodyParams ? 'set' : 'none'}</span>
+                </div>
+                <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/40">
+                  <span className="text-muted-foreground">Body exclude:</span>
+                  <span className="font-mono text-foreground truncate">{presetPreview.excludeBodyParams ? 'set' : 'none'}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right: Results */}
@@ -274,6 +337,13 @@ export default function RequestInspector() {
                       <div className="text-foreground font-medium truncate">{result.postProcessingMode}</div>
                     </div>
                   </div>
+                </div>
+
+                <div className="mt-3 rounded-lg bg-muted/30 border border-border/60 p-3">
+                  <div className="text-[11px] font-semibold text-foreground mb-2">Final request body</div>
+                  <pre className="text-[11px] font-mono text-foreground/90 whitespace-pre-wrap break-words overflow-x-auto">
+                    {JSON.stringify(result.requestBody, null, 2)}
+                  </pre>
                 </div>
 
                 {(result.connectionName || result.presetName) && (

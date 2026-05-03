@@ -323,15 +323,19 @@ router.post('/preview', async (req: Request, res: Response) => {
     const regexScripts = serverState.activeRegexScripts.filter(s => !s.disabled);
 
     let processedMessages: OutputMessage[];
+    let macroMessages: OutputMessage[] = [];
     if (chatCompletionPreset) {
-      processedMessages = buildMessages(chatCompletionPreset, janitorData, macroContext);
+      macroMessages = buildMessages(chatCompletionPreset, janitorData, macroContext);
+      processedMessages = macroMessages.map(msg => ({ ...msg }));
     } else {
-      processedMessages = body.messages.map(msg => ({
+      macroMessages = body.messages.map(msg => ({
         role: msg.role,
         content: processMacros(msg.content, macroContext),
       }));
+      processedMessages = macroMessages.map(msg => ({ ...msg }));
     }
 
+    const regexAppliedMessages = processedMessages.map(msg => ({ ...msg }));
     if (regexScripts.length > 0) {
       const inputScripts = regexScripts.filter(s => s.placement.includes(1));
       if (inputScripts.length > 0) {
@@ -342,6 +346,7 @@ router.post('/preview', async (req: Request, res: Response) => {
       }
     }
 
+    const postProcessedMessages = processedMessages.map(msg => ({ ...msg }));
     if (postProcessingMode !== 'none') {
       processedMessages = applyPostProcessing(processedMessages, postProcessingMode, {
         strictPlaceholderMessage: serverState.strictPlaceholderMessage,
@@ -385,6 +390,10 @@ router.post('/preview', async (req: Request, res: Response) => {
           ...buildParams,
         };
 
+    const bodyWithOverrides = connectionPreset
+      ? applyBodyParamOverrides(requestBody, connectionPreset.includeBodyParams, connectionPreset.excludeBodyParams)
+      : requestBody;
+
     const messagesWithTokens = processedMessages.map(msg => ({
       role: msg.role,
       content: msg.content,
@@ -405,7 +414,10 @@ router.post('/preview', async (req: Request, res: Response) => {
       baseUrl: connectionPreset?.baseUrl || '(not set)',
       presetName: chatCompletionPreset?.name || null,
       connectionName: connectionPreset?.name || null,
-      requestBody,
+      macroMessages,
+      regexAppliedMessages,
+      postProcessedMessages,
+      requestBody: bodyWithOverrides,
       totalMessages: messagesWithTokens.length,
       totalTokens,
       byRole,

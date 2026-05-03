@@ -36,6 +36,9 @@ interface PreviewResult {
   baseUrl: string;
   presetName: string | null;
   connectionName: string | null;
+  macroMessages?: PreviewMessage[];
+  regexAppliedMessages?: PreviewMessage[];
+  postProcessedMessages?: PreviewMessage[];
   requestBody: Record<string, unknown>;
   totalMessages: number;
   totalTokens: number;
@@ -123,6 +126,21 @@ function MessageRow({ msg, index }: { msg: PreviewMessage; index: number }) {
             {expanded ? <><ChevronUp size={12} /> Show less</> : <><ChevronDown size={12} /> Show {msg.content.length - 300} more chars</>}
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+function StagePanel({ title, subtitle, messages }: { title: string; subtitle: string; messages?: PreviewMessage[] }) {
+  if (!messages) return null;
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <h3 className="text-xs font-semibold text-foreground mb-1">{title}</h3>
+      <p className="text-[11px] text-muted-foreground mb-3">{subtitle}</p>
+      <div>
+        {messages.map((msg, i) => (
+          <MessageRow key={i} msg={msg} index={i} />
+        ))}
       </div>
     </div>
   );
@@ -442,12 +460,26 @@ export default function RequestInspector() {
                 </div>
               )}
 
-              {/* Message list */}
+              <StagePanel
+                title="Macro Stage"
+                subtitle="After ST macro expansion."
+                messages={result.macroMessages}
+              />
+              <StagePanel
+                title="Regex Stage"
+                subtitle="After input regex scripts."
+                messages={result.regexAppliedMessages}
+              />
+              <StagePanel
+                title="Post-Processing Stage"
+                subtitle="After prompt post-processing."
+                messages={result.postProcessedMessages}
+              />
               <div className="rounded-xl border border-border bg-card p-4">
                 <h3 className="text-xs font-semibold text-foreground mb-1">
-                  Assembled Messages ({result.totalMessages})
+                  Final Messages ({result.totalMessages})
                 </h3>
-                <p className="text-[11px] text-muted-foreground mb-3">These are the exact messages sent to the model after preset processing and post-processing.</p>
+                <p className="text-[11px] text-muted-foreground mb-3">This is the exact state right before the request is sent to the model.</p>
                 <div>
                   {result.messages.map((msg, i) => (
                     <MessageRow key={i} msg={msg} index={i} />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Download, Upload, Trash2, Moon, Sun, Monitor, AlertTriangle, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Settings as SettingsIcon, Download, Upload, Trash2, Moon, Sun, Monitor, AlertTriangle, RefreshCw, CheckCircle2, BookOpen } from 'lucide-react';
 import { storage } from '@/lib/storage';
 import { api } from '@/lib/api';
 import type { AppSettings, PromptPostProcessingMode } from '@/lib/types';
@@ -21,6 +21,12 @@ export default function Settings() {
   const [clearSuccess, setClearSuccess] = useState(false);
   const [statsResetting, setStatsResetting] = useState(false);
   const [statsResetDone, setStatsResetDone] = useState(false);
+  const [quickStartDismissed, setQuickStartDismissed] = useState(() => storage.quickStart.isDismissed());
+
+  const handleRestoreQuickStart = () => {
+    storage.quickStart.restore();
+    setQuickStartDismissed(false);
+  };
 
   const updateSettings = (partial: Partial<AppSettings>) => {
     setSettings(s => ({ ...s, ...partial }));
@@ -119,6 +125,30 @@ export default function Settings() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="flex items-center justify-between pt-1">
+          <div>
+            <div className="flex items-center gap-2">
+              <BookOpen size={13} className="text-muted-foreground" />
+              <span className="text-sm font-medium text-foreground">Quick Start Guide</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5 ml-5">
+              {quickStartDismissed ? 'Currently hidden on the Dashboard.' : 'Currently shown at the top of the Dashboard.'}
+            </p>
+          </div>
+          <button
+            onClick={handleRestoreQuickStart}
+            disabled={!quickStartDismissed}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-xs font-medium border transition-all',
+              quickStartDismissed
+                ? 'bg-primary/10 text-primary border-primary/30 hover:bg-primary/20'
+                : 'bg-muted/20 text-muted-foreground border-border cursor-default opacity-50'
+            )}
+          >
+            {quickStartDismissed ? 'Show again' : 'Showing'}
+          </button>
         </div>
       </div>
 

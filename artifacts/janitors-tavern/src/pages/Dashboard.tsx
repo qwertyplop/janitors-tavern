@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'wouter';
 import {
   Activity, Plug, ScrollText, ChevronRight, CheckCircle2, AlertCircle,
-  RefreshCw, Copy, Check, Zap, Info, KeyRound, Eye, EyeOff, Terminal, XCircle, Wifi, WifiOff, ChevronDown, ChevronUp, MessageSquare
+  RefreshCw, Copy, Check, Zap, Info, KeyRound, Eye, EyeOff, Terminal, XCircle, Wifi, WifiOff, ChevronDown, ChevronUp, MessageSquare, X
 } from 'lucide-react';
 import { storage } from '@/lib/storage';
 import { api } from '@/lib/api';
@@ -267,6 +267,12 @@ export default function Dashboard() {
   const [janitorApiKey, setJanitorApiKey] = useState<string | null>(null);
   const [logs, setLogs] = useState<RequestLogEntry[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const [quickStartDismissed, setQuickStartDismissed] = useState(() => storage.quickStart.isDismissed());
+
+  const handleDismissQuickStart = () => {
+    storage.quickStart.dismiss();
+    setQuickStartDismissed(true);
+  };
 
   const proxyUrl = `${window.location.protocol}//${window.location.host}/api/proxy/chat-completion`;
 
@@ -390,6 +396,45 @@ export default function Dashboard() {
         <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
         <p className="text-sm text-muted-foreground mt-1">Configure your active connection and preset, then copy the proxy URL into JanitorAI.</p>
       </div>
+
+      {!quickStartDismissed && (
+        <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Info size={14} className="text-primary" />
+              <h3 className="text-sm font-semibold text-foreground">Quick Start Guide</h3>
+            </div>
+            <button
+              onClick={handleDismissQuickStart}
+              className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+              title="Dismiss — you can restore this from Settings"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <ol className="space-y-2 text-sm text-muted-foreground">
+            <li className="flex gap-3">
+              <span className="text-primary font-bold shrink-0">1.</span>
+              <span>Go to <Link href="/connections"><span className="text-primary hover:underline cursor-pointer">Connections</span></Link> and add your AI provider (OpenAI, Anthropic, etc.)</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="text-primary font-bold shrink-0">2.</span>
+              <span>Optionally go to <Link href="/presets"><span className="text-primary hover:underline cursor-pointer">Presets</span></Link> to import a SillyTavern preset for prompt engineering</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="text-primary font-bold shrink-0">3.</span>
+              <span>Select your connection (and optional preset) below, then click <strong className="text-foreground">Activate Configuration</strong></span>
+            </li>
+            <li className="flex gap-3">
+              <span className="text-primary font-bold shrink-0">4.</span>
+              <span>Copy the <strong className="text-foreground">Proxy URL</strong> below and paste it into JanitorAI → Settings → Custom AI → API URL</span>
+            </li>
+          </ol>
+          <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-primary/10">
+            You can show this guide again anytime from <Link href="/settings"><span className="text-primary hover:underline cursor-pointer">Settings</span></Link>.
+          </p>
+        </div>
+      )}
 
       <ProxyUrlCard url={proxyUrl} />
       <ApiKeyCard apiKey={janitorApiKey} onRotate={handleRotateApiKey} />
@@ -548,31 +593,6 @@ export default function Dashboard() {
       </div>
 
       <RequestLogPanel logs={logs} loading={loadingLogs} onRefresh={loadLogs} />
-
-      <div className="bg-card border border-card-border rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Info size={14} className="text-muted-foreground" />
-          <h3 className="text-sm font-semibold text-foreground">Quick Start</h3>
-        </div>
-        <ol className="space-y-2 text-sm text-muted-foreground">
-          <li className="flex gap-3">
-            <span className="text-primary font-bold shrink-0">1.</span>
-            <span>Go to <Link href="/connections"><span className="text-primary hover:underline cursor-pointer">Connections</span></Link> and add your AI provider (OpenAI, Anthropic, etc.)</span>
-          </li>
-          <li className="flex gap-3">
-            <span className="text-primary font-bold shrink-0">2.</span>
-            <span>Optionally go to <Link href="/presets"><span className="text-primary hover:underline cursor-pointer">Presets</span></Link> to import a SillyTavern preset for prompt engineering</span>
-          </li>
-          <li className="flex gap-3">
-            <span className="text-primary font-bold shrink-0">3.</span>
-            <span>Select your connection (and optional preset) above, then click <strong className="text-foreground">Activate Configuration</strong></span>
-          </li>
-          <li className="flex gap-3">
-            <span className="text-primary font-bold shrink-0">4.</span>
-            <span>Copy the <strong className="text-foreground">Proxy URL</strong> and paste it into JanitorAI → Settings → Custom AI → API URL</span>
-          </li>
-        </ol>
-      </div>
     </div>
   );
 }

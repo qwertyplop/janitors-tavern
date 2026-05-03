@@ -136,8 +136,15 @@ export const storage = {
     },
   },
 
+  quickStart: {
+    isDismissed: (): boolean => localStorage.getItem('jt_quick_start_dismissed') === 'true',
+    dismiss: (): void => { localStorage.setItem('jt_quick_start_dismissed', 'true'); },
+    restore: (): void => { localStorage.removeItem('jt_quick_start_dismissed'); },
+  },
+
   clearAll: (): void => {
     Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
+    localStorage.removeItem('jt_quick_start_dismissed');
   },
 
   exportAll: (): string => {

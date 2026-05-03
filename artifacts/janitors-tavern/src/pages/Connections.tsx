@@ -309,6 +309,8 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [newHeaderKey, setNewHeaderKey] = useState('');
   const [newHeaderValue, setNewHeaderValue] = useState('');
+  const [includeBodyText, setIncludeBodyText] = useState(preset.includeBodyParams ?? '');
+  const [excludeBodyText, setExcludeBodyText] = useState(preset.excludeBodyParams ?? '');
 
   const set = (update: Partial<ConnectionPreset>) => {
     setForm(f => ({ ...f, ...update, updatedAt: new Date().toISOString() }));
@@ -363,6 +365,14 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
   };
 
   const isValid = form.name.trim() && form.baseUrl.trim() && form.model.trim() && form.apiKeys.length > 0;
+
+  const handleSaveWithBody = () => {
+    onSave({
+      ...form,
+      includeBodyParams: includeBodyText.trim() || undefined,
+      excludeBodyParams: excludeBodyText.trim() || undefined,
+    });
+  };
 
   return (
     <div className="bg-card border border-card-border rounded-xl p-6 space-y-5">
@@ -504,9 +514,41 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
         </button>
 
         {showAdvanced && (
-          <div className="mt-3 space-y-4 border-t border-border pt-4">
+          <div className="mt-3 space-y-5 border-t border-border pt-4">
+
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">Extra Headers</label>
+              <div>
+                <label className="text-xs font-medium text-foreground">Include Body Parameters</label>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Merged into the request body at highest priority, overriding preset values. One <code className="font-mono">key: value</code> per line.</p>
+              </div>
+              <textarea
+                value={includeBodyText}
+                onChange={e => setIncludeBodyText(e.target.value)}
+                rows={4}
+                placeholder={'top_k: 20\nrepetition_penalty: 1.1'}
+                className="w-full px-2.5 py-2 rounded bg-input border border-border text-foreground text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring resize-y"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div>
+                <label className="text-xs font-medium text-foreground">Exclude Body Parameters</label>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Remove these keys from the request body before sending. One key per line (with or without a leading <code className="font-mono">-</code>).</p>
+              </div>
+              <textarea
+                value={excludeBodyText}
+                onChange={e => setExcludeBodyText(e.target.value)}
+                rows={3}
+                placeholder={'- frequency_penalty\n- presence_penalty'}
+                className="w-full px-2.5 py-2 rounded bg-input border border-border text-foreground text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring resize-y"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div>
+                <label className="text-xs font-medium text-foreground">Include Request Headers</label>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Extra HTTP headers sent with every request.</p>
+              </div>
               {Object.entries(form.extraHeaders || {}).map(([k, v]) => (
                 <div key={k} className="flex items-center gap-2 text-xs font-mono">
                   <span className="text-muted-foreground px-2 py-1.5 bg-muted rounded">{k}:</span>
@@ -520,6 +562,7 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
                 <button onClick={addHeader} disabled={!newHeaderKey.trim()} className="px-2.5 py-1.5 rounded bg-secondary text-secondary-foreground text-xs border border-secondary-border disabled:opacity-40">Add</button>
               </div>
             </div>
+
             <div className="flex items-center gap-2">
               <input type="checkbox" id="bypassStatus" checked={form.bypassStatusCheck} onChange={e => set({ bypassStatusCheck: e.target.checked })} className="accent-primary" />
               <label htmlFor="bypassStatus" className="text-xs text-muted-foreground">Bypass status check</label>
@@ -546,7 +589,7 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
         <div className="flex-1" />
         <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
         <button
-          onClick={() => onSave(form)}
+          onClick={handleSaveWithBody}
           disabled={!isValid}
           className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
         >

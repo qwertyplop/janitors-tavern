@@ -126,6 +126,51 @@ function getAuthHeaders(baseUrl: string, apiKey: string, extraHeaders?: Record<s
   return { ...headers, ...extraHeaders };
 }
 
+function parseIncludeBodyParams(raw: string | undefined): Record<string, unknown> {
+  if (!raw || !raw.trim()) return {};
+  const result: Record<string, unknown> = {};
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const colonIdx = trimmed.indexOf(':');
+    if (colonIdx === -1) continue;
+    const key = trimmed.slice(0, colonIdx).trim();
+    const rawVal = trimmed.slice(colonIdx + 1).trim();
+    if (!key) continue;
+    try {
+      result[key] = JSON.parse(rawVal);
+    } catch {
+      result[key] = rawVal;
+    }
+  }
+  return result;
+}
+
+function parseExcludeBodyParams(raw: string | undefined): string[] {
+  if (!raw || !raw.trim()) return [];
+  const result: string[] = [];
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const key = trimmed.startsWith('-') ? trimmed.slice(1).trim() : trimmed;
+    if (key) result.push(key);
+  }
+  return result;
+}
+
+function applyBodyParamOverrides(
+  requestBody: Record<string, unknown>,
+  includeRaw: string | undefined,
+  excludeRaw: string | undefined
+): Record<string, unknown> {
+  const body = { ...requestBody };
+  for (const key of parseExcludeBodyParams(excludeRaw)) {
+    delete body[key];
+  }
+  Object.assign(body, parseIncludeBodyParams(includeRaw));
+  return body;
+}
+
 function buildExtraQueryUrl(baseUrl: string, path: string, extraQueryParams?: Record<string, string>): string {
   const base = baseUrl.replace(/\/$/, '');
   let url = `${base}${path}`;
@@ -548,6 +593,7 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
       if (soResult) {
         requestBody.response_format = soResult.responseFormat;
       }
+      requestBody = applyBodyParamOverrides(requestBody, connectionPreset.includeBodyParams, connectionPreset.excludeBodyParams);
 
       let upstreamRes = await fetch(endpoint, {
         method: 'POST',
@@ -699,6 +745,7 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
     if (soResult) {
       requestBody.response_format = soResult.responseFormat;
     }
+    requestBody = applyBodyParamOverrides(requestBody, connectionPreset.includeBodyParams, connectionPreset.excludeBodyParams);
 
     let upstreamRes = await fetch(endpoint, {
       method: 'POST',

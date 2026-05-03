@@ -36,6 +36,8 @@ export interface ConnectionPreset {
   defaultParameters?: SamplerParameters;
   extraHeaders?: Record<string, string>;
   extraQueryParams?: Record<string, string>;
+  includeBodyParams?: string;
+  excludeBodyParams?: string;
   lastTestedAt?: string;
   roundRobinEnabled?: boolean;
   createdAt: string;

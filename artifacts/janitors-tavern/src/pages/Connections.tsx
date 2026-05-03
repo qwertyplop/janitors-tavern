@@ -1,7 +1,8 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Plus, Plug, Pencil, Trash2, CheckCircle2, AlertCircle, RefreshCw,
-  ChevronDown, ChevronUp, Eye, EyeOff, X, Loader2, RotateCcw
+  ChevronDown, ChevronUp, Eye, EyeOff, X, Loader2, RotateCcw,
+  Search, Check, ChevronRight, Cpu
 } from 'lucide-react';
 import { storage, generateId } from '@/lib/storage';
 import { api } from '@/lib/api';
@@ -71,6 +72,226 @@ function ApiKeyRow({ apiKey, onDelete, onSelect, isSelected, showValue, roundRob
   );
 }
 
+const MODEL_GROUPS: Record<string, string> = {
+  'gpt': 'OpenAI GPT', 'o1': 'OpenAI Reasoning', 'o3': 'OpenAI Reasoning', 'o4': 'OpenAI Reasoning',
+  'claude': 'Anthropic Claude', 'gemini': 'Google Gemini', 'gemma': 'Google Gemma',
+  'llama': 'Meta LLaMA', 'mistral': 'Mistral', 'mixtral': 'Mistral',
+  'deepseek': 'DeepSeek', 'qwen': 'Qwen', 'phi': 'Microsoft Phi',
+  'command': 'Cohere Command', 'nova': 'Amazon Nova',
+};
+
+function getModelGroup(modelId: string): string {
+  const lower = modelId.toLowerCase();
+  for (const [prefix, label] of Object.entries(MODEL_GROUPS)) {
+    if (lower.startsWith(prefix)) return label;
+  }
+  return 'Other';
+}
+
+function ModelPickerModal({ currentModel, baseUrl, apiKeys, selectedKeyId, onSelect, onClose }: {
+  currentModel: string;
+  baseUrl: string;
+  apiKeys: ApiKey[];
+  selectedKeyId?: string;
+  onSelect: (model: string) => void;
+  onClose: () => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [manualModel, setManualModel] = useState(currentModel);
+  const [selected, setSelected] = useState(currentModel);
+  const [models, setModels] = useState<string[]>([]);
+  const [fetching, setFetching] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [fetched, setFetched] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    searchRef.current?.focus();
+    if (baseUrl && apiKeys.length > 0) fetchModels();
+  }, []);
+
+  const fetchModels = async () => {
+    setFetching(true);
+    setFetchError(null);
+    const key = apiKeys.find(k => k.id === selectedKeyId) || apiKeys[0];
+    try {
+      const result = await api.proxy.getModels({ baseUrl, apiKey: key?.value || '' });
+      const list = ((result.data?.map((m: { id: string }) => m.id)) || result.models || []) as string[];
+      setModels(list.sort());
+      setFetched(true);
+    } catch (e) {
+      setFetchError(e instanceof Error ? e.message : 'Failed to fetch models');
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  const filtered = models.filter(m => m.toLowerCase().includes(search.toLowerCase().trim()));
+
+  const grouped: Record<string, string[]> = {};
+  for (const m of filtered) {
+    const g = getModelGroup(m);
+    if (!grouped[g]) grouped[g] = [];
+    grouped[g].push(m);
+  }
+  const sortedGroups = Object.entries(grouped).sort(([a], [b]) => {
+    if (a === 'Other') return 1;
+    if (b === 'Other') return -1;
+    return a.localeCompare(b);
+  });
+
+  const confirm = () => {
+    const val = (selected || manualModel).trim();
+    if (val) { onSelect(val); onClose(); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-card border border-border rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl">
+
+        {/* Header */}
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-border shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
+            <Cpu size={15} className="text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-base font-semibold text-foreground">Select Model</h2>
+            <p className="text-xs text-muted-foreground">Choose from available models or enter a custom name</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Search + Refresh bar */}
+        <div className="px-6 py-3 border-b border-border flex gap-2 shrink-0">
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <input
+              ref={searchRef}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search models…"
+              className="w-full pl-9 pr-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X size={12} />
+              </button>
+            )}
+          </div>
+          <button
+            onClick={fetchModels}
+            disabled={fetching || !baseUrl || apiKeys.length === 0}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-secondary text-secondary-foreground border border-border text-xs font-medium hover:bg-secondary/80 transition-colors disabled:opacity-40 shrink-0"
+          >
+            {fetching ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+            {fetching ? 'Loading…' : fetched ? 'Refresh' : 'Fetch'}
+          </button>
+        </div>
+
+        {/* Custom name input */}
+        <div className="px-6 py-3 border-b border-border shrink-0">
+          <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5 block">Custom / override</label>
+          <input
+            value={manualModel}
+            onChange={e => { setManualModel(e.target.value); setSelected(e.target.value); }}
+            onKeyDown={e => { if (e.key === 'Enter') confirm(); }}
+            placeholder="Type any model name, e.g. gpt-4o or claude-3-5-sonnet-20241022"
+            className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+
+        {/* Model list */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
+          {fetchError && (
+            <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2.5 mb-4">
+              <AlertCircle size={13} className="shrink-0 mt-0.5" />
+              <span>{fetchError}</span>
+            </div>
+          )}
+
+          {fetching && (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <Loader2 size={24} className="animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Fetching available models…</p>
+            </div>
+          )}
+
+          {!fetching && !fetched && !fetchError && (
+            <div className="flex flex-col items-center justify-center py-12 gap-2 text-center">
+              <Cpu size={28} className="text-muted-foreground/30" />
+              <p className="text-sm text-muted-foreground">No models loaded yet</p>
+              <p className="text-xs text-muted-foreground/70">Click Fetch to load models from the provider</p>
+            </div>
+          )}
+
+          {!fetching && fetched && filtered.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 gap-2">
+              <Search size={24} className="text-muted-foreground/30" />
+              <p className="text-sm text-muted-foreground">No models match "{search}"</p>
+            </div>
+          )}
+
+          {!fetching && sortedGroups.map(([group, groupModels]) => (
+            <div key={group} className="mb-5">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">{group}</span>
+                <span className="text-[10px] text-muted-foreground/60 bg-muted/50 px-1.5 py-0.5 rounded-full">{groupModels.length}</span>
+              </div>
+              <div className="space-y-0.5">
+                {groupModels.map(m => {
+                  const isSelected = selected === m;
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => { setSelected(m); setManualModel(m); }}
+                      onDoubleClick={confirm}
+                      className={cn(
+                        'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all',
+                        isSelected
+                          ? 'bg-primary/12 border border-primary/35 text-primary'
+                          : 'hover:bg-secondary/60 text-foreground border border-transparent hover:border-border/40'
+                      )}
+                    >
+                      <div className={cn('w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors', isSelected ? 'border-primary bg-primary' : 'border-muted-foreground/40')}>
+                        {isSelected && <Check size={9} className="text-primary-foreground" />}
+                      </div>
+                      <span className="flex-1 font-mono text-xs">{m}</span>
+                      {isSelected && <ChevronRight size={13} className="text-primary shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-border shrink-0">
+          <span className="text-xs text-muted-foreground">
+            {fetched && models.length > 0
+              ? `${filtered.length} of ${models.length} model${models.length !== 1 ? 's' : ''}`
+              : 'Double-click a model to confirm'}
+          </span>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Cancel
+            </button>
+            <button
+              onClick={confirm}
+              disabled={!(selected || manualModel).trim()}
+              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+            >
+              Use Model
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
   preset: ConnectionPreset;
   onSave: (p: ConnectionPreset) => void;
@@ -84,8 +305,7 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
   const [showKeys, setShowKeys] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [fetchingModels, setFetchingModels] = useState(false);
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [showModelPicker, setShowModelPicker] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [newHeaderKey, setNewHeaderKey] = useState('');
   const [newHeaderValue, setNewHeaderValue] = useState('');
@@ -129,20 +349,6 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
     }
   };
 
-  const handleFetchModels = async () => {
-    setFetchingModels(true);
-    const selectedKey = form.apiKeys.find(k => k.id === form.selectedKeyId) || form.apiKeys[0];
-    try {
-      const result = await api.proxy.getModels({ baseUrl: form.baseUrl, apiKey: selectedKey?.value || '' });
-      const models = result.data?.map(m => m.id) || result.models || [];
-      setAvailableModels(models as string[]);
-    } catch (e) {
-      setAvailableModels([]);
-    } finally {
-      setFetchingModels(false);
-    }
-  };
-
   const addHeader = () => {
     if (!newHeaderKey.trim()) return;
     set({ extraHeaders: { ...form.extraHeaders, [newHeaderKey.trim()]: newHeaderValue } });
@@ -160,6 +366,16 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
 
   return (
     <div className="bg-card border border-card-border rounded-xl p-6 space-y-5">
+      {showModelPicker && (
+        <ModelPickerModal
+          currentModel={form.model}
+          baseUrl={form.baseUrl}
+          apiKeys={form.apiKeys}
+          selectedKeyId={form.selectedKeyId}
+          onSelect={model => set({ model })}
+          onClose={() => setShowModelPicker(false)}
+        />
+      )}
       <h2 className="text-lg font-semibold text-foreground">{preset.name ? `Edit: ${preset.name}` : 'New Connection'}</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -251,31 +467,17 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Model *</label>
-          <div className="flex gap-2 min-w-0">
-            {availableModels.length > 0 ? (
-              <select
-                className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                value={form.model} onChange={e => set({ model: e.target.value })}
-              >
-                <option value="">Select model...</option>
-                {availableModels.map((m, i) => <option key={`${m}-${i}`} value={m}>{m}</option>)}
-              </select>
-            ) : (
-              <input
-                className="flex-1 px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring font-mono"
-                value={form.model} onChange={e => set({ model: e.target.value })}
-                placeholder="gpt-4o"
-              />
-            )}
-            <button
-              onClick={handleFetchModels}
-              disabled={!form.baseUrl || form.apiKeys.length === 0 || fetchingModels}
-              className="px-3 py-2 rounded-lg bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-secondary-border text-xs font-medium transition-colors disabled:opacity-40 shrink-0"
-              title="Fetch available models"
-            >
-              {fetchingModels ? <Loader2 size={13} className="animate-spin" /> : 'Fetch'}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowModelPicker(true)}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm hover:border-primary/50 transition-colors text-left group"
+          >
+            <Cpu size={13} className="text-muted-foreground shrink-0" />
+            <span className={cn('flex-1 font-mono truncate', form.model ? 'text-foreground' : 'text-muted-foreground')}>
+              {form.model || 'Select or type a model…'}
+            </span>
+            <ChevronRight size={13} className="text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+          </button>
         </div>
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Post-processing Mode</label>

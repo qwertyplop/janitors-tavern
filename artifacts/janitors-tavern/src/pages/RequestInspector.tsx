@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ScanSearch, Play, RefreshCw, ChevronDown, ChevronUp, AlertCircle, Cpu, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { storage } from '@/lib/storage';
+import type { UILanguage } from '@/lib/types';
 
 const MOCK_REQUEST = JSON.stringify(
   {
@@ -87,8 +88,56 @@ function applyBodyOverrides(body: Record<string, unknown>, includeRaw?: string, 
   return next;
 }
 
-function stripSetVarMacros(content: string): string {
-  return content.replace(/\{\{\s*set(?:global)?var::[^{}]+\}\}/gi, '');
+const I18N: Record<UILanguage, Record<string, string>> = {
+  en: {
+    title: 'Request Inspector',
+    subtitle: "Preview what the proxy will send to the upstream model — request body, message structure, roles, and token estimates.",
+    simulatePreset: 'Simulate with Preset',
+    activePreset: 'Active preset (server state)',
+    noPreset: 'No preset (pass-through)',
+    activePresetHelp: 'Will use whatever preset is currently active on the server.',
+    noPresetHelp: 'Messages will be forwarded with macro expansion only, no prompt blocks.',
+    injectPreset: 'Will inject the "{name}" preset.',
+    requestJson: 'JanitorAI Request JSON',
+    resetMock: 'Reset to mock',
+    simulateConnection: 'Simulate with Connection',
+    activeConnection: 'Active connection (server state)',
+    noConnection: 'No connection override',
+    activeConnectionHelp: 'Will use the currently active connection on the server.',
+    noConnectionHelp: 'No connection preset will be attached.',
+    injectConnection: 'Will inject the "{name}" connection.',
+    finalDraft: 'Final Draft',
+    finalDraftHelp: 'Preset processed, STScript parsed, structured output processed, input regex parsed.',
+    runPreview: 'Run Preview',
+    running: 'Running…',
+  },
+  ru: {
+    title: 'Инспектор запроса',
+    subtitle: 'Показывает, что прокси отправит модели — тело запроса, структуру сообщений, роли и оценку токенов.',
+    simulatePreset: 'Проверить с пресетом',
+    activePreset: 'Активный пресет (состояние сервера)',
+    noPreset: 'Без пресета (прямой проход)',
+    activePresetHelp: 'Будет использован текущий активный пресет на сервере.',
+    noPresetHelp: 'Сообщения пройдут только через макросы, без блоков промпта.',
+    injectPreset: 'Будет подставлен пресет «{name}».',
+    requestJson: 'JSON запроса JanitorAI',
+    resetMock: 'Сбросить к примеру',
+    simulateConnection: 'Проверить с подключением',
+    activeConnection: 'Активное подключение (состояние сервера)',
+    noConnection: 'Без замены подключения',
+    activeConnectionHelp: 'Будет использовано текущее активное подключение на сервере.',
+    noConnectionHelp: 'Подключение не будет подставлено.',
+    injectConnection: 'Будет подставлено подключение «{name}».',
+    finalDraft: 'Итоговый черновик',
+    finalDraftHelp: 'Пресет обработан, STScript разобран, structured output применён, input regex применён.',
+    runPreview: 'Запустить просмотр',
+    running: 'Выполняется…',
+  },
+};
+
+function t(lang: UILanguage, key: keyof typeof I18N.en, vars?: Record<string, string>): string {
+  const raw = I18N[lang][key] || I18N.en[key];
+  return vars ? raw.replace(/\{(\w+)\}/g, (_, k) => vars[k] || '') : raw;
 }
 
 const ROLE_STYLES: Record<string, { badge: string; bar: string; label: string }> = {
@@ -143,6 +192,7 @@ export default function RequestInspector() {
   const [result, setResult] = useState<PreviewResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const uiLanguage = storage.settings.get().uiLanguage ?? 'en';
   const presetPreview = useMemo(() => {
     if (selectedPresetId === 'none') return null;
     if (selectedPresetId === 'active') return storage.presets.getAll().find(p => p.id === storage.active.getPresetId()) ?? null;
@@ -209,10 +259,10 @@ export default function RequestInspector() {
       <div className="mb-6">
         <div className="flex items-center gap-2.5 mb-1">
           <ScanSearch size={20} className="text-primary" />
-          <h1 className="text-xl font-bold text-foreground">Request Inspector</h1>
+          <h1 className="text-xl font-bold text-foreground">{t(uiLanguage, 'title')}</h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          Preview what the proxy will send to the upstream model — request body, message structure, roles, and token estimates.
+          {t(uiLanguage, 'subtitle')}
         </p>
       </div>
 
@@ -221,35 +271,35 @@ export default function RequestInspector() {
         {/* Left: Input */}
         <div className="space-y-4">
           <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-            <h2 className="text-sm font-semibold text-foreground">Simulate with Preset</h2>
+            <h2 className="text-sm font-semibold text-foreground">{t(uiLanguage, 'simulatePreset')}</h2>
             <select
               value={selectedPresetId}
               onChange={e => setSelectedPresetId(e.target.value)}
               className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
             >
-              <option value="active">Active preset (server state)</option>
+              <option value="active">{t(uiLanguage, 'activePreset')}</option>
               {presets.map(p => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
-              <option value="none">No preset (pass-through)</option>
+              <option value="none">{t(uiLanguage, 'noPreset')}</option>
             </select>
             <p className="text-[11px] text-muted-foreground">
               {selectedPresetId === 'active'
-                ? 'Will use whatever preset is currently active on the server.'
+                ? t(uiLanguage, 'activePresetHelp')
                 : selectedPresetId === 'none'
-                ? 'Messages will be forwarded with macro expansion only, no prompt blocks.'
-                : `Will inject the "${presets.find(p => p.id === selectedPresetId)?.name}" preset.`}
+                ? t(uiLanguage, 'noPresetHelp')
+                : t(uiLanguage, 'injectPreset', { name: presets.find(p => p.id === selectedPresetId)?.name || '' })}
             </p>
           </div>
 
           <div className="rounded-xl border border-border bg-card p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-foreground">JanitorAI Request JSON</h2>
+              <h2 className="text-sm font-semibold text-foreground">{t(uiLanguage, 'requestJson')}</h2>
               <button
                 onClick={() => { setRequestJson(MOCK_REQUEST); setJsonError(null); }}
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors border border-border"
               >
-                <RefreshCw size={11} /> Reset to mock
+                <RefreshCw size={11} /> {t(uiLanguage, 'resetMock')}
               </button>
             </div>
 
@@ -285,24 +335,24 @@ export default function RequestInspector() {
           </div>
 
           <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-            <h2 className="text-sm font-semibold text-foreground">Simulate with Connection</h2>
+            <h2 className="text-sm font-semibold text-foreground">{t(uiLanguage, 'simulateConnection')}</h2>
             <select
               value={selectedConnectionId}
               onChange={e => setSelectedConnectionId(e.target.value)}
               className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
             >
-              <option value="active">Active connection (server state)</option>
+              <option value="active">{t(uiLanguage, 'activeConnection')}</option>
               {connections.map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
-              <option value="none">No connection override</option>
+              <option value="none">{t(uiLanguage, 'noConnection')}</option>
             </select>
             <p className="text-[11px] text-muted-foreground">
               {selectedConnectionId === 'active'
-                ? 'Will use the currently active connection on the server.'
+                ? t(uiLanguage, 'activeConnectionHelp')
                 : selectedConnectionId === 'none'
-                ? 'No connection preset will be attached.'
-                : `Will inject the "${connections.find(c => c.id === selectedConnectionId)?.name}" connection.`}
+                ? t(uiLanguage, 'noConnectionHelp')
+                : t(uiLanguage, 'injectConnection', { name: connections.find(c => c.id === selectedConnectionId)?.name || '' })}
             </p>
           </div>
 
@@ -447,12 +497,12 @@ export default function RequestInspector() {
               )}
 
               <div className="rounded-xl border border-border bg-card p-4">
-                <h3 className="text-xs font-semibold text-foreground mb-1">Final Draft</h3>
-                <p className="text-[11px] text-muted-foreground mb-3">Preset processed, STScript parsed, structured output processed, input regex parsed.</p>
+                <h3 className="text-xs font-semibold text-foreground mb-1">{t(uiLanguage, 'finalDraft')}</h3>
+                <p className="text-[11px] text-muted-foreground mb-3">{t(uiLanguage, 'finalDraftHelp')}</p>
                 <div>
-                  {result.messages.map((msg, i) => (
-                    <MessageRow key={i} msg={{ ...msg, content: stripSetVarMacros(msg.content) }} index={i} />
-                  ))}
+          {result.messages.map((msg, i) => (
+            <MessageRow key={i} msg={msg} index={i} />
+          ))}
                 </div>
               </div>
             </>

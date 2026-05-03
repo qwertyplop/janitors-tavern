@@ -173,9 +173,11 @@ export interface SamplerParameters {
 }
 
 export type ThemeMode = 'light' | 'dark' | 'system';
+export type UILanguage = 'en' | 'ru';
 
 export interface AppSettings {
   theme: ThemeMode;
+  uiLanguage: UILanguage;
   defaultPostProcessing: PromptPostProcessingMode;
   strictPlaceholderMessage: string;
   logging: {
@@ -238,6 +240,7 @@ export const DEFAULT_SAMPLER_SETTINGS: STSamplerSettings = {
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   theme: 'dark',
+  uiLanguage: 'en',
   defaultPostProcessing: 'none',
   strictPlaceholderMessage: '[Start a new chat]',
   logging: {

@@ -5,6 +5,8 @@ import { api } from '@/lib/api';
 import type { AppSettings, PromptPostProcessingMode, UILanguage } from '@/lib/types';
 import { POST_PROCESSING_LABELS, POST_PROCESSING_TIPS } from '@/lib/types';
 import { useTheme } from '@/hooks/useTheme';
+import { useLang } from '@/hooks/useLang';
+import { t } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 const POST_PROCESSING_MODES: PromptPostProcessingMode[] = [
@@ -14,10 +16,11 @@ const POST_PROCESSING_MODES: PromptPostProcessingMode[] = [
 
 const LANGUAGE_OPTIONS: Array<{ value: UILanguage; label: string }> = [
   { value: 'en', label: 'English' },
-  { value: 'ru', label: 'Russian' },
+  { value: 'ru', label: 'Русский' },
 ];
 
 export default function Settings() {
+  const lang = useLang();
   const { theme, changeTheme } = useTheme();
   const [settings, setSettings] = useState<AppSettings>(() => storage.settings.get());
   const [saving, setSaving] = useState(false);
@@ -35,6 +38,13 @@ export default function Settings() {
 
   const updateSettings = (partial: Partial<AppSettings>) => {
     setSettings(s => ({ ...s, ...partial }));
+  };
+
+  const handleLanguageChange = (newLang: UILanguage) => {
+    updateSettings({ uiLanguage: newLang });
+    const current = storage.settings.get();
+    storage.settings.save({ ...current, uiLanguage: newLang });
+    window.dispatchEvent(new CustomEvent('jt:language-change'));
   };
 
   const handleSave = async () => {
@@ -98,18 +108,24 @@ export default function Settings() {
     setStatsResetting(false);
   };
 
+  const loggingItems = [
+    { key: 'logRequests', label: t(lang, 'logRequests'), desc: t(lang, 'logRequestsDesc') },
+    { key: 'logResponses', label: t(lang, 'logResponses'), desc: t(lang, 'logResponsesDesc') },
+    { key: 'logRawRequestBody', label: t(lang, 'logRawRequestBody'), desc: t(lang, 'logRawRequestBodyDesc') },
+  ];
+
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-        <p className="text-sm text-muted-foreground mt-1">Configure global app settings, post-processing defaults, and data management.</p>
+        <h1 className="text-2xl font-bold text-foreground">{t(lang, 'settingsTitle')}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{t(lang, 'settingsSubtitle')}</p>
       </div>
 
       <div className="bg-card border border-card-border rounded-xl p-5 space-y-5">
-        <h2 className="text-sm font-semibold text-foreground">Appearance</h2>
+        <h2 className="text-sm font-semibold text-foreground">{t(lang, 'appearance')}</h2>
 
         <div className="space-y-2">
-          <label className="text-xs font-medium text-muted-foreground">Theme</label>
+          <label className="text-xs font-medium text-muted-foreground">{t(lang, 'theme')}</label>
           <div className="flex gap-2">
             {[
               { value: 'light' as const, label: 'Light', icon: Sun },
@@ -133,11 +149,11 @@ export default function Settings() {
         </div>
 
         <div className="space-y-2">
-          <label className="text-xs font-medium text-muted-foreground">UI Language</label>
+          <label className="text-xs font-medium text-muted-foreground">{t(lang, 'uiLanguage')}</label>
           <select
             className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
             value={settings.uiLanguage}
-            onChange={e => updateSettings({ uiLanguage: e.target.value as UILanguage })}
+            onChange={e => handleLanguageChange(e.target.value as UILanguage)}
           >
             {LANGUAGE_OPTIONS.map(option => (
               <option key={option.value} value={option.value}>{option.label}</option>
@@ -149,10 +165,10 @@ export default function Settings() {
           <div>
             <div className="flex items-center gap-2">
               <BookOpen size={13} className="text-muted-foreground" />
-              <span className="text-sm font-medium text-foreground">Quick Start Guide</span>
+              <span className="text-sm font-medium text-foreground">{t(lang, 'quickStartGuide')}</span>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5 ml-5">
-              {quickStartDismissed ? 'Currently hidden on the Dashboard.' : 'Currently shown at the top of the Dashboard.'}
+              {quickStartDismissed ? t(lang, 'quickStartHidden') : t(lang, 'quickStartShown')}
             </p>
           </div>
           <button
@@ -165,17 +181,17 @@ export default function Settings() {
                 : 'bg-muted/20 text-muted-foreground border-border cursor-default opacity-50'
             )}
           >
-            {quickStartDismissed ? 'Show again' : 'Showing'}
+            {quickStartDismissed ? t(lang, 'showAgain') : t(lang, 'showing')}
           </button>
         </div>
       </div>
 
       <div className="bg-card border border-card-border rounded-xl p-5 space-y-5">
-        <h2 className="text-sm font-semibold text-foreground">Proxy Defaults</h2>
-        <p className="text-xs text-muted-foreground">These settings apply globally unless overridden by a connection preset.</p>
+        <h2 className="text-sm font-semibold text-foreground">{t(lang, 'proxyDefaults')}</h2>
+        <p className="text-xs text-muted-foreground">{t(lang, 'proxyDefaultsSubtitle')}</p>
 
         <div className="space-y-2">
-          <label className="text-xs font-medium text-muted-foreground">Default Post-processing Mode</label>
+          <label className="text-xs font-medium text-muted-foreground">{t(lang, 'defaultPostProcessing')}</label>
           <select
             className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
             value={settings.defaultPostProcessing}
@@ -189,26 +205,22 @@ export default function Settings() {
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Strict Mode Placeholder Message</label>
+          <label className="text-xs font-medium text-muted-foreground">{t(lang, 'strictPlaceholder')}</label>
           <input
             className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
             value={settings.strictPlaceholderMessage}
             onChange={e => updateSettings({ strictPlaceholderMessage: e.target.value })}
             placeholder="[Start a new chat]"
           />
-          <p className="text-xs text-muted-foreground">Used when strict post-processing needs a placeholder user message.</p>
+          <p className="text-xs text-muted-foreground">{t(lang, 'strictPlaceholderHelp')}</p>
         </div>
       </div>
 
       <div className="bg-card border border-card-border rounded-xl p-5 space-y-5">
-        <h2 className="text-sm font-semibold text-foreground">Logging</h2>
-        <p className="text-xs text-muted-foreground">Control what gets logged by the proxy server. Logs appear in the server console.</p>
+        <h2 className="text-sm font-semibold text-foreground">{t(lang, 'logging')}</h2>
+        <p className="text-xs text-muted-foreground">{t(lang, 'loggingSubtitle')}</p>
         <div className="space-y-3">
-          {[
-            { key: 'logRequests', label: 'Log outgoing requests', desc: 'Log the prompt sent to the AI provider' },
-            { key: 'logResponses', label: 'Log incoming responses', desc: 'Log the AI provider response' },
-            { key: 'logRawRequestBody', label: 'Log raw request body', desc: 'Log the full raw body from JanitorAI' },
-          ].map(({ key, label, desc }) => (
+          {loggingItems.map(({ key, label, desc }) => (
             <div key={key} className="flex items-start gap-3">
               <input
                 type="checkbox"
@@ -228,7 +240,7 @@ export default function Settings() {
 
       {saved && (
         <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-600 dark:text-green-400 text-sm">
-          <CheckCircle2 size={14} /> Settings saved and applied to server.
+          <CheckCircle2 size={14} /> {t(lang, 'saved')}
         </div>
       )}
 
@@ -237,22 +249,22 @@ export default function Settings() {
         disabled={saving}
         className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
       >
-        {saving ? <><RefreshCw size={14} className="animate-spin" /> Saving...</> : 'Save Settings'}
+        {saving ? <><RefreshCw size={14} className="animate-spin" /> {t(lang, 'saving')}</> : t(lang, 'saveSettings')}
       </button>
 
       <div className="bg-card border border-card-border rounded-xl p-5 space-y-4">
-        <h2 className="text-sm font-semibold text-foreground">Data Management</h2>
+        <h2 className="text-sm font-semibold text-foreground">{t(lang, 'dataManagement')}</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <button
             onClick={handleExport}
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-secondary-border text-sm font-medium transition-colors"
           >
-            <Download size={14} /> Export All Data
+            <Download size={14} /> {t(lang, 'exportAllData')}
           </button>
 
           <label className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-secondary-border text-sm font-medium transition-colors cursor-pointer">
-            <Upload size={14} /> Import Data
+            <Upload size={14} /> {t(lang, 'importData')}
             <input type="file" accept=".json" className="hidden" onChange={handleImport} />
           </label>
         </div>
@@ -260,24 +272,28 @@ export default function Settings() {
         <div className="border-t border-border pt-4 space-y-2">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-medium text-foreground">Reset Usage Statistics</h3>
-              <p className="text-xs text-muted-foreground">Clears all token usage and request counts.</p>
+              <h3 className="text-sm font-medium text-foreground">{t(lang, 'resetUsageStats')}</h3>
+              <p className="text-xs text-muted-foreground">{t(lang, 'resetUsageStatsHelp')}</p>
             </div>
             <button
               onClick={handleResetStats}
               disabled={statsResetting}
               className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground border border-secondary-border text-sm font-medium hover:bg-secondary/80 disabled:opacity-40"
             >
-              {statsResetDone ? <span className="text-green-600 dark:text-green-400">Reset!</span> : statsResetting ? 'Resetting...' : 'Reset Stats'}
+              {statsResetDone
+                ? <span className="text-green-600 dark:text-green-400">{t(lang, 'resetDone')}</span>
+                : statsResetting
+                ? t(lang, 'resetting')
+                : t(lang, 'resetStats')}
             </button>
           </div>
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm font-medium text-foreground flex items-center gap-1.5">
                 <AlertTriangle size={13} className="text-destructive" />
-                Clear All Data
+                {t(lang, 'clearAllData')}
               </h3>
-              <p className="text-xs text-muted-foreground">Removes all connections, presets, scripts, and settings from this browser.</p>
+              <p className="text-xs text-muted-foreground">{t(lang, 'clearAllDataHelp')}</p>
             </div>
             <button
               onClick={handleClearAll}
@@ -288,15 +304,15 @@ export default function Settings() {
                   : 'bg-destructive/10 text-destructive border-destructive/40 hover:bg-destructive/20'
               )}
             >
-              {clearSuccess ? 'Cleared!' : clearConfirm ? 'Click again to confirm' : 'Clear All'}
+              {clearSuccess ? t(lang, 'cleared') : clearConfirm ? t(lang, 'clickAgainConfirm') : t(lang, 'clearAll')}
             </button>
           </div>
         </div>
       </div>
 
       <div className="text-center space-y-1">
-        <p className="text-xs text-muted-foreground">Janitor's Tavern — A SillyTavern-compatible proxy for JanitorAI</p>
-        <p className="text-xs text-muted-foreground">All preset and connection data is stored locally in your browser.</p>
+        <p className="text-xs text-muted-foreground">{t(lang, 'footerOne')}</p>
+        <p className="text-xs text-muted-foreground">{t(lang, 'footerTwo')}</p>
       </div>
     </div>
   );

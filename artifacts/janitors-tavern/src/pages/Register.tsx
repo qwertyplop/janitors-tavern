@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { Beer, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Beer, AlertCircle, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLang } from '@/hooks/useLang';
+import { t } from '@/lib/i18n';
 
 export default function Register() {
+  const lang = useLang();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -31,9 +34,9 @@ export default function Register() {
     e.preventDefault();
     setError('');
 
-    if (!username.trim()) { setError('Username is required'); return; }
-    if (password.length < 6) { setError('Password must be at least 6 characters'); return; }
-    if (password !== confirmPassword) { setError('Passwords do not match'); return; }
+    if (!username.trim()) { setError(t(lang, 'usernameRequired')); return; }
+    if (password.length < 6) { setError(t(lang, 'passwordShort')); return; }
+    if (password !== confirmPassword) { setError(t(lang, 'passwordMismatch')); return; }
 
     setLoading(true);
     const result = await register(username.trim(), password);
@@ -61,23 +64,23 @@ export default function Register() {
             <Beer size={28} className="text-primary" />
           </div>
           <h1 className="text-2xl font-bold text-foreground">Janitor's Tavern</h1>
-          <p className="text-sm text-muted-foreground mt-1">Set up your admin account to protect this instance</p>
+          <p className="text-sm text-muted-foreground mt-1">{t(lang, 'setupTitle')}</p>
         </div>
 
         <div className="bg-card border border-card-border rounded-xl p-6 space-y-4">
           <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-accent/30 border border-accent-border text-accent-foreground text-xs">
             <ShieldCheck size={14} />
-            This is a one-time setup. Your credentials protect the management UI and API.
+            {t(lang, 'authSetupNote')}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Username</label>
+              <label className="text-xs font-medium text-muted-foreground">{t(lang, 'username')}</label>
               <input
                 type="text"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
-                placeholder="Choose a username"
+                placeholder={t(lang, 'usernameHint')}
                 autoComplete="username"
                 required
                 disabled={loading}
@@ -86,12 +89,12 @@ export default function Register() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Password</label>
+              <label className="text-xs font-medium text-muted-foreground">{t(lang, 'password')}</label>
               <input
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="At least 6 characters"
+                placeholder={t(lang, 'passwordHint')}
                 autoComplete="new-password"
                 required
                 disabled={loading}
@@ -100,12 +103,12 @@ export default function Register() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Confirm Password</label>
+              <label className="text-xs font-medium text-muted-foreground">{t(lang, 'confirmPassword')}</label>
               <input
                 type="password"
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
-                placeholder="Confirm your password"
+                placeholder={t(lang, 'confirmPasswordHint')}
                 autoComplete="new-password"
                 required
                 disabled={loading}
@@ -126,17 +129,18 @@ export default function Register() {
               className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (
-                <><div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> Setting up...</>
+                <><div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> {t(lang, 'settingUp')}</>
               ) : (
-                <><ShieldCheck size={15} /> Set Up Authentication</>
+                <><ShieldCheck size={15} /> {t(lang, 'setUpAuthentication')}</>
               )}
             </button>
           </form>
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-4">
-          Authentication is optional but recommended if this instance is publicly accessible.
-          Skip by leaving auth unconfigured (anyone can access the UI).
+          {t(lang, 'authOptionalNote')}
+          {' '}
+          {t(lang, 'authOptionalNote2')}
         </p>
       </div>
     </div>

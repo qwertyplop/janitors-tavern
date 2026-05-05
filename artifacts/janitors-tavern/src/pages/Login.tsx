@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { Beer, AlertCircle, CheckCircle2, LogIn } from 'lucide-react';
+import { Beer, AlertCircle, LogIn } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLang } from '@/hooks/useLang';
+import { t } from '@/lib/i18n';
 
 export default function Login() {
+  const lang = useLang();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -56,18 +59,18 @@ export default function Login() {
             <Beer size={28} className="text-primary" />
           </div>
           <h1 className="text-2xl font-bold text-foreground">Janitor's Tavern</h1>
-          <p className="text-sm text-muted-foreground mt-1">Sign in to access your configuration</p>
+          <p className="text-sm text-muted-foreground mt-1">{t(lang, 'signInTitle')}</p>
         </div>
 
         <div className="bg-card border border-card-border rounded-xl p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Username</label>
+              <label className="text-xs font-medium text-muted-foreground">{t(lang, 'username')}</label>
               <input
                 type="text"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
-                placeholder="Your username"
+                placeholder={t(lang, 'usernameLoginHint')}
                 autoComplete="username"
                 required
                 disabled={loading}
@@ -76,12 +79,12 @@ export default function Login() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Password</label>
+              <label className="text-xs font-medium text-muted-foreground">{t(lang, 'password')}</label>
               <input
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="Your password"
+                placeholder={t(lang, 'passwordLoginHint')}
                 autoComplete="current-password"
                 required
                 disabled={loading}
@@ -102,16 +105,16 @@ export default function Login() {
               className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (
-                <><div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> Signing in...</>
+                <><div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> {t(lang, 'signingIn')}</>
               ) : (
-                <><LogIn size={15} /> Sign In</>
+                <><LogIn size={15} /> {t(lang, 'signIn')}</>
               )}
             </button>
           </form>
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-4">
-          Proxy URL and health check are always accessible without login.
+          {t(lang, 'proxyAccessNote')}
         </p>
       </div>
     </div>

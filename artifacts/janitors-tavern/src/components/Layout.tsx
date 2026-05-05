@@ -3,14 +3,8 @@ import { Link, useRoute } from 'wouter';
 import { LayoutDashboard, Plug, ScrollText, Code2, Settings, ChevronLeft, ChevronRight, Beer, Menu, X, LogOut, FlaskConical, ScanSearch, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
-
-const navItems = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/connections', label: 'Connections', icon: Plug },
-  { path: '/presets', label: 'Presets', icon: ScrollText },
-  { path: '/extensions', label: 'Extensions', icon: Code2 },
-  { path: '/settings', label: 'Settings', icon: Settings },
-];
+import { useLang } from '@/hooks/useLang';
+import { t } from '@/lib/i18n';
 
 function NavItem({ path, label, icon: Icon, collapsed }: { path: string; label: string; icon: React.ElementType; collapsed: boolean }) {
   const [isActive] = useRoute(path === '/' ? '/' : `${path}*`);
@@ -42,6 +36,7 @@ function NavItem({ path, label, icon: Icon, collapsed }: { path: string; label: 
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {
+  const lang = useLang();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { logout, username, authConfigured } = useAuth();
@@ -56,6 +51,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     setCollapsed(next);
     localStorage.setItem('jt.sidebarCollapsed', String(next));
   };
+
+  const navItems = [
+    { path: '/', label: t(lang, 'dashboardTitle'), icon: LayoutDashboard },
+    { path: '/connections', label: t(lang, 'navConnections'), icon: Plug },
+    { path: '/presets', label: t(lang, 'navPresets'), icon: ScrollText },
+    { path: '/extensions', label: t(lang, 'navExtensions'), icon: Code2 },
+    { path: '/settings', label: t(lang, 'settingsTitle'), icon: Settings },
+  ];
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -92,10 +95,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 collapsed ? 'justify-center' : ''
               )}>
                 <ScanSearch size={18} className="shrink-0" />
-                {!collapsed && <span className="text-sm font-medium truncate">Request Inspector</span>}
+                {!collapsed && <span className="text-sm font-medium truncate">{t(lang, 'requestInspector')}</span>}
                 {collapsed && (
                   <div className="absolute left-full ml-2 px-2 py-1 bg-popover border border-popover-border text-popover-foreground text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                    Request Inspector
+                    {t(lang, 'requestInspector')}
                   </div>
                 )}
               </div>
@@ -106,10 +109,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 collapsed ? 'justify-center' : ''
               )}>
                 <FlaskConical size={18} className="shrink-0" />
-                {!collapsed && <span className="text-sm font-medium truncate">Diagnostics</span>}
+                {!collapsed && <span className="text-sm font-medium truncate">{t(lang, 'diagnostics')}</span>}
                 {collapsed && (
                   <div className="absolute left-full ml-2 px-2 py-1 bg-popover border border-popover-border text-popover-foreground text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                    Diagnostics
+                    {t(lang, 'diagnostics')}
                   </div>
                 )}
               </div>
@@ -131,10 +134,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-destructive/10 hover:text-destructive transition-colors text-xs',
                 collapsed ? 'justify-center' : ''
               )}
-              title="Sign out"
+              title={t(lang, 'signOut')}
             >
               <LogOut size={14} />
-              {!collapsed && <span>Sign Out</span>}
+              {!collapsed && <span>{t(lang, 'signOut')}</span>}
             </button>
           </div>
         )}
@@ -144,7 +147,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             onClick={toggleCollapse}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors text-xs"
           >
-            {collapsed ? <ChevronRight size={14} /> : <><ChevronLeft size={14} /><span>Collapse</span></>}
+            {collapsed ? <ChevronRight size={14} /> : <><ChevronLeft size={14} /><span>{t(lang, 'collapse')}</span></>}
           </button>
         </div>
       </aside>

@@ -5,6 +5,8 @@ import type { RegexScript, StructuredOutputPreset } from '@/lib/types';
 import { DEFAULT_SO_PRESET } from '@/lib/types';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useLang } from '@/hooks/useLang';
+import { t } from '@/lib/i18n';
 
 // ─── Regex Scripts ────────────────────────────────────────────────────────────
 
@@ -875,18 +877,19 @@ function StructuredOutputTab() {
 type Tab = 'regex' | 'structured-output';
 
 export default function Extensions() {
+  const lang = useLang();
   const [activeTab, setActiveTab] = useState<Tab>('regex');
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'regex', label: 'Regex Scripts' },
-    { id: 'structured-output', label: 'Structured Output' },
+    { id: 'regex', label: t(lang, 'regexScriptsTab') },
+    { id: 'structured-output', label: t(lang, 'structuredOutputTab') },
   ];
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Extensions</h1>
-        <p className="text-sm text-muted-foreground mt-1">Tools that transform and structure AI responses.</p>
+        <h1 className="text-2xl font-bold text-foreground">{t(lang, 'extensionsTitle')}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{t(lang, 'extensionsSubtitle')}</p>
       </div>
 
       <div className="flex border-b border-border">

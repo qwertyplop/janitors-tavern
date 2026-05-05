@@ -6,8 +6,10 @@ import {
 } from 'lucide-react';
 import { storage } from '@/lib/storage';
 import { api } from '@/lib/api';
-import type { ConnectionPreset, ChatCompletionPreset, UsageStats, RequestLogEntry } from '@/lib/types';
+import type { ConnectionPreset, ChatCompletionPreset, UsageStats, RequestLogEntry, UILanguage } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { useLang } from '@/hooks/useLang';
+import { t } from '@/lib/i18n';
 
 function copyToClipboard(text: string, setCopied: (v: boolean) => void) {
   navigator.clipboard.writeText(text).then(() => {
@@ -16,24 +18,23 @@ function copyToClipboard(text: string, setCopied: (v: boolean) => void) {
   });
 }
 
-function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
+function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="bg-card border border-card-border rounded-xl p-4 flex flex-col gap-1">
       <span className="text-xs text-muted-foreground">{label}</span>
       <span className="text-2xl font-bold text-foreground">{value}</span>
-      {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
     </div>
   );
 }
 
-function ProxyUrlCard({ url }: { url: string }) {
+function ProxyUrlCard({ url, lang }: { url: string; lang: UILanguage }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="bg-accent/30 border border-accent-border rounded-xl p-4 flex flex-col gap-2">
       <div className="flex items-center gap-2">
         <Zap size={14} className="text-primary" />
-        <span className="text-xs font-semibold text-primary uppercase tracking-wide">Proxy URL</span>
-        <span className="text-xs text-muted-foreground ml-auto">Configure this in JanitorAI</span>
+        <span className="text-xs font-semibold text-primary uppercase tracking-wide">{t(lang, 'proxyUrl')}</span>
+        <span className="text-xs text-muted-foreground ml-auto">{t(lang, 'configureInJanitor')}</span>
       </div>
       <div className="flex items-center gap-2">
         <code className="flex-1 text-sm font-mono text-foreground bg-background border border-border rounded-lg px-3 py-2 truncate">
@@ -44,23 +45,21 @@ function ProxyUrlCard({ url }: { url: string }) {
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-xs font-medium transition-colors shrink-0"
         >
           {copied ? <Check size={13} /> : <Copy size={13} />}
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? t(lang, 'copied') : t(lang, 'copy')}
         </button>
       </div>
-      <p className="text-xs text-muted-foreground">
-        In JanitorAI → Settings → Custom AI → API URL.
-      </p>
+      <p className="text-xs text-muted-foreground">{t(lang, 'proxyUrlHint')}</p>
     </div>
   );
 }
 
-function ApiKeyCard({ apiKey, onRotate }: { apiKey: string | null; onRotate: () => void }) {
+function ApiKeyCard({ apiKey, onRotate, lang }: { apiKey: string | null; onRotate: () => void; lang: UILanguage }) {
   const [copied, setCopied] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [rotating, setRotating] = useState(false);
 
   const handleRotate = async () => {
-    if (!confirm('Regenerate the API key? The old key will stop working immediately.')) return;
+    if (!confirm(t(lang, 'confirmApiKeyRotate'))) return;
     setRotating(true);
     await onRotate();
     setRotating(false);
@@ -75,8 +74,8 @@ function ApiKeyCard({ apiKey, onRotate }: { apiKey: string | null; onRotate: () 
     <div className="bg-accent/30 border border-accent-border rounded-xl p-4 flex flex-col gap-2">
       <div className="flex items-center gap-2">
         <KeyRound size={14} className="text-primary" />
-        <span className="text-xs font-semibold text-primary uppercase tracking-wide">API Key</span>
-        <span className="text-xs text-muted-foreground ml-auto">Paste this in JanitorAI API key field</span>
+        <span className="text-xs font-semibold text-primary uppercase tracking-wide">{t(lang, 'apiKey')}</span>
+        <span className="text-xs text-muted-foreground ml-auto">{t(lang, 'apiKeyHint')}</span>
       </div>
       <div className="flex items-center gap-2">
         <code className="flex-1 text-sm font-mono text-foreground bg-background border border-border rounded-lg px-3 py-2 truncate select-all">
@@ -85,7 +84,6 @@ function ApiKeyCard({ apiKey, onRotate }: { apiKey: string | null; onRotate: () 
         <button
           onClick={() => setRevealed(r => !r)}
           className="p-2 rounded-lg bg-muted/40 hover:bg-muted/70 text-muted-foreground border border-border transition-colors shrink-0"
-          title={revealed ? 'Hide key' : 'Reveal key'}
         >
           {revealed ? <EyeOff size={13} /> : <Eye size={13} />}
         </button>
@@ -95,21 +93,19 @@ function ApiKeyCard({ apiKey, onRotate }: { apiKey: string | null; onRotate: () 
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-xs font-medium transition-colors shrink-0 disabled:opacity-50"
         >
           {copied ? <Check size={13} /> : <Copy size={13} />}
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? t(lang, 'copied') : t(lang, 'copy')}
         </button>
         <button
           onClick={handleRotate}
           disabled={rotating || !apiKey}
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-muted/40 hover:bg-muted/70 text-muted-foreground border border-border text-xs font-medium transition-colors shrink-0 disabled:opacity-50"
-          title="Regenerate API key"
+          title={t(lang, 'regenerateKey')}
         >
           <RefreshCw size={13} className={rotating ? 'animate-spin' : ''} />
-          {rotating ? '' : 'Regenerate'}
+          {rotating ? '' : t(lang, 'regenerate')}
         </button>
       </div>
-      <p className="text-xs text-muted-foreground">
-        In JanitorAI → Settings → Custom AI → API Key. Required for every request to the proxy.
-      </p>
+      <p className="text-xs text-muted-foreground">{t(lang, 'apiKeyFullHint')}</p>
     </div>
   );
 }
@@ -121,17 +117,12 @@ function formatRelativeTime(isoString: string): string {
   return `${Math.floor(diff / 3600000)}h ago`;
 }
 
-function roleColor(role: string) {
-  if (role === 'system') return 'text-yellow-500';
-  if (role === 'assistant') return 'text-blue-400';
-  return 'text-green-400';
-}
-
-function BodySection({ icon, label, content, emptyText }: {
+function BodySection({ icon, label, content, emptyText, lang }: {
   icon: React.ReactNode;
   label: string;
   content: string | null;
   emptyText: string;
+  lang: UILanguage;
 }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -143,10 +134,9 @@ function BodySection({ icon, label, content, emptyText }: {
           <button
             onClick={() => copyToClipboard(content, setCopied)}
             className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            title="Copy to clipboard"
           >
             {copied ? <Check size={10} /> : <Copy size={10} />}
-            {copied ? 'Copied' : 'Copy'}
+            {copied ? t(lang, 'copied') : t(lang, 'copy')}
           </button>
         )}
       </div>
@@ -163,7 +153,7 @@ function BodySection({ icon, label, content, emptyText }: {
   );
 }
 
-function LogEntryRow({ entry }: { entry: RequestLogEntry }) {
+function LogEntryRow({ entry, lang }: { entry: RequestLogEntry; lang: UILanguage }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <div className="flex flex-col">
@@ -186,7 +176,7 @@ function LogEntryRow({ entry }: { entry: RequestLogEntry }) {
           )}
           <span className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
             {entry.stream ? <Wifi size={11} /> : <WifiOff size={11} />}
-            {entry.stream ? 'stream' : 'sync'}
+            {entry.stream ? t(lang, 'streamMode') : t(lang, 'syncMode')}
             {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
           </span>
         </div>
@@ -213,22 +203,25 @@ function LogEntryRow({ entry }: { entry: RequestLogEntry }) {
       {expanded && (
         <div className="px-4 pb-3 space-y-2 border-t border-border/50 bg-muted/10">
           <BodySection
+            lang={lang}
             icon={<ArrowDownToLine size={11} className="text-muted-foreground" />}
-            label="Raw JanitorAI Request"
+            label={t(lang, 'rawJanitorRequest')}
             content={entry.rawInputBody != null ? JSON.stringify(entry.rawInputBody, null, 2) : null}
-            emptyText="Not captured"
+            emptyText={t(lang, 'notCaptured')}
           />
           <BodySection
+            lang={lang}
             icon={<Repeat2 size={11} className="text-muted-foreground" />}
-            label="Processed Request to Model"
+            label={t(lang, 'processedRequest')}
             content={entry.processedRequestBody != null ? JSON.stringify(entry.processedRequestBody, null, 2) : null}
-            emptyText="Not captured"
+            emptyText={t(lang, 'notCaptured')}
           />
           <BodySection
+            lang={lang}
             icon={<ArrowUpFromLine size={11} className="text-muted-foreground" />}
-            label={entry.stream ? 'Streamed Response Content' : 'Raw Response from Provider'}
+            label={entry.stream ? t(lang, 'streamedResponseContent') : t(lang, 'rawResponseFromProvider')}
             content={entry.rawResponseBody}
-            emptyText="No response body captured"
+            emptyText={t(lang, 'noResponseCaptured')}
           />
         </div>
       )}
@@ -236,14 +229,14 @@ function LogEntryRow({ entry }: { entry: RequestLogEntry }) {
   );
 }
 
-function RequestLogPanel({ logs, loading, onRefresh }: { logs: RequestLogEntry[]; loading: boolean; onRefresh: () => void }) {
+function RequestLogPanel({ logs, loading, onRefresh, lang }: { logs: RequestLogEntry[]; loading: boolean; onRefresh: () => void; lang: UILanguage }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Terminal size={16} className="text-primary" />
-          <h2 className="text-sm font-semibold text-foreground">Request Log</h2>
-          <span className="text-xs text-muted-foreground">(last 20)</span>
+          <h2 className="text-sm font-semibold text-foreground">{t(lang, 'requestLog')}</h2>
+          <span className="text-xs text-muted-foreground">({t(lang, 'last20')})</span>
         </div>
         <button
           onClick={onRefresh}
@@ -251,20 +244,20 @@ function RequestLogPanel({ logs, loading, onRefresh }: { logs: RequestLogEntry[]
           className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-          Refresh
+          {t(lang, 'refresh')}
         </button>
       </div>
 
       {logs.length === 0 ? (
         <div className="bg-card border border-card-border rounded-xl p-6 text-center">
           <Terminal size={20} className="text-muted-foreground mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">No requests yet. Send a message in JanitorAI to see logs here.</p>
+          <p className="text-sm text-muted-foreground">{t(lang, 'noRequestsYet')}</p>
         </div>
       ) : (
         <div className="bg-card border border-card-border rounded-xl overflow-hidden">
           <div className="divide-y divide-border">
             {logs.map(entry => (
-              <LogEntryRow key={entry.id} entry={entry} />
+              <LogEntryRow key={entry.id} entry={entry} lang={lang} />
             ))}
           </div>
         </div>
@@ -274,6 +267,7 @@ function RequestLogPanel({ logs, loading, onRefresh }: { logs: RequestLogEntry[]
 }
 
 export default function Dashboard() {
+  const lang = useLang();
   const [connections, setConnections] = useState<ConnectionPreset[]>([]);
   const [presets, setPresets] = useState<ChatCompletionPreset[]>([]);
   const [activeConnectionId, setActiveConnectionId] = useState<string | null>(null);
@@ -320,8 +314,6 @@ export default function Dashboard() {
       const res = await api.apiKey.get();
       setJanitorApiKey(res.apiKey);
     } catch {
-      // Auth may not be configured — key is still available publicly on the health endpoint
-      // Try fetching it directly
       try {
         const res = await fetch('/api/auth/api-key');
         if (res.ok) {
@@ -368,9 +360,9 @@ export default function Dashboard() {
   const activeConnection = connections.find(c => c.id === activeConnectionId) || null;
   const activePreset = presets.find(p => p.id === activePresetId) || null;
 
-  const handleActivate = async () => {
+  const handleActivate = useCallback(async () => {
     if (!activeConnection) {
-      setActivationError('Please select a connection first');
+      setActivationError(t(lang, 'addConnectionFirst'));
       return;
     }
     setActivating(true);
@@ -393,7 +385,7 @@ export default function Dashboard() {
     } finally {
       setActivating(false);
     }
-  };
+  }, [activeConnection, activePreset, lang]);
 
   const handleSelectConnection = (id: string) => {
     storage.active.setConnectionId(id);
@@ -413,8 +405,8 @@ export default function Dashboard() {
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">Configure your active connection and preset, then copy the proxy URL into JanitorAI.</p>
+        <h1 className="text-2xl font-bold text-foreground">{t(lang, 'dashboardTitle')}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{t(lang, 'dashboardSubtitle')}</p>
       </div>
 
       {!quickStartDismissed && (
@@ -422,12 +414,12 @@ export default function Dashboard() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Info size={14} className="text-primary" />
-              <h3 className="text-sm font-semibold text-foreground">Quick Start Guide</h3>
+              <h3 className="text-sm font-semibold text-foreground">{t(lang, 'quickStartTitle')}</h3>
             </div>
             <button
               onClick={handleDismissQuickStart}
               className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-              title="Dismiss — you can restore this from Settings"
+              title={t(lang, 'dismissHint')}
             >
               <X size={14} />
             </button>
@@ -435,49 +427,49 @@ export default function Dashboard() {
           <ol className="space-y-2 text-sm text-muted-foreground">
             <li className="flex gap-3">
               <span className="text-primary font-bold shrink-0">1.</span>
-              <span>Go to <Link href="/connections"><span className="text-primary hover:underline cursor-pointer">Connections</span></Link> and add your AI provider (OpenAI, Anthropic, etc.)</span>
+              <span>{t(lang, 'step1')}</span>
             </li>
             <li className="flex gap-3">
               <span className="text-primary font-bold shrink-0">2.</span>
-              <span>Optionally go to <Link href="/presets"><span className="text-primary hover:underline cursor-pointer">Presets</span></Link> to import a SillyTavern preset for prompt engineering</span>
+              <span>{t(lang, 'step2')}</span>
             </li>
             <li className="flex gap-3">
               <span className="text-primary font-bold shrink-0">3.</span>
-              <span>Select your connection (and optional preset) below, then click <strong className="text-foreground">Activate Configuration</strong></span>
+              <span>{t(lang, 'step3')}</span>
             </li>
             <li className="flex gap-3">
               <span className="text-primary font-bold shrink-0">4.</span>
-              <span>Copy the <strong className="text-foreground">Proxy URL</strong> below and paste it into JanitorAI → Settings → Custom AI → API URL</span>
+              <span>{t(lang, 'step4')}</span>
             </li>
           </ol>
           <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-primary/10">
-            You can show this guide again anytime from <Link href="/settings"><span className="text-primary hover:underline cursor-pointer">Settings</span></Link>.
+            {t(lang, 'restoreHint')}
           </p>
         </div>
       )}
 
-      <ProxyUrlCard url={proxyUrl} />
-      <ApiKeyCard apiKey={janitorApiKey} onRotate={handleRotateApiKey} />
+      <ProxyUrlCard url={proxyUrl} lang={lang} />
+      <ApiKeyCard apiKey={janitorApiKey} onRotate={handleRotateApiKey} lang={lang} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-card border border-card-border rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Plug size={16} className="text-primary" />
-              <h2 className="text-sm font-semibold text-foreground">Active Connection</h2>
+              <h2 className="text-sm font-semibold text-foreground">{t(lang, 'activeConnection')}</h2>
             </div>
             <Link href="/connections">
               <button className="text-xs text-primary hover:underline flex items-center gap-1">
-                Manage <ChevronRight size={12} />
+                {t(lang, 'manage')} <ChevronRight size={12} />
               </button>
             </Link>
           </div>
 
           {connections.length === 0 ? (
             <div className="text-center py-4">
-              <p className="text-sm text-muted-foreground">No connections yet</p>
+              <p className="text-sm text-muted-foreground">{t(lang, 'noConnectionsYet')}</p>
               <Link href="/connections">
-                <button className="mt-2 text-xs text-primary hover:underline">+ Add connection</button>
+                <button className="mt-2 text-xs text-primary hover:underline">{t(lang, 'addConnection')}</button>
               </Link>
             </div>
           ) : (
@@ -497,7 +489,7 @@ export default function Dashboard() {
                     {activeConnectionId === conn.id && <CheckCircle2 size={13} className="text-primary shrink-0" />}
                     <span className="font-medium truncate">{conn.name}</span>
                   </div>
-                  <div className="text-xs text-muted-foreground mt-0.5 truncate pl-0">{conn.baseUrl} · {conn.model || 'No model'}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5 truncate">{conn.baseUrl} · {conn.model || t(lang, 'noModel')}</div>
                 </button>
               ))}
             </div>
@@ -508,11 +500,11 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ScrollText size={16} className="text-primary" />
-              <h2 className="text-sm font-semibold text-foreground">Active Preset</h2>
+              <h2 className="text-sm font-semibold text-foreground">{t(lang, 'activePreset')}</h2>
             </div>
             <Link href="/presets">
               <button className="text-xs text-primary hover:underline flex items-center gap-1">
-                Manage <ChevronRight size={12} />
+                {t(lang, 'manage')} <ChevronRight size={12} />
               </button>
             </Link>
           </div>
@@ -528,9 +520,9 @@ export default function Dashboard() {
           >
             <div className="flex items-center gap-2">
               {activePresetId === null && <CheckCircle2 size={13} className="text-primary shrink-0" />}
-              <span className="font-medium">Pass-through (no preset)</span>
+              <span className="font-medium">{t(lang, 'passThrough')}</span>
             </div>
-            <div className="text-xs text-muted-foreground mt-0.5">Forward messages as-is from JanitorAI</div>
+            <div className="text-xs text-muted-foreground mt-0.5">{t(lang, 'passThroughHelp')}</div>
           </button>
 
           {presets.length > 0 && (
@@ -570,7 +562,7 @@ export default function Dashboard() {
         {activationSuccess && (
           <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-600 dark:text-green-400 text-sm mb-3">
             <CheckCircle2 size={14} />
-            Configuration activated! JanitorAI requests will now use the selected connection.
+            {t(lang, 'configurationActivated')}
           </div>
         )}
         <button
@@ -584,13 +576,13 @@ export default function Dashboard() {
           )}
         >
           {activating ? (
-            <><RefreshCw size={16} className="animate-spin" /> Activating...</>
+            <><RefreshCw size={16} className="animate-spin" /> {t(lang, 'activating')}</>
           ) : (
-            <><Zap size={16} /> Activate Configuration</>
+            <><Zap size={16} /> {t(lang, 'activateConfiguration')}</>
           )}
         </button>
         <p className="text-xs text-center text-muted-foreground mt-2">
-          Press this after changing your connection or preset.
+          {t(lang, 'activationPressHint')}
         </p>
       </div>
 
@@ -598,21 +590,23 @@ export default function Dashboard() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Activity size={16} className="text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">Usage Statistics</h2>
+            <h2 className="text-sm font-semibold text-foreground">{t(lang, 'usageStatistics')}</h2>
           </div>
           {timeUntilReset && (
-            <span className="text-xs text-muted-foreground">Resets in {timeUntilReset.hours}h {timeUntilReset.minutes}m</span>
+            <span className="text-xs text-muted-foreground">
+              {t(lang, 'resetsIn', { hours: timeUntilReset.hours, minutes: timeUntilReset.minutes })}
+            </span>
           )}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label="Total Requests" value={loadingStats ? '...' : totalRequests.toLocaleString()} />
-          <StatCard label="Total Tokens" value={loadingStats ? '...' : totalTokens >= 1000 ? `${(totalTokens / 1000).toFixed(1)}k` : totalTokens} />
-          <StatCard label="Today's Requests" value={loadingStats ? '...' : dailyRequests.toLocaleString()} />
-          <StatCard label="Today's Tokens" value={loadingStats ? '...' : dailyTokens >= 1000 ? `${(dailyTokens / 1000).toFixed(1)}k` : dailyTokens} />
+          <StatCard label={t(lang, 'totalRequests')} value={loadingStats ? '...' : totalRequests.toLocaleString()} />
+          <StatCard label={t(lang, 'totalTokens')} value={loadingStats ? '...' : totalTokens >= 1000 ? `${(totalTokens / 1000).toFixed(1)}k` : totalTokens} />
+          <StatCard label={t(lang, 'todaysRequests')} value={loadingStats ? '...' : dailyRequests.toLocaleString()} />
+          <StatCard label={t(lang, 'todaysTokens')} value={loadingStats ? '...' : dailyTokens >= 1000 ? `${(dailyTokens / 1000).toFixed(1)}k` : dailyTokens} />
         </div>
       </div>
 
-      <RequestLogPanel logs={logs} loading={loadingLogs} onRefresh={loadLogs} />
+      <RequestLogPanel logs={logs} loading={loadingLogs} onRefresh={loadLogs} lang={lang} />
     </div>
   );
 }

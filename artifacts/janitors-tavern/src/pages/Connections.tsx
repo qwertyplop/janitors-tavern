@@ -6,9 +6,11 @@ import {
 } from 'lucide-react';
 import { storage, generateId } from '@/lib/storage';
 import { api } from '@/lib/api';
-import type { ConnectionPreset, ApiKey, PromptPostProcessingMode } from '@/lib/types';
+import type { ConnectionPreset, ApiKey, PromptPostProcessingMode, UILanguage } from '@/lib/types';
 import { POST_PROCESSING_LABELS, POST_PROCESSING_TIPS } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { useLang } from '@/hooks/useLang';
+import { t } from '@/lib/i18n';
 
 const POST_PROCESSING_MODES: PromptPostProcessingMode[] = [
   'none','merge','merge-tools','semi-strict','semi-strict-tools',
@@ -33,7 +35,7 @@ function emptyConnection(): ConnectionPreset {
   };
 }
 
-function ApiKeyRow({ apiKey, onDelete, onSelect, isSelected, showValue, roundRobinEnabled, usageCount, isLastUsed }: {
+function ApiKeyRow({ apiKey, onDelete, onSelect, isSelected, showValue, roundRobinEnabled, usageCount, isLastUsed, lang }: {
   apiKey: ApiKey;
   onDelete: () => void;
   onSelect: () => void;
@@ -42,6 +44,7 @@ function ApiKeyRow({ apiKey, onDelete, onSelect, isSelected, showValue, roundRob
   roundRobinEnabled?: boolean;
   usageCount?: number;
   isLastUsed?: boolean;
+  lang: UILanguage;
 }) {
   return (
     <div className={cn('flex items-center gap-2 p-2.5 rounded-lg border text-sm', isSelected && !roundRobinEnabled ? 'border-primary/40 bg-primary/5' : 'border-border')}>
@@ -57,8 +60,8 @@ function ApiKeyRow({ apiKey, onDelete, onSelect, isSelected, showValue, roundRob
       )}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="font-medium truncate">{apiKey.name || 'Unnamed key'}</span>
-          {isLastUsed && <span className="text-xs bg-primary/15 text-primary border border-primary/30 px-1.5 py-0.5 rounded-full shrink-0">last used</span>}
+          <span className="font-medium truncate">{apiKey.name || t(lang, 'unnamedKey')}</span>
+          {isLastUsed && <span className="text-xs bg-primary/15 text-primary border border-primary/30 px-1.5 py-0.5 rounded-full shrink-0">{t(lang, 'lastUsedBadge')}</span>}
         </div>
         <div className="text-xs text-muted-foreground font-mono truncate">
           {showValue ? apiKey.value : `${apiKey.value.slice(0, 4)}${'•'.repeat(Math.min(20, apiKey.value.length - 4))}${apiKey.value.slice(-4)}`}
@@ -96,6 +99,7 @@ function ModelPickerModal({ currentModel, baseUrl, apiKeys, selectedKeyId, onSel
   onSelect: (model: string) => void;
   onClose: () => void;
 }) {
+  const lang = useLang();
   const [search, setSearch] = useState('');
   const [manualModel, setManualModel] = useState(currentModel);
   const [selected, setSelected] = useState(currentModel);
@@ -149,21 +153,19 @@ function ModelPickerModal({ currentModel, baseUrl, apiKeys, selectedKeyId, onSel
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="bg-card border border-border rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl">
 
-        {/* Header */}
         <div className="flex items-center gap-3 px-6 py-4 border-b border-border shrink-0">
           <div className="w-8 h-8 rounded-lg bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
             <Cpu size={15} className="text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold text-foreground">Select Model</h2>
-            <p className="text-xs text-muted-foreground">Choose from available models or enter a custom name</p>
+            <h2 className="text-base font-semibold text-foreground">{t(lang, 'modelPickerTitle')}</h2>
+            <p className="text-xs text-muted-foreground">{t(lang, 'modelPickerSubtitle')}</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
             <X size={16} />
           </button>
         </div>
 
-        {/* Search + Refresh bar */}
         <div className="px-6 py-3 border-b border-border flex gap-2 shrink-0">
           <div className="relative flex-1">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -171,7 +173,7 @@ function ModelPickerModal({ currentModel, baseUrl, apiKeys, selectedKeyId, onSel
               ref={searchRef}
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search models…"
+              placeholder={t(lang, 'searchModels')}
               className="w-full pl-9 pr-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
             />
             {search && (
@@ -186,13 +188,12 @@ function ModelPickerModal({ currentModel, baseUrl, apiKeys, selectedKeyId, onSel
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-secondary text-secondary-foreground border border-border text-xs font-medium hover:bg-secondary/80 transition-colors disabled:opacity-40 shrink-0"
           >
             {fetching ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-            {fetching ? 'Loading…' : fetched ? 'Refresh' : 'Fetch'}
+            {fetching ? t(lang, 'loading') : fetched ? t(lang, 'refreshModels') : t(lang, 'fetch')}
           </button>
         </div>
 
-        {/* Custom name input */}
         <div className="px-6 py-3 border-b border-border shrink-0">
-          <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5 block">Custom / override</label>
+          <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5 block">{t(lang, 'customOverride')}</label>
           <input
             value={manualModel}
             onChange={e => { setManualModel(e.target.value); setSelected(e.target.value); }}
@@ -202,7 +203,6 @@ function ModelPickerModal({ currentModel, baseUrl, apiKeys, selectedKeyId, onSel
           />
         </div>
 
-        {/* Model list */}
         <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
           {fetchError && (
             <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2.5 mb-4">
@@ -214,22 +214,22 @@ function ModelPickerModal({ currentModel, baseUrl, apiKeys, selectedKeyId, onSel
           {fetching && (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
               <Loader2 size={24} className="animate-spin text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Fetching available models…</p>
+              <p className="text-sm text-muted-foreground">{t(lang, 'fetchingModels')}</p>
             </div>
           )}
 
           {!fetching && !fetched && !fetchError && (
             <div className="flex flex-col items-center justify-center py-12 gap-2 text-center">
               <Cpu size={28} className="text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">No models loaded yet</p>
-              <p className="text-xs text-muted-foreground/70">Click Fetch to load models from the provider</p>
+              <p className="text-sm text-muted-foreground">{t(lang, 'noModelsLoaded')}</p>
+              <p className="text-xs text-muted-foreground/70">{t(lang, 'clickFetchHint')}</p>
             </div>
           )}
 
           {!fetching && fetched && filtered.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 gap-2">
               <Search size={24} className="text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">No models match "{search}"</p>
+              <p className="text-sm text-muted-foreground">{t(lang, 'noModelsMatch', { search })}</p>
             </div>
           )}
 
@@ -267,23 +267,22 @@ function ModelPickerModal({ currentModel, baseUrl, apiKeys, selectedKeyId, onSel
           ))}
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-border shrink-0">
           <span className="text-xs text-muted-foreground">
             {fetched && models.length > 0
-              ? `${filtered.length} of ${models.length} model${models.length !== 1 ? 's' : ''}`
-              : 'Double-click a model to confirm'}
+              ? t(lang, 'modelCount', { filtered: filtered.length, total: models.length, s: models.length !== 1 ? 's' : '' })
+              : t(lang, 'doubleClickConfirm')}
           </span>
           <div className="flex items-center gap-2">
             <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Cancel
+              {t(lang, 'cancel')}
             </button>
             <button
               onClick={confirm}
               disabled={!(selected || manualModel).trim()}
               className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
             >
-              Use Model
+              {t(lang, 'useModel')}
             </button>
           </div>
         </div>
@@ -299,6 +298,7 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
   onTest: (p: ConnectionPreset) => Promise<void>;
   keyStats?: Array<{ keyId: string; name: string; usageCount: number; isLastUsed: boolean }>;
 }) {
+  const lang = useLang();
   const [form, setForm] = useState<ConnectionPreset>(preset);
   const [newKeyName, setNewKeyName] = useState('');
   const [newKeyValue, setNewKeyValue] = useState('');
@@ -386,11 +386,13 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
           onClose={() => setShowModelPicker(false)}
         />
       )}
-      <h2 className="text-lg font-semibold text-foreground">{preset.name ? `Edit: ${preset.name}` : 'New Connection'}</h2>
+      <h2 className="text-lg font-semibold text-foreground">
+        {preset.name ? t(lang, 'editConnection', { name: preset.name }) : t(lang, 'newConnection')}
+      </h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Connection Name *</label>
+          <label className="text-xs font-medium text-muted-foreground">{t(lang, 'connectionName')}</label>
           <input
             className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
             value={form.name} onChange={e => set({ name: e.target.value })}
@@ -398,7 +400,7 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
           />
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Provider Base URL *</label>
+          <label className="text-xs font-medium text-muted-foreground">{t(lang, 'providerBaseUrl')}</label>
           <input
             className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring font-mono"
             value={form.baseUrl} onChange={e => set({ baseUrl: e.target.value })}
@@ -409,7 +411,7 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-medium text-muted-foreground">API Keys</label>
+          <label className="text-xs font-medium text-muted-foreground">{t(lang, 'apiKeys')}</label>
           <div className="flex items-center gap-3">
             {form.apiKeys.length > 1 && (
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
@@ -420,18 +422,18 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
                   className="accent-primary"
                 />
                 <RotateCcw size={11} />
-                Round-robin rotation
+                {t(lang, 'roundRobin')}
               </label>
             )}
             <button onClick={() => setShowKeys(!showKeys)} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
               {showKeys ? <EyeOff size={12} /> : <Eye size={12} />}
-              {showKeys ? 'Hide values' : 'Show values'}
+              {showKeys ? t(lang, 'hideValues') : t(lang, 'showValues')}
             </button>
           </div>
         </div>
         {form.roundRobinEnabled && form.apiKeys.length > 1 && (
           <p className="text-xs text-primary/80 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
-            Keys will be used in rotation automatically. On a 429 rate-limit error, the next key is tried immediately.
+            {t(lang, 'keyRotationHint')}
           </p>
         )}
         <div className="space-y-2">
@@ -448,6 +450,7 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
                 roundRobinEnabled={!!(form.roundRobinEnabled && form.apiKeys.length > 1)}
                 usageCount={stat?.usageCount}
                 isLastUsed={stat?.isLastUsed}
+                lang={lang}
               />
             );
           })}
@@ -469,14 +472,14 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
             disabled={!newKeyValue.trim()}
             className="px-3 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-xs font-medium transition-colors disabled:opacity-40"
           >
-            Add
+            {t(lang, 'add')}
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Model *</label>
+          <label className="text-xs font-medium text-muted-foreground">{t(lang, 'model')}</label>
           <button
             type="button"
             onClick={() => setShowModelPicker(true)}
@@ -484,13 +487,13 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
           >
             <Cpu size={13} className="text-muted-foreground shrink-0" />
             <span className={cn('flex-1 font-mono truncate', form.model ? 'text-foreground' : 'text-muted-foreground')}>
-              {form.model || 'Select or type a model…'}
+              {form.model || t(lang, 'selectOrTypeModel')}
             </span>
             <ChevronRight size={13} className="text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
           </button>
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Post-processing Mode</label>
+          <label className="text-xs font-medium text-muted-foreground">{t(lang, 'postProcessingMode')}</label>
           <select
             className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
             value={form.promptPostProcessing}
@@ -510,16 +513,15 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
           className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           {showAdvanced ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-          Advanced options
+          {t(lang, 'advancedOptions')}
         </button>
 
         {showAdvanced && (
           <div className="mt-3 space-y-5 border-t border-border pt-4">
-
             <div className="space-y-2">
               <div>
-                <label className="text-xs font-medium text-foreground">Include Body Parameters</label>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Merged into the request body at highest priority, overriding preset values. One <code className="font-mono">key: value</code> per line.</p>
+                <label className="text-xs font-medium text-foreground">{t(lang, 'includeBodyParams')}</label>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{t(lang, 'includeBodyParamsHelp')}</p>
               </div>
               <textarea
                 value={includeBodyText}
@@ -532,8 +534,8 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
 
             <div className="space-y-2">
               <div>
-                <label className="text-xs font-medium text-foreground">Exclude Body Parameters</label>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Remove these keys from the request body before sending. One key per line (with or without a leading <code className="font-mono">-</code>).</p>
+                <label className="text-xs font-medium text-foreground">{t(lang, 'excludeBodyParams')}</label>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{t(lang, 'excludeBodyParamsHelp')}</p>
               </div>
               <textarea
                 value={excludeBodyText}
@@ -546,8 +548,8 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
 
             <div className="space-y-2">
               <div>
-                <label className="text-xs font-medium text-foreground">Include Request Headers</label>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Extra HTTP headers sent with every request.</p>
+                <label className="text-xs font-medium text-foreground">{t(lang, 'includeRequestHeaders')}</label>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{t(lang, 'includeRequestHeadersHelp')}</p>
               </div>
               {Object.entries(form.extraHeaders || {}).map(([k, v]) => (
                 <div key={k} className="flex items-center gap-2 text-xs font-mono">
@@ -559,13 +561,13 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
               <div className="flex gap-2">
                 <input className="w-36 px-2.5 py-1.5 rounded bg-input border border-border text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-ring" value={newHeaderKey} onChange={e => setNewHeaderKey(e.target.value)} placeholder="Header-Name" />
                 <input className="flex-1 px-2.5 py-1.5 rounded bg-input border border-border text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-ring" value={newHeaderValue} onChange={e => setNewHeaderValue(e.target.value)} placeholder="Value" />
-                <button onClick={addHeader} disabled={!newHeaderKey.trim()} className="px-2.5 py-1.5 rounded bg-secondary text-secondary-foreground text-xs border border-secondary-border disabled:opacity-40">Add</button>
+                <button onClick={addHeader} disabled={!newHeaderKey.trim()} className="px-2.5 py-1.5 rounded bg-secondary text-secondary-foreground text-xs border border-secondary-border disabled:opacity-40">{t(lang, 'add')}</button>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
               <input type="checkbox" id="bypassStatus" checked={form.bypassStatusCheck} onChange={e => set({ bypassStatusCheck: e.target.checked })} className="accent-primary" />
-              <label htmlFor="bypassStatus" className="text-xs text-muted-foreground">Bypass status check</label>
+              <label htmlFor="bypassStatus" className="text-xs text-muted-foreground">{t(lang, 'bypassStatusCheck')}</label>
             </div>
           </div>
         )}
@@ -584,16 +586,16 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
           disabled={testing || !form.baseUrl || !form.model || form.apiKeys.length === 0}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-secondary-border text-sm font-medium transition-colors disabled:opacity-40"
         >
-          {testing ? <><Loader2 size={14} className="animate-spin" /> Testing...</> : <><RefreshCw size={14} /> Test</>}
+          {testing ? <><Loader2 size={14} className="animate-spin" /> {t(lang, 'testing')}</> : <><RefreshCw size={14} /> {t(lang, 'test')}</>}
         </button>
         <div className="flex-1" />
-        <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
+        <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-colors">{t(lang, 'cancel')}</button>
         <button
           onClick={handleSaveWithBody}
           disabled={!isValid}
           className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
         >
-          Save Connection
+          {t(lang, 'saveConnection')}
         </button>
       </div>
     </div>
@@ -601,6 +603,7 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
 }
 
 export default function Connections() {
+  const lang = useLang();
   const [connections, setConnections] = useState<ConnectionPreset[]>([]);
   const [editing, setEditing] = useState<ConnectionPreset | null>(null);
   const [showNew, setShowNew] = useState(false);
@@ -649,15 +652,15 @@ export default function Connections() {
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Connections</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage your AI provider connections and API keys.</p>
+          <h1 className="text-2xl font-bold text-foreground">{t(lang, 'connectionsTitle')}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t(lang, 'connectionsSubtitle')}</p>
         </div>
         {!showNew && !editing && (
           <button
             onClick={() => setShowNew(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
           >
-            <Plus size={16} /> New Connection
+            <Plus size={16} /> {t(lang, 'newConnection')}
           </button>
         )}
       </div>
@@ -674,9 +677,9 @@ export default function Connections() {
       {connections.length === 0 && !showNew ? (
         <div className="text-center py-16 bg-card border border-card-border rounded-xl">
           <Plug size={32} className="mx-auto mb-3 text-muted-foreground opacity-40" />
-          <p className="text-muted-foreground text-sm">No connections yet.</p>
+          <p className="text-muted-foreground text-sm">{t(lang, 'noConnectionsYet')}.</p>
           <button onClick={() => setShowNew(true)} className="mt-3 text-primary text-sm hover:underline">
-            Add your first connection
+            {t(lang, 'addFirstConnection')}
           </button>
         </div>
       ) : (
@@ -700,15 +703,15 @@ export default function Connections() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold text-foreground">{conn.name}</h3>
-                      {conn.id === activeId && <span className="text-xs bg-primary/15 text-primary border border-primary/30 px-2 py-0.5 rounded-full">Active</span>}
+                      {conn.id === activeId && <span className="text-xs bg-primary/15 text-primary border border-primary/30 px-2 py-0.5 rounded-full">{t(lang, 'activeLabel')}</span>}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5 font-mono truncate">{conn.baseUrl}</p>
                     <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground flex-wrap">
-                      <span>{conn.model || 'No model'}</span>
+                      <span>{conn.model || t(lang, 'noModel')}</span>
                       <span>·</span>
                       <span>{conn.apiKeys.length} key{conn.apiKeys.length !== 1 ? 's' : ''}</span>
                       {conn.roundRobinEnabled && conn.apiKeys.length > 1 && (
-                        <><span>·</span><span className="flex items-center gap-1 text-primary"><RotateCcw size={11} />Round-robin</span></>
+                        <><span>·</span><span className="flex items-center gap-1 text-primary"><RotateCcw size={11} />{t(lang, 'roundRobin')}</span></>
                       )}
                       <span>·</span>
                       <span>{POST_PROCESSING_LABELS[conn.promptPostProcessing]}</span>
@@ -722,13 +725,13 @@ export default function Connections() {
                     )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => setEditing(conn)} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors" title="Edit">
+                    <button onClick={() => setEditing(conn)} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors" title={t(lang, 'edit')}>
                       <Pencil size={14} />
                     </button>
                     <button
                       onClick={() => handleDelete(conn.id)}
                       className={cn('p-2 rounded-lg transition-colors', deleteConfirm === conn.id ? 'bg-destructive/20 text-destructive' : 'hover:bg-secondary text-muted-foreground hover:text-destructive')}
-                      title={deleteConfirm === conn.id ? 'Click again to confirm' : 'Delete'}
+                      title={deleteConfirm === conn.id ? t(lang, 'clickAgainConfirm') : 'Delete'}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -741,7 +744,7 @@ export default function Connections() {
       )}
 
       <div className="bg-card border border-card-border rounded-xl p-4 text-sm text-muted-foreground space-y-2">
-        <h3 className="font-semibold text-foreground text-sm">Common Provider URLs</h3>
+        <h3 className="font-semibold text-foreground text-sm">{t(lang, 'commonProviderUrls')}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-mono">
           {[
             ['OpenAI', 'https://api.openai.com/v1'],

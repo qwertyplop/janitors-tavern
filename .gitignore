@@ -48,5 +48,6 @@ Thumbs.db
 .cache/
 .local/
 
-# Runtime data (contains generated secrets)
+# Runtime data (contains generated secrets — never commit)
 artifacts/api-server/data/auth.json
+artifacts/data/auth.json

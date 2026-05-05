@@ -226,9 +226,9 @@ function LogEntryRow({ entry }: { entry: RequestLogEntry }) {
           />
           <BodySection
             icon={<ArrowUpFromLine size={11} className="text-muted-foreground" />}
-            label="Raw Response from Provider"
+            label={entry.stream ? 'Streamed Response Content' : 'Raw Response from Provider'}
             content={entry.rawResponseBody}
-            emptyText={entry.stream ? 'Stream — content captured up to 8 KB' : 'No response body'}
+            emptyText="No response body captured"
           />
         </div>
       )}

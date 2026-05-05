@@ -673,8 +673,7 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
       const reader = upstreamRes.body.getReader();
       const decoder = new TextDecoder();
       let outputTokens = 0;
-      let rawStreamBuffer = '';
-      const MAX_RAW_STREAM_CHARS = 8000;
+      let streamContentBuffer = '';
 
       const soProcessor = soResult ? new SOStreamProcessor(soResult.hidePrefillLength) : null;
       const outputScripts = regexScripts.filter(s => s.placement.includes(2));
@@ -685,7 +684,6 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
           const { done, value } = await reader.read();
           if (done) break;
           let text = decoder.decode(value, { stream: true });
-          if (rawStreamBuffer.length < MAX_RAW_STREAM_CHARS) rawStreamBuffer += text;
 
           if (isAnthropic && text.includes('event:') && text.includes('data:')) {
             text = transformAnthropicStreamChunk(text);
@@ -694,6 +692,17 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
 
           const tokenCounts = extractTokenCountsFromStreamChunk(text);
           if (tokenCounts) outputTokens = tokenCounts.completionTokens;
+
+          for (const line of text.split('\n')) {
+            if (!line.startsWith('data: ')) continue;
+            const data = line.slice(6).trim();
+            if (data === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }> };
+              const delta = parsed.choices?.[0]?.delta?.content;
+              if (typeof delta === 'string') streamContentBuffer += delta;
+            } catch {}
+          }
 
           if (soProcessor) {
             const lines = text.split('\n');
@@ -762,7 +771,7 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
         reader.releaseLock();
       }
 
-      _logRawResponseBody = rawStreamBuffer.slice(0, MAX_RAW_STREAM_CHARS);
+      _logRawResponseBody = streamContentBuffer || null;
       recordUsage(inputTokensEstimate, outputTokens);
       addRequestLog({ id: requestId, timestamp: new Date().toISOString(), model: _logModel, connectionName: _logConnectionName, presetName: _logPresetName, inputTokens: inputTokensEstimate, outputTokens, status: 'success', error: null, stream: true, durationMs: Date.now() - startTime, rawInputMessageCount: _logRawInputMessageCount, processedMessageCount: _logProcessedMessages.length, processedMessages: _logProcessedMessages, responseContent: null, rawInputBody: _logRawInputBody, processedRequestBody: _logProcessedRequestBody, rawResponseBody: _logRawResponseBody });
       res.end();

@@ -47,3 +47,6 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Runtime data (contains generated secrets)
+artifacts/api-server/data/auth.json

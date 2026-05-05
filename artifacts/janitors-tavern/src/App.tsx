@@ -24,8 +24,6 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       const callbackUrl = encodeURIComponent(location);
       setLocation(`/login?callbackUrl=${callbackUrl}`);
     }
-    if (!authConfigured && location !== '/register' && !isPublicPath) {
-    }
   }, [isAuthenticated, authConfigured, loading, location, setLocation]);
 
   if (loading) {

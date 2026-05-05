@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'wouter';
 import {
   Activity, Plug, ScrollText, ChevronRight, CheckCircle2, AlertCircle,
-  RefreshCw, Copy, Check, Zap, Info, KeyRound, Eye, EyeOff, Terminal, XCircle, Wifi, WifiOff, ChevronDown, ChevronUp, MessageSquare, X
+  RefreshCw, Copy, Check, Zap, Info, KeyRound, Eye, EyeOff, Terminal, XCircle, Wifi, WifiOff, ChevronDown, ChevronUp, X, ArrowDownToLine, ArrowUpFromLine, Repeat2
 } from 'lucide-react';
 import { storage } from '@/lib/storage';
 import { api } from '@/lib/api';
@@ -127,6 +127,42 @@ function roleColor(role: string) {
   return 'text-green-400';
 }
 
+function BodySection({ icon, label, content, emptyText }: {
+  icon: React.ReactNode;
+  label: string;
+  content: string | null;
+  emptyText: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="pt-2">
+      <div className="flex items-center gap-1.5 mb-1.5">
+        {icon}
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</span>
+        {content && (
+          <button
+            onClick={() => copyToClipboard(content, setCopied)}
+            className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            title="Copy to clipboard"
+          >
+            {copied ? <Check size={10} /> : <Copy size={10} />}
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+        )}
+      </div>
+      {content == null || content === '' ? (
+        <p className="text-xs text-muted-foreground italic">{emptyText}</p>
+      ) : (
+        <div className="rounded-lg bg-background border border-border p-2">
+          <pre className="text-xs text-foreground whitespace-pre-wrap break-all font-mono leading-relaxed max-h-64 overflow-y-auto">
+            {content}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LogEntryRow({ entry }: { entry: RequestLogEntry }) {
   const [expanded, setExpanded] = useState(false);
   return (
@@ -176,40 +212,24 @@ function LogEntryRow({ entry }: { entry: RequestLogEntry }) {
 
       {expanded && (
         <div className="px-4 pb-3 space-y-2 border-t border-border/50 bg-muted/10">
-          <div className="pt-2">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <MessageSquare size={11} className="text-muted-foreground" />
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Processed Messages ({entry.processedMessageCount})</span>
-            </div>
-            <div className="space-y-1.5 max-h-64 overflow-y-auto">
-              {entry.processedMessages.length === 0 ? (
-                <p className="text-xs text-muted-foreground italic">No messages captured</p>
-              ) : (
-                entry.processedMessages.map((msg, i) => (
-                  <div key={i} className="rounded-lg bg-background border border-border p-2">
-                    <span className={`text-xs font-semibold uppercase tracking-wide ${roleColor(msg.role)}`}>{msg.role}</span>
-                    <pre className="text-xs text-foreground mt-1 whitespace-pre-wrap break-all font-sans leading-relaxed max-h-32 overflow-y-auto">
-                      {msg.content}
-                    </pre>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {entry.responseContent !== null && (
-            <div>
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <MessageSquare size={11} className="text-muted-foreground" />
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Response</span>
-              </div>
-              <div className="rounded-lg bg-background border border-border p-2">
-                <pre className="text-xs text-foreground whitespace-pre-wrap break-all font-sans leading-relaxed max-h-48 overflow-y-auto">
-                  {entry.responseContent}
-                </pre>
-              </div>
-            </div>
-          )}
+          <BodySection
+            icon={<ArrowDownToLine size={11} className="text-muted-foreground" />}
+            label="Raw JanitorAI Request"
+            content={entry.rawInputBody != null ? JSON.stringify(entry.rawInputBody, null, 2) : null}
+            emptyText="Not captured"
+          />
+          <BodySection
+            icon={<Repeat2 size={11} className="text-muted-foreground" />}
+            label="Processed Request to Model"
+            content={entry.processedRequestBody != null ? JSON.stringify(entry.processedRequestBody, null, 2) : null}
+            emptyText="Not captured"
+          />
+          <BodySection
+            icon={<ArrowUpFromLine size={11} className="text-muted-foreground" />}
+            label="Raw Response from Provider"
+            content={entry.rawResponseBody}
+            emptyText={entry.stream ? 'Stream — content captured up to 8 KB' : 'No response body'}
+          />
         </div>
       )}
     </div>

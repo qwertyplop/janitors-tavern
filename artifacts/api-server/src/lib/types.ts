@@ -246,6 +246,9 @@ export interface RequestLogEntry {
   processedMessageCount: number;
   processedMessages: Array<{ role: string; content: string }>;
   responseContent: string | null;
+  rawInputBody: Record<string, unknown> | null;
+  processedRequestBody: Record<string, unknown> | null;
+  rawResponseBody: string | null;
 }
 
 export const DEFAULT_SAMPLER_SETTINGS: STSamplerSettings = {

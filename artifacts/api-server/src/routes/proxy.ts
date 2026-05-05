@@ -442,6 +442,9 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
   let _logPresetName: string | null = null;
   let _logProcessedMessages: OutputMessage[] = [];
   let _logRawInputMessageCount = 0;
+  let _logRawInputBody: Record<string, unknown> | null = null;
+  let _logProcessedRequestBody: Record<string, unknown> | null = null;
+  let _logRawResponseBody: string | null = null;
 
   try {
     const body = req.body as {
@@ -514,6 +517,7 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
     _logConnectionName = connectionPreset.name;
     _logPresetName = chatCompletionPreset?.name ?? null;
     _logRawInputMessageCount = body.messages?.length ?? 0;
+    _logRawInputBody = req.body as Record<string, unknown>;
 
     const janitorRequest = {
       messages: body.messages,
@@ -621,6 +625,7 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
         requestBody.response_format = soResult.responseFormat;
       }
       requestBody = applyBodyParamOverrides(requestBody, connectionPreset.includeBodyParams, connectionPreset.excludeBodyParams);
+      _logProcessedRequestBody = requestBody;
 
       let upstreamRes = await fetch(endpoint, {
         method: 'POST',
@@ -649,13 +654,13 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
 
       if (!upstreamRes.ok) {
         const errorText = await upstreamRes.text();
-        addRequestLog({ id: requestId, timestamp: new Date().toISOString(), model: _logModel, connectionName: _logConnectionName, presetName: _logPresetName, inputTokens: inputTokensEstimate, outputTokens: 0, status: 'error', error: `Provider error: ${upstreamRes.status} - ${errorText}`, stream: true, durationMs: Date.now() - startTime, rawInputMessageCount: _logRawInputMessageCount, processedMessageCount: _logProcessedMessages.length, processedMessages: _logProcessedMessages, responseContent: errorText });
+        addRequestLog({ id: requestId, timestamp: new Date().toISOString(), model: _logModel, connectionName: _logConnectionName, presetName: _logPresetName, inputTokens: inputTokensEstimate, outputTokens: 0, status: 'error', error: `Provider error: ${upstreamRes.status} - ${errorText}`, stream: true, durationMs: Date.now() - startTime, rawInputMessageCount: _logRawInputMessageCount, processedMessageCount: _logProcessedMessages.length, processedMessages: _logProcessedMessages, responseContent: errorText, rawInputBody: _logRawInputBody, processedRequestBody: _logProcessedRequestBody, rawResponseBody: errorText });
         res.status(upstreamRes.status).json({ error: `Provider error: ${upstreamRes.status} - ${errorText}` });
         return;
       }
 
       if (!upstreamRes.body) {
-        addRequestLog({ id: requestId, timestamp: new Date().toISOString(), model: _logModel, connectionName: _logConnectionName, presetName: _logPresetName, inputTokens: inputTokensEstimate, outputTokens: 0, status: 'error', error: 'No response body from provider', stream: true, durationMs: Date.now() - startTime, rawInputMessageCount: _logRawInputMessageCount, processedMessageCount: _logProcessedMessages.length, processedMessages: _logProcessedMessages, responseContent: null });
+        addRequestLog({ id: requestId, timestamp: new Date().toISOString(), model: _logModel, connectionName: _logConnectionName, presetName: _logPresetName, inputTokens: inputTokensEstimate, outputTokens: 0, status: 'error', error: 'No response body from provider', stream: true, durationMs: Date.now() - startTime, rawInputMessageCount: _logRawInputMessageCount, processedMessageCount: _logProcessedMessages.length, processedMessages: _logProcessedMessages, responseContent: null, rawInputBody: _logRawInputBody, processedRequestBody: _logProcessedRequestBody, rawResponseBody: null });
         res.status(500).json({ error: 'No response body from provider' });
         return;
       }
@@ -668,6 +673,8 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
       const reader = upstreamRes.body.getReader();
       const decoder = new TextDecoder();
       let outputTokens = 0;
+      let rawStreamBuffer = '';
+      const MAX_RAW_STREAM_CHARS = 8000;
 
       const soProcessor = soResult ? new SOStreamProcessor(soResult.hidePrefillLength) : null;
       const outputScripts = regexScripts.filter(s => s.placement.includes(2));
@@ -678,6 +685,7 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
           const { done, value } = await reader.read();
           if (done) break;
           let text = decoder.decode(value, { stream: true });
+          if (rawStreamBuffer.length < MAX_RAW_STREAM_CHARS) rawStreamBuffer += text;
 
           if (isAnthropic && text.includes('event:') && text.includes('data:')) {
             text = transformAnthropicStreamChunk(text);
@@ -754,8 +762,9 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
         reader.releaseLock();
       }
 
+      _logRawResponseBody = rawStreamBuffer.slice(0, MAX_RAW_STREAM_CHARS);
       recordUsage(inputTokensEstimate, outputTokens);
-      addRequestLog({ id: requestId, timestamp: new Date().toISOString(), model: _logModel, connectionName: _logConnectionName, presetName: _logPresetName, inputTokens: inputTokensEstimate, outputTokens, status: 'success', error: null, stream: true, durationMs: Date.now() - startTime, rawInputMessageCount: _logRawInputMessageCount, processedMessageCount: _logProcessedMessages.length, processedMessages: _logProcessedMessages, responseContent: null });
+      addRequestLog({ id: requestId, timestamp: new Date().toISOString(), model: _logModel, connectionName: _logConnectionName, presetName: _logPresetName, inputTokens: inputTokensEstimate, outputTokens, status: 'success', error: null, stream: true, durationMs: Date.now() - startTime, rawInputMessageCount: _logRawInputMessageCount, processedMessageCount: _logProcessedMessages.length, processedMessages: _logProcessedMessages, responseContent: null, rawInputBody: _logRawInputBody, processedRequestBody: _logProcessedRequestBody, rawResponseBody: _logRawResponseBody });
       res.end();
       return;
     }
@@ -773,6 +782,7 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
       requestBody.response_format = soResult.responseFormat;
     }
     requestBody = applyBodyParamOverrides(requestBody, connectionPreset.includeBodyParams, connectionPreset.excludeBodyParams);
+    _logProcessedRequestBody = requestBody;
 
     let upstreamRes = await fetch(endpoint, {
       method: 'POST',
@@ -798,6 +808,7 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
     res.setHeader('X-Key-Used', activeKeyName);
 
     const rawBody = await upstreamRes.text();
+    _logRawResponseBody = rawBody;
 
     let outputTokens = 0;
     try {
@@ -828,17 +839,17 @@ router.post('/chat-completion', async (req: Request, res: Response) => {
         responseContent = content;
       }
 
-      addRequestLog({ id: requestId, timestamp: new Date().toISOString(), model: _logModel, connectionName: _logConnectionName, presetName: _logPresetName, inputTokens: inputTokensEstimate, outputTokens, status: upstreamRes.ok ? 'success' : 'error', error: upstreamRes.ok ? null : `Provider error: ${upstreamRes.status}`, stream: false, durationMs: Date.now() - startTime, rawInputMessageCount: _logRawInputMessageCount, processedMessageCount: _logProcessedMessages.length, processedMessages: _logProcessedMessages, responseContent });
+      addRequestLog({ id: requestId, timestamp: new Date().toISOString(), model: _logModel, connectionName: _logConnectionName, presetName: _logPresetName, inputTokens: inputTokensEstimate, outputTokens, status: upstreamRes.ok ? 'success' : 'error', error: upstreamRes.ok ? null : `Provider error: ${upstreamRes.status}`, stream: false, durationMs: Date.now() - startTime, rawInputMessageCount: _logRawInputMessageCount, processedMessageCount: _logProcessedMessages.length, processedMessages: _logProcessedMessages, responseContent, rawInputBody: _logRawInputBody, processedRequestBody: _logProcessedRequestBody, rawResponseBody: _logRawResponseBody });
       res.status(upstreamRes.status).json(responseJson);
     } catch {
-      addRequestLog({ id: requestId, timestamp: new Date().toISOString(), model: _logModel, connectionName: _logConnectionName, presetName: _logPresetName, inputTokens: inputTokensEstimate, outputTokens, status: upstreamRes.ok ? 'success' : 'error', error: upstreamRes.ok ? null : `Provider error: ${upstreamRes.status}`, stream: false, durationMs: Date.now() - startTime, rawInputMessageCount: _logRawInputMessageCount, processedMessageCount: _logProcessedMessages.length, processedMessages: _logProcessedMessages, responseContent: rawBody.slice(0, 500) });
+      addRequestLog({ id: requestId, timestamp: new Date().toISOString(), model: _logModel, connectionName: _logConnectionName, presetName: _logPresetName, inputTokens: inputTokensEstimate, outputTokens, status: upstreamRes.ok ? 'success' : 'error', error: upstreamRes.ok ? null : `Provider error: ${upstreamRes.status}`, stream: false, durationMs: Date.now() - startTime, rawInputMessageCount: _logRawInputMessageCount, processedMessageCount: _logProcessedMessages.length, processedMessages: _logProcessedMessages, responseContent: rawBody.slice(0, 500), rawInputBody: _logRawInputBody, processedRequestBody: _logProcessedRequestBody, rawResponseBody: _logRawResponseBody });
       res.status(upstreamRes.status).set('Content-Type', 'application/json').send(rawBody);
     }
   } catch (error) {
     console.error('[Proxy] Error:', error);
     const errMsg = error instanceof Error ? error.message : 'Unknown error';
     try {
-      addRequestLog({ id: requestId, timestamp: new Date().toISOString(), model: _logModel, connectionName: _logConnectionName, presetName: _logPresetName, inputTokens: 0, outputTokens: 0, status: 'error', error: `Proxy error: ${errMsg}`, stream: false, durationMs: Date.now() - startTime, rawInputMessageCount: _logRawInputMessageCount, processedMessageCount: _logProcessedMessages.length, processedMessages: _logProcessedMessages, responseContent: null });
+      addRequestLog({ id: requestId, timestamp: new Date().toISOString(), model: _logModel, connectionName: _logConnectionName, presetName: _logPresetName, inputTokens: 0, outputTokens: 0, status: 'error', error: `Proxy error: ${errMsg}`, stream: false, durationMs: Date.now() - startTime, rawInputMessageCount: _logRawInputMessageCount, processedMessageCount: _logProcessedMessages.length, processedMessages: _logProcessedMessages, responseContent: null, rawInputBody: _logRawInputBody, processedRequestBody: _logProcessedRequestBody, rawResponseBody: null });
     } catch {}
     res.status(500).json({ error: `Proxy error: ${errMsg}` });
   }

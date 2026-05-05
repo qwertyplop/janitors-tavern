@@ -277,6 +277,9 @@ export interface RequestLogEntry {
   processedMessageCount: number;
   processedMessages: Array<{ role: string; content: string }>;
   responseContent: string | null;
+  rawInputBody: Record<string, unknown> | null;
+  processedRequestBody: Record<string, unknown> | null;
+  rawResponseBody: string | null;
 }
 
 export const POST_PROCESSING_LABELS: Record<PromptPostProcessingMode, string> = {

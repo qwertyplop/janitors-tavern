@@ -119,6 +119,9 @@ export function addRequestLog(entry: RequestLogEntry): void {
     responseContent: entry.responseContent !== null && entry.responseContent.length > MAX_RESPONSE_CHARS
       ? entry.responseContent.slice(0, MAX_RESPONSE_CHARS) + '\n…[truncated]'
       : entry.responseContent,
+    rawResponseBody: entry.rawResponseBody !== null && entry.rawResponseBody.length > MAX_RESPONSE_CHARS
+      ? entry.rawResponseBody.slice(0, MAX_RESPONSE_CHARS) + '\n…[truncated]'
+      : entry.rawResponseBody,
   };
   requestLog.unshift(truncated);
   if (requestLog.length > MAX_LOG_ENTRIES) {

@@ -1,0 +1,107 @@
+Restoring a Project from .migration-backup — Agent Guide
+1. Orient in 60 seconds (read only these files)
+Run these in one parallel batch:
+
+ls .migration-backup/artifacts/
+ls .migration-backup/artifacts/<frontend-dir>/src/
+ls .migration-backup/artifacts/<api-dir>/src/
+cat .migration-backup/replit.md   # ← most important: full architecture in one file
+ls .migration-backup/artifacts/<frontend-dir>/vite.config.ts   # confirms Vite, not Next.js
+
+From replit.md extract: framework, port assignments, storage model, any required env vars.
+
+2. Create the artifacts in parallel
+await Promise.all([
+  createArtifact({ kind: "web",  title: "<App Name>", slug: "<frontend-slug>", previewPath: "/",    description: "Vite+React frontend" }),
+  createArtifact({ kind: "api",  title: "API Server",  slug: "api-server",     previewPath: "/api", description: "Express API backend"  }),
+]);
+
+This creates the artifact directories AND registers their workflows automatically.
+
+3. Copy source files with cp -r — never the write tool
+# Frontend
+cp -r .migration-backup/artifacts/<frontend>/src           artifacts/<frontend>/
+cp -r .migration-backup/artifacts/<frontend>/public        artifacts/<frontend>/
+cp    .migration-backup/artifacts/<frontend>/index.html    artifacts/<frontend>/
+cp    .migration-backup/artifacts/<frontend>/vite.config.ts artifacts/<frontend>/
+cp    .migration-backup/artifacts/<frontend>/tsconfig.json  artifacts/<frontend>/
+cp    .migration-backup/artifacts/<frontend>/components.json artifacts/<frontend>/
+# API server
+cp -r .migration-backup/artifacts/<api>/src      artifacts/<api>/
+cp    .migration-backup/artifacts/<api>/build.mjs artifacts/<api>/
+# Attached assets
+cp -r .migration-backup/attached_assets/* attached_assets/ 2>/dev/null || true
+
+Do NOT copy: node_modules/, dist/, .replit-artifact/artifact.toml, package.json
+
+4. Merge package.json dependencies, then install
+Read both the backup and scaffold package.json files in parallel. Add any missing deps to the scaffold's file, then:
+
+pnpm install
+
+Key packages for this specific app:
+
+Frontend: wouter, framer-motion, sonner, @tanstack/react-query, all @radix-ui/*, lucide-react, react-hook-form, zod, date-fns, recharts
+API: express ^5, pino, pino-http, cors, cookie-parser, esbuild, esbuild-plugin-pino, pino-pretty
+5. Fix the security issue before first start
+Check if auth.json contains a hardcoded key:
+
+cat artifacts/api-server/data/auth.json
+
+If it has a janitorApiKey or accessToken, scrub it — the bootstrap() function generates a fresh key on first run:
+
+{ "isAuthenticated": false }
+
+Also fix auth-state.ts to use a package-relative path instead of process.cwd() (which varies by runtime):
+
+// BEFORE — breaks in Replit:
+const DATA_DIR = path.join(process.cwd(), 'data');
+// AFTER — always resolves correctly:
+import { fileURLToPath } from 'url';
+const DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'data');
+
+Add to .gitignore:
+
+artifacts/api-server/data/auth.json
+artifacts/data/auth.json
+
+6. Start both workflows in parallel
+await Promise.all([
+  restartWorkflow({ workflowName: "artifacts/api-server: API Server" }),
+  restartWorkflow({ workflowName: "artifacts/janitors-tavern: web"   }),
+]);
+
+Verify health:
+
+curl -s http://localhost:8080/api/health
+curl -s http://localhost:8080/api/auth/status
+
+7. Clean up after confirming both run
+rm -rf .migration-backup
+rm -rf artifacts/data   # stray dir — correct location is artifacts/api-server/data/
+
+Remove the 3 stale backup workflows:
+
+await Promise.all([
+  removeWorkflow({ name: ".migration-backup/artifacts/api-server: API Server" }),
+  removeWorkflow({ name: ".migration-backup/artifacts/janitors-tavern: web"   }),
+  removeWorkflow({ name: ".migration-backup/artifacts/mockup-sandbox: Component Preview Server" }),
+]);
+
+8. Known gotchas
+Issue	Cause	Fix
+Blank preview page	BASE_PATH not set	Replit injects it automatically via artifact config
+API 404 on all routes	Stale dist/ from backup	Workflow rebuilds on start — wait for it
+Auth key empty on Dashboard	bootstrap() hasn't run yet	Refresh — writes on first API call
+import.meta.url error	ESM/CJS mismatch	Ensure "type": "module" in api-server package.json
+Vite PORT error in logs	PORT not injected	Replit handles it — ignore if server is running
+Time budget (target: under 10 minutes)
+Step	Time
+Read backup replit.md + ls	30s
+createArtifact × 2 (parallel)	1 min
+cp -r source files	1 min
+Merge package.json + pnpm install	2 min
+Security fixes	1 min
+Start workflows + verify	2 min
+Cleanup	30s
+Total	~8 min

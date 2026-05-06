@@ -3,6 +3,8 @@ import { FlaskConical, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 import { storage } from '@/lib/storage';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useLang } from '@/hooks/useLang';
+import { t } from '@/lib/i18n';
 
 interface TestResult {
   name: string;
@@ -11,6 +13,7 @@ interface TestResult {
 }
 
 export default function TestStorage() {
+  const lang = useLang();
   const [results, setResults] = useState<TestResult[]>([]);
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(false);
@@ -24,7 +27,6 @@ export default function TestStorage() {
       r.push({ name, status, message });
     };
 
-    // Test 1: localStorage read/write
     try {
       const testKey = 'jt._test';
       const testValue = { ts: Date.now() };
@@ -40,7 +42,6 @@ export default function TestStorage() {
       add('localStorage read/write', 'fail', `Error: ${e instanceof Error ? e.message : String(e)}`);
     }
 
-    // Test 2: storage.connections CRUD
     try {
       const before = storage.connections.getAll().length;
       const testId = `_test_${Date.now()}`;
@@ -61,7 +62,6 @@ export default function TestStorage() {
       add('Storage CRUD (connections)', 'fail', `Error: ${e instanceof Error ? e.message : String(e)}`);
     }
 
-    // Test 3: API server health
     try {
       const res = await fetch('/api/healthz');
       const data = await res.json() as { status: string };
@@ -74,7 +74,6 @@ export default function TestStorage() {
       add('API server health check', 'fail', `Error: ${e instanceof Error ? e.message : String(e)}`);
     }
 
-    // Test 4: Stats endpoint
     try {
       const statsData = await api.stats.get();
       if (statsData.stats && typeof statsData.stats.totalRequests === 'number') {
@@ -86,7 +85,6 @@ export default function TestStorage() {
       add('Stats API endpoint', 'fail', `Error: ${e instanceof Error ? e.message : String(e)}`);
     }
 
-    // Test 5: Export / Import round-trip
     try {
       const exported = storage.exportAll();
       const parsed = JSON.parse(exported);
@@ -110,25 +108,22 @@ export default function TestStorage() {
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Storage & API Diagnostics</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Run diagnostics to verify localStorage, the API server, and data operations are working correctly.
-          This replaces the Firebase test page from the original app.
-        </p>
+        <h1 className="text-2xl font-bold text-foreground">{t(lang, 'diagnosticsTitle')}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{t(lang, 'diagnosticsSubtitle')}</p>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-card border border-card-border rounded-xl p-4 text-center">
           <div className="text-2xl font-bold text-foreground">{results.length}</div>
-          <div className="text-xs text-muted-foreground">Tests</div>
+          <div className="text-xs text-muted-foreground">{t(lang, 'testsLabel')}</div>
         </div>
         <div className="bg-card border border-card-border rounded-xl p-4 text-center">
           <div className={cn('text-2xl font-bold', done && passCount > 0 ? 'text-green-600 dark:text-green-400' : 'text-foreground')}>{passCount}</div>
-          <div className="text-xs text-muted-foreground">Passed</div>
+          <div className="text-xs text-muted-foreground">{t(lang, 'passedLabel')}</div>
         </div>
         <div className="bg-card border border-card-border rounded-xl p-4 text-center">
           <div className={cn('text-2xl font-bold', failCount > 0 ? 'text-destructive' : 'text-foreground')}>{failCount}</div>
-          <div className="text-xs text-muted-foreground">Failed</div>
+          <div className="text-xs text-muted-foreground">{t(lang, 'failedLabel')}</div>
         </div>
       </div>
 
@@ -137,7 +132,10 @@ export default function TestStorage() {
         disabled={running}
         className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-60"
       >
-        {running ? <><RefreshCw size={15} className="animate-spin" /> Running tests...</> : <><FlaskConical size={15} /> Run Diagnostics</>}
+        {running
+          ? <><RefreshCw size={15} className="animate-spin" /> {t(lang, 'runningTests')}</>
+          : <><FlaskConical size={15} /> {t(lang, 'runDiagnostics')}</>
+        }
       </button>
 
       {results.length > 0 && (
@@ -163,19 +161,19 @@ export default function TestStorage() {
       {done && (
         <div className={cn('px-4 py-3 rounded-xl border text-sm font-medium', failCount === 0 ? 'bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-400' : 'bg-destructive/10 border-destructive/30 text-destructive')}>
           {failCount === 0
-            ? `✅ All ${passCount} tests passed. Storage and API are working correctly.`
-            : `⚠️ ${failCount} test(s) failed. Check the results above for details.`
+            ? t(lang, 'allTestsPassed', { count: passCount })
+            : t(lang, 'someTestsFailed', { count: failCount })
           }
         </div>
       )}
 
       <div className="bg-card border border-card-border rounded-xl p-4 text-sm text-muted-foreground">
-        <h3 className="font-semibold text-foreground mb-2">Storage Architecture</h3>
+        <h3 className="font-semibold text-foreground mb-2">{t(lang, 'storageArchTitle')}</h3>
         <div className="space-y-1 text-xs">
-          <div><span className="text-foreground font-medium">Client data:</span> localStorage (connections, presets, regex scripts, settings)</div>
-          <div><span className="text-foreground font-medium">Server state:</span> In-memory Express server (active connection/preset, stats, logging)</div>
-          <div><span className="text-foreground font-medium">Auth credentials:</span> Server-side file (<code className="font-mono">artifacts/api-server/data/auth.json</code>)</div>
-          <div><span className="text-foreground font-medium">No Firebase:</span> This app uses no external database or cloud services</div>
+          <div><span className="text-foreground font-medium">{t(lang, 'storageClientData')}</span> {t(lang, 'storageClientDataDesc')}</div>
+          <div><span className="text-foreground font-medium">{t(lang, 'storageServerState')}</span> {t(lang, 'storageServerStateDesc')}</div>
+          <div><span className="text-foreground font-medium">{t(lang, 'storageAuthCreds')}</span> {t(lang, 'storageAuthCredsDesc')}</div>
+          <div><span className="text-foreground font-medium">{t(lang, 'storageNoFirebase')}</span> {t(lang, 'storageNoFirebaseDesc')}</div>
         </div>
       </div>
     </div>

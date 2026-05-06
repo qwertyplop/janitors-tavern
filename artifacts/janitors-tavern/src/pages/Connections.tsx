@@ -7,10 +7,9 @@ import {
 import { storage, generateId } from '@/lib/storage';
 import { api } from '@/lib/api';
 import type { ConnectionPreset, ApiKey, PromptPostProcessingMode, UILanguage } from '@/lib/types';
-import { POST_PROCESSING_LABELS, POST_PROCESSING_TIPS } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useLang } from '@/hooks/useLang';
-import { t } from '@/lib/i18n';
+import { t, ppLabel, ppTip } from '@/lib/i18n';
 
 const POST_PROCESSING_MODES: PromptPostProcessingMode[] = [
   'none','merge','merge-tools','semi-strict','semi-strict-tools',
@@ -500,10 +499,10 @@ function ConnectionForm({ preset, onSave, onCancel, onTest, keyStats }: {
             onChange={e => set({ promptPostProcessing: e.target.value as PromptPostProcessingMode })}
           >
             {POST_PROCESSING_MODES.map(m => (
-              <option key={m} value={m}>{POST_PROCESSING_LABELS[m]}</option>
+              <option key={m} value={m}>{ppLabel(lang, m)}</option>
             ))}
           </select>
-          <p className="text-xs text-muted-foreground">{POST_PROCESSING_TIPS[form.promptPostProcessing]}</p>
+          <p className="text-xs text-muted-foreground">{ppTip(lang, form.promptPostProcessing)}</p>
         </div>
       </div>
 
@@ -714,7 +713,7 @@ export default function Connections() {
                         <><span>·</span><span className="flex items-center gap-1 text-primary"><RotateCcw size={11} />{t(lang, 'roundRobin')}</span></>
                       )}
                       <span>·</span>
-                      <span>{POST_PROCESSING_LABELS[conn.promptPostProcessing]}</span>
+                      <span>{ppLabel(lang, conn.promptPostProcessing)}</span>
                       {conn.lastTestedAt && <><span>·</span><span className="text-green-600 dark:text-green-400">Tested</span></>}
                     </div>
                     {conn.id === activeId && lastUsedKey && (

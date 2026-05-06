@@ -3,10 +3,9 @@ import { Settings as SettingsIcon, Download, Upload, Trash2, Moon, Sun, Monitor,
 import { storage } from '@/lib/storage';
 import { api } from '@/lib/api';
 import type { AppSettings, PromptPostProcessingMode, UILanguage } from '@/lib/types';
-import { POST_PROCESSING_LABELS, POST_PROCESSING_TIPS } from '@/lib/types';
 import { useTheme } from '@/hooks/useTheme';
 import { useLang } from '@/hooks/useLang';
-import { t } from '@/lib/i18n';
+import { t, ppLabel, ppTip } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 const POST_PROCESSING_MODES: PromptPostProcessingMode[] = [
@@ -198,10 +197,10 @@ export default function Settings() {
             onChange={e => updateSettings({ defaultPostProcessing: e.target.value as PromptPostProcessingMode })}
           >
             {POST_PROCESSING_MODES.map(m => (
-              <option key={m} value={m}>{POST_PROCESSING_LABELS[m]}</option>
+              <option key={m} value={m}>{ppLabel(lang, m)}</option>
             ))}
           </select>
-          <p className="text-xs text-muted-foreground">{POST_PROCESSING_TIPS[settings.defaultPostProcessing]}</p>
+          <p className="text-xs text-muted-foreground">{ppTip(lang, settings.defaultPostProcessing)}</p>
         </div>
 
         <div className="space-y-1.5">

@@ -3,6 +3,7 @@ import { ScanSearch, Play, RefreshCw, ChevronDown, ChevronUp, AlertCircle, Cpu, 
 import { cn } from '@/lib/utils';
 import { storage } from '@/lib/storage';
 import type { UILanguage } from '@/lib/types';
+import { useLang } from '@/hooks/useLang';
 
 const MOCK_REQUEST = JSON.stringify(
   {
@@ -110,6 +111,23 @@ const I18N: Record<UILanguage, Record<string, string>> = {
     finalDraftHelp: 'Preset processed, STScript parsed, structured output processed, input regex parsed.',
     runPreview: 'Run Preview',
     running: 'Running…',
+    connectionWorkflow: 'Connection Workflow',
+    presetWorkflow: 'Preset Workflow',
+    connectionLabel: 'Connection:',
+    bodyInclude: 'Body include:',
+    bodyExclude: 'Body exclude:',
+    presetLabel: 'Preset:',
+    messagesOut: 'Messages out',
+    estTokens: 'Est. tokens',
+    inputMsgs: 'Input msgs',
+    modelLabel: 'Model',
+    postProcessingLabel: 'Post-processing',
+    finalRequestBody: 'Final request body',
+    samplerParams: 'Sampler Parameters (will be sent)',
+    showLess: 'Show less',
+    showMoreChars: 'Show {n} more chars',
+    previewFailed: 'Preview failed',
+    runPreviewHint: 'Run a preview to see the assembled request',
   },
   ru: {
     title: 'Инспектор запроса',
@@ -132,6 +150,23 @@ const I18N: Record<UILanguage, Record<string, string>> = {
     finalDraftHelp: 'Пресет обработан, STScript разобран, structured output применён, input regex применён.',
     runPreview: 'Запустить просмотр',
     running: 'Выполняется…',
+    connectionWorkflow: 'Подключение',
+    presetWorkflow: 'Пресет',
+    connectionLabel: 'Подключение:',
+    bodyInclude: 'Тело (включить):',
+    bodyExclude: 'Тело (исключить):',
+    presetLabel: 'Пресет:',
+    messagesOut: 'Сообщений отправлено',
+    estTokens: 'Прим. токенов',
+    inputMsgs: 'Вх. сообщений',
+    modelLabel: 'Модель',
+    postProcessingLabel: 'Постобработка',
+    finalRequestBody: 'Итоговое тело запроса',
+    samplerParams: 'Параметры сэмплера (будут отправлены)',
+    showLess: 'Свернуть',
+    showMoreChars: 'Ещё {n} символов',
+    previewFailed: 'Предпросмотр не удался',
+    runPreviewHint: 'Запустите предпросмотр, чтобы увидеть собранный запрос',
   },
 };
 
@@ -147,6 +182,7 @@ const ROLE_STYLES: Record<string, { badge: string; bar: string; label: string }>
 };
 
 function MessageRow({ msg, index }: { msg: PreviewMessage; index: number }) {
+  const lang = useLang();
   const [expanded, setExpanded] = useState(false);
   const style = ROLE_STYLES[msg.role] ?? ROLE_STYLES.system;
   const isLong = msg.content.length > 300;
@@ -173,7 +209,7 @@ function MessageRow({ msg, index }: { msg: PreviewMessage; index: number }) {
             onClick={() => setExpanded(e => !e)}
             className="mt-1.5 flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
           >
-            {expanded ? <><ChevronUp size={12} /> Show less</> : <><ChevronDown size={12} /> Show {msg.content.length - 300} more chars</>}
+            {expanded ? <><ChevronUp size={12} /> {t(lang, 'showLess')}</> : <><ChevronDown size={12} /> {t(lang, 'showMoreChars', { n: String(msg.content.length - 300) })}</>}
           </button>
         )}
       </div>
@@ -192,7 +228,7 @@ export default function RequestInspector() {
   const [result, setResult] = useState<PreviewResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  const uiLanguage = storage.settings.get().uiLanguage ?? 'en';
+  const uiLanguage = useLang();
   const presetPreview = useMemo(() => {
     if (selectedPresetId === 'none') return null;
     if (selectedPresetId === 'active') return storage.presets.getAll().find(p => p.id === storage.active.getPresetId()) ?? null;
@@ -327,9 +363,9 @@ export default function RequestInspector() {
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
-                <><div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> Running…</>
+                <><div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> {t(uiLanguage, 'running')}</>
               ) : (
-                <><Play size={14} /> Run Preview</>
+                <><Play size={14} /> {t(uiLanguage, 'runPreview')}</>
               )}
             </button>
           </div>
@@ -358,18 +394,18 @@ export default function RequestInspector() {
 
           {connectionPreview && (
             <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-              <h2 className="text-sm font-semibold text-foreground">Connection Workflow</h2>
+              <h2 className="text-sm font-semibold text-foreground">{t(uiLanguage, 'connectionWorkflow')}</h2>
               <div className="grid grid-cols-1 gap-2 text-xs">
                 <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/40">
-                  <span className="text-muted-foreground">Connection:</span>
+                  <span className="text-muted-foreground">{t(uiLanguage, 'connectionLabel')}</span>
                   <span className="font-medium text-foreground truncate">{connectionPreview.name}</span>
                 </div>
                 <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/40">
-                  <span className="text-muted-foreground">Body include:</span>
+                  <span className="text-muted-foreground">{t(uiLanguage, 'bodyInclude')}</span>
                   <span className="font-mono text-foreground truncate">{connectionPreview.includeBodyParams ? 'set' : 'none'}</span>
                 </div>
                 <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/40">
-                  <span className="text-muted-foreground">Body exclude:</span>
+                  <span className="text-muted-foreground">{t(uiLanguage, 'bodyExclude')}</span>
                   <span className="font-mono text-foreground truncate">{connectionPreview.excludeBodyParams ? 'set' : 'none'}</span>
                 </div>
               </div>
@@ -378,10 +414,10 @@ export default function RequestInspector() {
 
           {presetPreview && (
             <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-              <h2 className="text-sm font-semibold text-foreground">Preset Workflow</h2>
+              <h2 className="text-sm font-semibold text-foreground">{t(uiLanguage, 'presetWorkflow')}</h2>
               <div className="grid grid-cols-1 gap-2 text-xs">
                 <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/40">
-                  <span className="text-muted-foreground">Preset:</span>
+                  <span className="text-muted-foreground">{t(uiLanguage, 'presetLabel')}</span>
                   <span className="font-medium text-foreground truncate">{presetPreview.name}</span>
                 </div>
               </div>
@@ -395,7 +431,7 @@ export default function RequestInspector() {
             <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 flex items-start gap-3">
               <AlertCircle size={16} className="text-destructive shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-destructive">Preview failed</p>
+                <p className="text-sm font-medium text-destructive">{t(uiLanguage, 'previewFailed')}</p>
                 <p className="text-xs text-destructive/80 mt-0.5">{apiError}</p>
               </div>
             </div>
@@ -405,7 +441,7 @@ export default function RequestInspector() {
             <div className="rounded-xl border border-border bg-card/50 flex items-center justify-center h-64 text-center">
               <div className="space-y-2">
                 <ScanSearch size={32} className="text-muted-foreground/30 mx-auto" />
-                <p className="text-sm text-muted-foreground">Run a preview to see the assembled request</p>
+                <p className="text-sm text-muted-foreground">{t(uiLanguage, 'runPreviewHint')}</p>
               </div>
             </div>
           )}
@@ -417,15 +453,15 @@ export default function RequestInspector() {
                 <div className="grid grid-cols-3 gap-3 mb-4">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-foreground tabular-nums">{result.totalMessages}</div>
-                    <div className="text-[11px] text-muted-foreground mt-0.5">Messages out</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">{t(uiLanguage, 'messagesOut')}</div>
                   </div>
                   <div className="text-center border-x border-border/40">
                     <div className="text-2xl font-bold text-primary tabular-nums">~{result.totalTokens.toLocaleString()}</div>
-                    <div className="text-[11px] text-muted-foreground mt-0.5">Est. tokens</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">{t(uiLanguage, 'estTokens')}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-foreground tabular-nums">{result.inputMessageCount}</div>
-                    <div className="text-[11px] text-muted-foreground mt-0.5">Input msgs</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">{t(uiLanguage, 'inputMsgs')}</div>
                   </div>
                 </div>
 
@@ -433,21 +469,21 @@ export default function RequestInspector() {
                   <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/40">
                     <Cpu size={12} className="text-muted-foreground shrink-0" />
                     <div className="min-w-0">
-                      <div className="text-[10px] text-muted-foreground">Model</div>
+                      <div className="text-[10px] text-muted-foreground">{t(uiLanguage, 'modelLabel')}</div>
                       <div className="text-foreground font-medium truncate">{result.model}</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/40">
                     <Zap size={12} className="text-muted-foreground shrink-0" />
                     <div className="min-w-0">
-                      <div className="text-[10px] text-muted-foreground">Post-processing</div>
+                      <div className="text-[10px] text-muted-foreground">{t(uiLanguage, 'postProcessingLabel')}</div>
                       <div className="text-foreground font-medium truncate">{result.postProcessingMode}</div>
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-3 rounded-lg bg-muted/30 border border-border/60 p-3">
-                  <div className="text-[11px] font-semibold text-foreground mb-2">Final request body</div>
+                  <div className="text-[11px] font-semibold text-foreground mb-2">{t(uiLanguage, 'finalRequestBody')}</div>
                   <pre className="text-[11px] font-mono text-foreground/90 whitespace-pre-wrap break-words overflow-x-auto">
                     {JSON.stringify(result.requestBody, null, 2)}
                   </pre>
@@ -484,7 +520,7 @@ export default function RequestInspector() {
               {/* Sampler params */}
               {Object.keys(result.samplerParams).length > 0 && (
                 <div className="rounded-xl border border-border bg-card p-4">
-                  <h3 className="text-xs font-semibold text-foreground mb-2">Sampler Parameters (will be sent)</h3>
+                  <h3 className="text-xs font-semibold text-foreground mb-2">{t(uiLanguage, 'samplerParams')}</h3>
                   <div className="flex flex-wrap gap-2">
                     {Object.entries(result.samplerParams).map(([k, v]) => (
                       <div key={k} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/50 border border-border text-xs">

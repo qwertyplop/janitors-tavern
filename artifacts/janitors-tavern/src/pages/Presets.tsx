@@ -1,9 +1,11 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { ScrollText, Plus, Pencil, Trash2, Upload, Download, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, GripVertical, Lock, X } from 'lucide-react';
+import { ScrollText, Plus, Pencil, Trash2, Upload, Download, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, GripVertical, Lock, X, Tag } from 'lucide-react';
 import { storage, generateId } from '@/lib/storage';
 import type { ChatCompletionPreset, STSamplerSettings, SamplerSettingKey, STPromptBlock, RegexScript } from '@/lib/types';
 import { DEFAULT_SAMPLER_SETTINGS } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { useLang } from '@/hooks/useLang';
+import { t } from '@/lib/i18n';
 
 const DEFAULT_PROMPT_BLOCKS: STPromptBlock[] = [
   { identifier: 'main',               name: 'Main Prompt',               role: 'system', content: "Write {{char}}'s next reply in a fictional chat between {{char}} and {{user}}.", marker: false, enabled: true,  injection_position: 0, injection_depth: 4, injection_order: 100 },
@@ -219,6 +221,7 @@ function PromptBlockList({ blocks, promptOrder, onBlocksChange, onOrderChange }:
   onBlocksChange: (blocks: ChatCompletionPreset['promptBlocks']) => void;
   onOrderChange: (order: ChatCompletionPreset['promptOrder']) => void;
 }) {
+  const lang = useLang();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
@@ -273,7 +276,7 @@ function PromptBlockList({ blocks, promptOrder, onBlocksChange, onOrderChange }:
   if (blocks.length === 0) {
     return (
       <div className="text-center py-8 text-xs text-muted-foreground border border-dashed border-border rounded-lg">
-        No prompt blocks. Import a SillyTavern preset to populate them.
+        {t(lang, 'noPromptBlocks')}
       </div>
     );
   }
@@ -284,8 +287,8 @@ function PromptBlockList({ blocks, promptOrder, onBlocksChange, onOrderChange }:
       <div>
         <div className="flex items-center gap-2 mb-2.5">
           <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
-          <span className="text-xs font-semibold text-foreground">Active Blocks ({activeItems.length})</span>
-          <span className="text-[10px] text-muted-foreground">These blocks are included in the prompt order</span>
+          <span className="text-xs font-semibold text-foreground">{t(lang, 'activeBlocks', { count: activeItems.length })}</span>
+          <span className="text-[10px] text-muted-foreground">{t(lang, 'activeBlocksDesc')}</span>
         </div>
         <div className={cn('space-y-1', dragId ? 'select-none' : '')}>
           {activeItems.map(({ item, block }) => {
@@ -320,7 +323,7 @@ function PromptBlockList({ blocks, promptOrder, onBlocksChange, onOrderChange }:
                     <>
                       <button onClick={() => setEditingId(isEditing ? null : block.identifier)}
                         className="px-2.5 py-1 rounded border border-border text-xs text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors shrink-0">
-                        {isEditing ? 'Close' : 'Edit'}
+                        {isEditing ? t(lang, 'close') : t(lang, 'edit')}
                       </button>
                       <button onClick={() => removeFromOrder(block.identifier)} title="Remove from order"
                         className="p-1 rounded text-muted-foreground/50 hover:text-destructive transition-colors shrink-0">
@@ -330,7 +333,7 @@ function PromptBlockList({ blocks, promptOrder, onBlocksChange, onOrderChange }:
                   )}
                 </div>
                 {isMarker && (
-                  <p className="px-3 pb-2 -mt-1 text-[10px] text-amber-500/60">Dynamic content placeholder — cannot be edited</p>
+                  <p className="px-3 pb-2 -mt-1 text-[10px] text-amber-500/60">{t(lang, 'markerDesc')}</p>
                 )}
                 {!isMarker && isEditing && (
                   <BlockEditPanel block={block} onUpdate={u => updateBlock(block.identifier, u)} />
@@ -340,7 +343,7 @@ function PromptBlockList({ blocks, promptOrder, onBlocksChange, onOrderChange }:
           })}
           {activeItems.length === 0 && (
             <div className="text-center py-4 text-xs text-muted-foreground border border-dashed border-border rounded-lg">
-              No blocks in the prompt order.
+              {t(lang, 'noBlocksInOrder')}
             </div>
           )}
         </div>
@@ -351,8 +354,8 @@ function PromptBlockList({ blocks, promptOrder, onBlocksChange, onOrderChange }:
         <div>
           <div className="flex items-center gap-2 mb-2.5">
             <span className="w-2 h-2 rounded-full bg-muted-foreground/30 shrink-0" />
-            <span className="text-xs font-semibold text-foreground">Inactive Blocks ({inactiveBlocks.length})</span>
-            <span className="text-[10px] text-muted-foreground">Available but not included in the prompt order</span>
+            <span className="text-xs font-semibold text-foreground">{t(lang, 'inactiveBlocks', { count: inactiveBlocks.length })}</span>
+            <span className="text-[10px] text-muted-foreground">{t(lang, 'inactiveBlocksDesc')}</span>
           </div>
           <div className="space-y-1">
             {inactiveBlocks.map(block => {
@@ -371,7 +374,7 @@ function PromptBlockList({ blocks, promptOrder, onBlocksChange, onOrderChange }:
                     {block.marker && <span className={cn(badge, 'bg-amber-500/10 text-amber-400/60 border-amber-500/20')}>Marker</span>}
                     <button onClick={() => setEditingId(isEditing ? null : block.identifier)}
                       className="px-2.5 py-1 rounded border border-border/40 text-xs text-muted-foreground/60 hover:text-foreground transition-colors shrink-0">
-                      {isEditing ? 'Close' : 'Edit'}
+                      {isEditing ? t(lang, 'close') : t(lang, 'edit')}
                     </button>
                   </div>
                   {!block.marker && isEditing && (
@@ -392,6 +395,7 @@ function PresetForm({ preset, onSave, onCancel }: {
   onSave: (p: ChatCompletionPreset) => void;
   onCancel: () => void;
 }) {
+  const lang = useLang();
   const [form, setForm] = useState<ChatCompletionPreset>(preset);
   const [tab, setTab] = useState<'sampler'|'prompts'|'advanced'>('sampler');
   const [tagInput, setTagInput] = useState('');
@@ -406,9 +410,9 @@ function PresetForm({ preset, onSave, onCancel }: {
     setForm(f => ({ ...f, samplerEnabled: { ...f.samplerEnabled, [key]: enabled } }));
 
   const addTag = () => {
-    const t = tagInput.trim();
-    if (!t || form.tags.includes(t)) return;
-    set({ tags: [...form.tags, t] });
+    const tag = tagInput.trim();
+    if (!tag || form.tags.includes(tag)) return;
+    set({ tags: [...form.tags, tag] });
     setTagInput('');
   };
 
@@ -417,43 +421,45 @@ function PresetForm({ preset, onSave, onCancel }: {
   return (
     <div className="bg-card border border-card-border rounded-xl overflow-hidden">
       <div className="p-5 space-y-4 border-b border-border">
-        <h2 className="text-lg font-semibold">{preset.name ? `Edit: ${preset.name}` : 'New Preset'}</h2>
+        <h2 className="text-lg font-semibold">
+          {preset.name ? t(lang, 'editPreset', { name: preset.name }) : t(lang, 'newPreset')}
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Name *</label>
+            <label className="text-xs font-medium text-muted-foreground">{t(lang, 'nameRequired')}</label>
             <input className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
               value={form.name} onChange={e => set({ name: e.target.value })} placeholder="My Preset" />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Description</label>
+            <label className="text-xs font-medium text-muted-foreground">{t(lang, 'description')}</label>
             <input className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
               value={form.description || ''} onChange={e => set({ description: e.target.value })} placeholder="Optional description" />
           </div>
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Tags</label>
+          <label className="text-xs font-medium text-muted-foreground">{t(lang, 'tags')}</label>
           <div className="flex flex-wrap gap-1.5 mb-2">
             {form.tags.map(tag => (
               <span key={tag} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent text-accent-foreground text-xs border border-accent-border">
                 {tag}
-                <button onClick={() => set({ tags: form.tags.filter(t => t !== tag) })} className="text-accent-foreground/60 hover:text-accent-foreground ml-0.5">×</button>
+                <button onClick={() => set({ tags: form.tags.filter(x => x !== tag) })} className="text-accent-foreground/60 hover:text-accent-foreground ml-0.5">×</button>
               </span>
             ))}
           </div>
           <div className="flex gap-2">
             <input className="flex-1 px-2.5 py-1.5 rounded bg-input border border-border text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               value={tagInput} onChange={e => setTagInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addTag()} placeholder="Add tag..." />
-            <button onClick={addTag} className="px-3 py-1.5 rounded bg-secondary text-secondary-foreground text-xs border border-secondary-border">Add</button>
+              onKeyDown={e => e.key === 'Enter' && addTag()} placeholder={t(lang, 'addTagPlaceholder')} />
+            <button onClick={addTag} className="px-3 py-1.5 rounded bg-secondary text-secondary-foreground text-xs border border-secondary-border">{t(lang, 'add')}</button>
           </div>
         </div>
       </div>
 
       <div className="flex border-b border-border">
-        {(['sampler','prompts','advanced'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} className={cn('flex-1 py-2.5 text-xs font-medium capitalize transition-colors',
-            tab === t ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground')}>
-            {t === 'sampler' ? 'Sampler' : t === 'prompts' ? 'Prompt Blocks' : 'Advanced'}
+        {(['sampler','prompts','advanced'] as const).map(tabId => (
+          <button key={tabId} onClick={() => setTab(tabId)} className={cn('flex-1 py-2.5 text-xs font-medium capitalize transition-colors',
+            tab === tabId ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground')}>
+            {tabId === 'sampler' ? t(lang, 'samplerTab') : tabId === 'prompts' ? t(lang, 'promptBlocksTab') : t(lang, 'advancedTab')}
           </button>
         ))}
       </div>
@@ -462,9 +468,8 @@ function PresetForm({ preset, onSave, onCancel }: {
         {tab === 'sampler' && (
           <div className="space-y-6">
 
-            {/* Core Sampling Parameters */}
             <div>
-              <h3 className="text-sm font-semibold text-foreground mb-1">Core Sampling Parameters</h3>
+              <h3 className="text-sm font-semibold text-foreground mb-1">{t(lang, 'coreSamplingParams')}</h3>
               <div>
                 {(['temperature','top_p','top_k','min_p'] as SamplerSettingKey[]).map(key => (
                   <SamplerSlider key={key} name={key}
@@ -475,9 +480,8 @@ function PresetForm({ preset, onSave, onCancel }: {
               </div>
             </div>
 
-            {/* Penalty Parameters */}
             <div>
-              <h3 className="text-sm font-semibold text-foreground mb-1">Penalty Parameters</h3>
+              <h3 className="text-sm font-semibold text-foreground mb-1">{t(lang, 'penaltyParams')}</h3>
               <div>
                 {(['frequency_penalty','presence_penalty','repetition_penalty'] as SamplerSettingKey[]).map(key => (
                   <SamplerSlider key={key} name={key}
@@ -488,17 +492,16 @@ function PresetForm({ preset, onSave, onCancel }: {
               </div>
             </div>
 
-            {/* Context & Token Limits */}
             <div>
-              <h3 className="text-sm font-semibold text-foreground mb-3">Context & Token Limits</h3>
+              <h3 className="text-sm font-semibold text-foreground mb-3">{t(lang, 'contextTokenLimits')}</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-foreground">Max Context</label>
+                  <label className="text-sm font-medium text-foreground">{t(lang, 'maxContext')}</label>
                   <input type="number" min={512} max={2000000} step={1}
                     value={form.sampler.openai_max_context}
                     onChange={e => set({ sampler: { ...form.sampler, openai_max_context: Number(e.target.value) } })}
                     className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
-                  <p className="text-[11px] text-muted-foreground">Maximum context window size (internal use)</p>
+                  <p className="text-[11px] text-muted-foreground">{t(lang, 'maxContextDesc')}</p>
                 </div>
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
@@ -506,20 +509,19 @@ function PresetForm({ preset, onSave, onCancel }: {
                       checked={form.samplerEnabled?.openai_max_tokens ?? false}
                       onChange={e => toggleSamplerEnabled('openai_max_tokens', e.target.checked)}
                       className="accent-primary cursor-pointer" />
-                    <label htmlFor="max-tokens-enabled" className="text-sm font-medium text-foreground cursor-pointer select-none">Max Response Tokens</label>
+                    <label htmlFor="max-tokens-enabled" className="text-sm font-medium text-foreground cursor-pointer select-none">{t(lang, 'maxResponseTokens')}</label>
                   </div>
                   <input type="number" min={1} max={32768} step={1}
                     value={form.sampler.openai_max_tokens}
                     onChange={e => setSampler('openai_max_tokens', Number(e.target.value))}
                     className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
-                  <p className="text-[11px] text-muted-foreground">Maximum tokens in response</p>
+                  <p className="text-[11px] text-muted-foreground">{t(lang, 'maxTokensDesc')}</p>
                 </div>
               </div>
             </div>
 
-            {/* Generation Settings */}
             <div>
-              <h3 className="text-sm font-semibold text-foreground mb-3">Generation Settings</h3>
+              <h3 className="text-sm font-semibold text-foreground mb-3">{t(lang, 'generationSettings')}</h3>
               <div className={cn('space-y-1.5 transition-opacity', !(form.samplerEnabled?.seed ?? false) && 'opacity-60')}>
                 <div className="flex items-center gap-2">
                   <input type="checkbox" id="seed-enabled"
@@ -532,7 +534,7 @@ function PresetForm({ preset, onSave, onCancel }: {
                   value={form.sampler.seed}
                   onChange={e => setSampler('seed', Number(e.target.value))}
                   className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
-                <p className="text-[11px] text-muted-foreground">-1 for random. Same seed = reproducible outputs.</p>
+                <p className="text-[11px] text-muted-foreground">{t(lang, 'seedDesc')}</p>
               </div>
             </div>
 
@@ -541,12 +543,12 @@ function PresetForm({ preset, onSave, onCancel }: {
 
         {tab === 'prompts' && (
           <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">Edit prompt blocks content. Import a SillyTavern preset JSON to populate the full structure.</p>
+            <p className="text-xs text-muted-foreground">{t(lang, 'promptBlocksDesc')}</p>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Assistant Prefill</label>
+              <label className="text-xs font-medium text-muted-foreground">{t(lang, 'assistantPrefillLabel')}</label>
               <input className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 value={form.assistantPrefill} onChange={e => set({ assistantPrefill: e.target.value })}
-                placeholder="Prefill the assistant's first message..." />
+                placeholder={t(lang, 'assistantPrefillPlaceholder')} />
             </div>
             <PromptBlockList
               blocks={form.promptBlocks}
@@ -560,15 +562,14 @@ function PresetForm({ preset, onSave, onCancel }: {
         {tab === 'advanced' && (
           <div className="space-y-7">
 
-            {/* ── Provider Settings ── */}
             <div>
-              <h3 className="text-sm font-semibold text-foreground mb-0.5">Provider Settings</h3>
-              <p className="text-[11px] text-muted-foreground mb-3">Settings specific to different API providers</p>
+              <h3 className="text-sm font-semibold text-foreground mb-0.5">{t(lang, 'providerSettingsSection')}</h3>
+              <p className="text-[11px] text-muted-foreground mb-3">{t(lang, 'providerSettingsDesc')}</p>
               <div className="space-y-2">
                 {([
-                  { key: 'claudeUseSysprompt',      label: 'Use Claude System Prompt',    desc: 'Merge system messages into a separate system instruction field (Claude)' },
-                  { key: 'makersuiteUseSysprompt',   label: 'Use MakerSuite System Prompt', desc: 'Merge system messages into a separate system instruction field (Gemini)' },
-                  { key: 'squashSystemMessages',     label: 'Squash System Messages',       desc: 'Combine consecutive System messages into a single message (deprecated)' },
+                  { key: 'claudeUseSysprompt',     label: t(lang, 'claudeSyspromptLabel'), desc: t(lang, 'claudeSyspromptDesc') },
+                  { key: 'makersuiteUseSysprompt',  label: t(lang, 'geminiSyspromptLabel'), desc: t(lang, 'geminiSyspromptDesc') },
+                  { key: 'squashSystemMessages',    label: t(lang, 'squashSystemLabel'),    desc: t(lang, 'squashSystemDesc') },
                 ] as { key: keyof typeof form.providerSettings; label: string; desc: string }[]).map(({ key, label, desc }) => (
                   <label key={key} className={cn('flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
                     (form.providerSettings[key] as boolean) ? 'border-primary/30 bg-primary/5' : 'border-border hover:border-border/80')}>
@@ -582,18 +583,15 @@ function PresetForm({ preset, onSave, onCancel }: {
                   </label>
                 ))}
               </div>
-              <p className="text-[11px] text-muted-foreground mt-2.5 italic">
-                Note: Streaming is controlled by the JanitorAI request, not preset settings.
-              </p>
+              <p className="text-[11px] text-muted-foreground mt-2.5 italic">{t(lang, 'streamingNote')}</p>
             </div>
 
-            {/* ── Reasoning Settings ── */}
             <div>
-              <h3 className="text-sm font-semibold text-foreground mb-0.5">Reasoning Settings</h3>
-              <p className="text-[11px] text-muted-foreground mb-3">Settings for models that support reasoning/thinking modes</p>
+              <h3 className="text-sm font-semibold text-foreground mb-0.5">{t(lang, 'reasoningSettings')}</h3>
+              <p className="text-[11px] text-muted-foreground mb-3">{t(lang, 'reasoningSettingsDesc')}</p>
               <div className="flex items-start gap-4">
                 <div className="flex-1 space-y-1">
-                  <label className="text-xs font-medium text-foreground">Reasoning Effort</label>
+                  <label className="text-xs font-medium text-foreground">{t(lang, 'reasoningEffortLabel')}</label>
                   <select className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                     value={form.advancedSettings.reasoningEffort}
                     onChange={e => set({ advancedSettings: { ...form.advancedSettings, reasoningEffort: e.target.value as 'auto' | 'low' | 'medium' | 'high' } })}>
@@ -603,10 +601,10 @@ function PresetForm({ preset, onSave, onCancel }: {
                     <option value="high">High</option>
                   </select>
                   <p className="text-[11px] text-muted-foreground">
-                    {form.advancedSettings.reasoningEffort === 'auto' ? 'Let the model decide' :
-                     form.advancedSettings.reasoningEffort === 'low'  ? 'Faster, less thorough reasoning' :
-                     form.advancedSettings.reasoningEffort === 'medium' ? 'Balanced reasoning depth' :
-                     'Maximum reasoning depth (slower)'}
+                    {form.advancedSettings.reasoningEffort === 'auto' ? t(lang, 'reasoningAuto') :
+                     form.advancedSettings.reasoningEffort === 'low'  ? t(lang, 'reasoningLow') :
+                     form.advancedSettings.reasoningEffort === 'medium' ? t(lang, 'reasoningMedium') :
+                     t(lang, 'reasoningHigh')}
                   </p>
                 </div>
                 <label className={cn('flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors min-w-[180px]',
@@ -615,22 +613,21 @@ function PresetForm({ preset, onSave, onCancel }: {
                     onChange={e => set({ advancedSettings: { ...form.advancedSettings, showThoughts: e.target.checked } })}
                     className="accent-primary mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-xs font-medium text-foreground">Show Thoughts</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Display model reasoning in responses</p>
+                    <p className="text-xs font-medium text-foreground">{t(lang, 'showThoughtsLabel')}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{t(lang, 'showThoughtsDesc')}</p>
                   </div>
                 </label>
               </div>
             </div>
 
-            {/* ── Advanced Features ── */}
             <div>
-              <h3 className="text-sm font-semibold text-foreground mb-0.5">Advanced Features</h3>
+              <h3 className="text-sm font-semibold text-foreground mb-0.5">{t(lang, 'advancedFeatures')}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {([
-                  { key: 'functionCalling',  label: 'Enable Function Calling', desc: 'Allow model to call functions/tools' },
-                  { key: 'enableWebSearch',  label: 'Enable Web Search',        desc: 'Enrich prompts with search results' },
-                  { key: 'wrapInQuotes',     label: 'Wrap in Quotes',           desc: 'Wrap user messages in hidden quotation marks (deprecated)' },
-                  { key: 'maxContextUnlocked', label: 'Unlock Max Context',     desc: 'Allow higher context limits' },
+                  { key: 'functionCalling',    label: t(lang, 'functionCallingLabel'), desc: t(lang, 'functionCallingDesc') },
+                  { key: 'enableWebSearch',    label: t(lang, 'webSearchLabel'),       desc: t(lang, 'webSearchDesc') },
+                  { key: 'wrapInQuotes',       label: t(lang, 'wrapInQuotesLabel'),    desc: t(lang, 'wrapInQuotesDesc') },
+                  { key: 'maxContextUnlocked', label: t(lang, 'unlockMaxContextLabel'), desc: t(lang, 'unlockMaxContextDesc') },
                 ] as { key: keyof typeof form.advancedSettings; label: string; desc: string }[]).map(({ key, label, desc }) => (
                   <label key={key} className={cn('flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
                     (form.advancedSettings[key] as boolean) ? 'border-primary/30 bg-primary/5' : 'border-border hover:border-border/80')}>
@@ -646,18 +643,17 @@ function PresetForm({ preset, onSave, onCancel }: {
               </div>
             </div>
 
-            {/* ── Start Reply With ── */}
             <div>
-              <h3 className="text-sm font-semibold text-foreground mb-0.5">Start Reply With</h3>
-              <p className="text-[11px] text-muted-foreground mb-3">Prepend text to the beginning of every AI response. Useful for forcing a specific format or style.</p>
+              <h3 className="text-sm font-semibold text-foreground mb-0.5">{t(lang, 'startReplyWith')}</h3>
+              <p className="text-[11px] text-muted-foreground mb-3">{t(lang, 'startReplyWithDesc')}</p>
               <label className={cn('flex items-center gap-2 mb-3 cursor-pointer')}>
                 <input type="checkbox" checked={form.advancedSettings.startReplyWith.enabled}
                   onChange={e => set({ advancedSettings: { ...form.advancedSettings, startReplyWith: { ...form.advancedSettings.startReplyWith, enabled: e.target.checked } } })}
                   className="accent-primary" />
-                <span className="text-xs font-medium text-foreground">Enable Start Reply With</span>
+                <span className="text-xs font-medium text-foreground">{t(lang, 'enableStartReplyWith')}</span>
               </label>
               <div className="space-y-1">
-                <label className="text-[11px] text-muted-foreground">Content to prepend</label>
+                <label className="text-[11px] text-muted-foreground">{t(lang, 'contentToPrepend')}</label>
                 <textarea
                   className="w-full px-3 py-2 rounded-lg bg-input border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none disabled:opacity-40"
                   rows={3}
@@ -675,10 +671,10 @@ function PresetForm({ preset, onSave, onCancel }: {
 
       <div className="flex items-center gap-3 px-5 py-4 border-t border-border">
         <div className="flex-1" />
-        <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
+        <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-colors">{t(lang, 'cancel')}</button>
         <button onClick={() => onSave(form)} disabled={!isValid}
           className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-40">
-          Save Preset
+          {t(lang, 'savePreset')}
         </button>
       </div>
     </div>
@@ -846,6 +842,7 @@ export default function Presets() {
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const fileRef = useRef<HTMLInputElement>(null);
+  const lang = useLang();
 
   const load = useCallback(() => setPresets(storage.presets.getAll()), []);
   useEffect(() => { load(); }, [load]);
@@ -904,7 +901,7 @@ export default function Presets() {
         load();
         setImportError(null);
       } else {
-        setImportError('Failed to parse preset file. Make sure it is a valid SillyTavern preset JSON.');
+        setImportError(t(lang, 'importParseError'));
         setTimeout(() => setImportError(null), 5000);
       }
     };
@@ -916,19 +913,19 @@ export default function Presets() {
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Presets</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage Chat Completion presets. Import SillyTavern presets or create your own.</p>
+          <h1 className="text-2xl font-bold text-foreground">{t(lang, 'presetsTitle')}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t(lang, 'presetsSubtitle')}</p>
         </div>
         {!showNew && !editing && (
           <div className="flex gap-2 shrink-0">
             <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
             <button onClick={() => fileRef.current?.click()}
               className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-secondary-border text-sm font-medium transition-colors">
-              <Upload size={14} /> Import
+              <Upload size={14} /> {t(lang, 'import')}
             </button>
             <button onClick={() => setShowNew(true)}
               className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">
-              <Plus size={14} /> New
+              <Plus size={14} /> {t(lang, 'newBtn')}
             </button>
           </div>
         )}
@@ -945,12 +942,12 @@ export default function Presets() {
       {presets.length === 0 && !showNew ? (
         <div className="text-center py-16 bg-card border border-card-border rounded-xl">
           <ScrollText size={32} className="mx-auto mb-3 text-muted-foreground opacity-40" />
-          <p className="text-muted-foreground text-sm">No presets yet.</p>
-          <p className="text-xs text-muted-foreground mt-1">Import a SillyTavern preset or create a new one.</p>
+          <p className="text-muted-foreground text-sm">{t(lang, 'noPresetsYet')}</p>
+          <p className="text-xs text-muted-foreground mt-1">{t(lang, 'noPresetsHint')}</p>
           <div className="flex items-center justify-center gap-3 mt-4">
-            <button onClick={() => fileRef.current?.click()} className="text-primary text-sm hover:underline flex items-center gap-1"><Upload size={13} /> Import</button>
-            <span className="text-muted-foreground">or</span>
-            <button onClick={() => setShowNew(true)} className="text-primary text-sm hover:underline flex items-center gap-1"><Plus size={13} /> Create</button>
+            <button onClick={() => fileRef.current?.click()} className="text-primary text-sm hover:underline flex items-center gap-1"><Upload size={13} /> {t(lang, 'import')}</button>
+            <span className="text-muted-foreground">{t(lang, 'importOrCreate')}</span>
+            <button onClick={() => setShowNew(true)} className="text-primary text-sm hover:underline flex items-center gap-1"><Plus size={13} /> {t(lang, 'create')}</button>
           </div>
         </div>
       ) : (
@@ -958,9 +955,9 @@ export default function Presets() {
           {presets.length > 1 && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <ArrowUpDown size={12} className="shrink-0" />
-              <span className="mr-1">Sort:</span>
+              <span className="mr-1">{t(lang, 'sortLabel')}</span>
               {(['alpha', 'date', 'blocks'] as SortKey[]).map(key => {
-                const label = key === 'alpha' ? 'Alphabetical' : key === 'date' ? 'Date Added' : 'Block Count';
+                const label = key === 'alpha' ? t(lang, 'sortAlpha') : key === 'date' ? t(lang, 'sortDate') : t(lang, 'sortBlocks');
                 const active = sortKey === key;
                 const Icon = active ? (sortDir === 'asc' ? ArrowUp : ArrowDown) : null;
                 return (
@@ -985,11 +982,11 @@ export default function Presets() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold text-foreground">{preset.name}</h3>
-                      {preset.id === activeId && <span className="text-xs bg-primary/15 text-primary border border-primary/30 px-2 py-0.5 rounded-full">Active</span>}
+                      {preset.id === activeId && <span className="text-xs bg-primary/15 text-primary border border-primary/30 px-2 py-0.5 rounded-full">{t(lang, 'activeLabel')}</span>}
                     </div>
                     {preset.description && <p className="text-xs text-muted-foreground mt-0.5">{preset.description}</p>}
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                      <span className="text-xs text-muted-foreground">{preset.promptBlocks.length} blocks</span>
+                      <span className="text-xs text-muted-foreground">{t(lang, 'blocksCount', { count: String(preset.promptBlocks.length) })}</span>
                       {preset.tags.map(tag => (
                         <span key={tag} className="text-xs bg-accent/50 text-accent-foreground border border-accent-border px-1.5 py-0.5 rounded-full flex items-center gap-1">
                           <Tag size={9} />{tag}
@@ -1006,7 +1003,7 @@ export default function Presets() {
                     </button>
                     <button onClick={() => handleDelete(preset.id)}
                       className={cn('p-2 rounded-lg transition-colors', deleteConfirm === preset.id ? 'bg-destructive/20 text-destructive' : 'hover:bg-secondary text-muted-foreground hover:text-destructive')}
-                      title={deleteConfirm === preset.id ? 'Click again to confirm' : 'Delete'}>
+                      title={deleteConfirm === preset.id ? t(lang, 'clickAgainConfirm') : 'Delete'}>
                       <Trash2 size={14} />
                     </button>
                   </div>
